@@ -1,0 +1,26 @@
+# Obyo Option
+
+> Obyo Option, ikili opsiyon (binary options) ticareti yapan kullanıcılar için geliştirilmiş bir demo ticaret platformudur. Forex ve OTC paritelerinde (AUD/CAD, AUD/CHF, AUD/JPY vb.) gerçek zamanlı piyasa simülasyonu sunar.
+
+## Genel Bakış
+
+Obyo Option; kullanıcıların demo bakiye ile YUKARI/AŞAĞI (CALL/PUT) tahminleri yaparak ikili opsiyon ticaretini öğrenmesini sağlayan bir eğitim ve simülasyon platformudur. Platform gerçek para ticareti sunmaz.
+
+## Kamuya Açık Sayfalar
+
+- /          : Ana sayfa — canlı grafik, işlem kontrolleri, varlık seçimi
+- /privacy   : Gizlilik Politikası — KVKK/GDPR, veri toplama ve güvenlik bilgileri
+
+## Önemli Bilgiler
+
+- Desteklenen varlıklar: 13 Forex/OTC paritesi ve Bitcoin Cash (OTC)
+- İşlem süresi: 5 saniyeden 1 saate kadar seçilebilir vadeler
+- Payout oranı: %84–88 arasında değişir
+- Platform dili: Türkçe
+- Güvenlik: ISO/IEC 27001:2022, SSL/TLS 256-bit, IFMRRC Lisanslı, PCI DSS Uyumlu
+
+## İletişim ve Yasal
+
+- Gizlilik sorular için: privacy@obyo.io
+- Yasal: Obyo Financial Technologies Ltd., 85 Great Portland Street, London, W1W 7LT, United Kingdom
+- Bu platform yatırım tavsiyesi vermez. Demo sonuçlar gerçek piyasa performansını garanti etmez.
