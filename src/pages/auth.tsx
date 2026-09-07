@@ -39,7 +39,7 @@ export default function AuthPage() {
     if (mode === "login") {
       const res = await login(form.email, form.password);
       if (!res.success) { setErr(res.error ?? t.loginFailed); setLoading(false); return; }
-      const isAdm = form.email.trim().toLowerCase() === "admin@gmail.com";
+      const isAdm = form.email.trim().toLowerCase() === "admin@obyo.com";
       navigate(isAdm ? "/admin" : "/");
     } else {
       const res = await register({ ...form, currency });
@@ -60,11 +60,13 @@ export default function AuthPage() {
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
         className="flex flex-col items-center mb-8"
       >
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 overflow-hidden mb-3">
-          <img src="/logo.jpg" alt="Obyo" className="h-full w-full object-cover" />
-        </div>
-        <p className="text-xl font-black text-white">Obyo Option</p>
-        <p className="text-xs text-[#FF6B00] font-bold mt-0.5">Profesyonel Opsiyon Trading</p>
+        <img
+          src="/logo.png"
+          alt="Obyo Option"
+          className="h-14 w-14 object-contain mb-2 drop-shadow-[0_4px_16px_rgba(255,107,0,0.3)]"
+        />
+        <p className="text-xl font-black text-white">Obyo <span className="text-[#FF6B00]">Option</span></p>
+        <p className="text-xs text-white/50 font-medium mt-0.5">Profesyonel Opsiyon Trading</p>
       </motion.div>
 
       {/* Card */}

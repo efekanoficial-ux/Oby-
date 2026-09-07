@@ -1,17 +1,23 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import firebaseConfig from "../../firebase-applet-config.json";
 
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummyDevKeyForObyoOption123456",
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "obyo-option.firebaseapp.com",
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID || "obyo-option",
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "obyo-option.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "100000000000",
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID || "1:100000000000:web:obyo1234567890",
-};
-
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db   = getFirestore(app);
+export const db = (firebaseConfig as any).firestoreDatabaseId
+  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+  : getFirestore(app);
+
+// Connection test according to Firebase guidelines
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, "test", "connection"));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("the client is offline")) {
+      console.warn("Firestore connection check: client is offline or initializing.");
+    }
+  }
+}
+testConnection();

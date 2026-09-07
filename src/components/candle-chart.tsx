@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import type { DrawingItem, DrawingType } from "@/types/drawing";
 import {
   createChart,
   ColorType,
@@ -43,9 +44,14 @@ interface Props {
   activeEntries?: (ActiveEntry & { amount?: number })[];
   /** Increment to trigger a scroll-to-live (recenter) from outside. */
   goLiveKey?: number;
+  /** Active chart drawings (horizontal, vertical, trend) */
+  drawings?: DrawingItem[];
+  onDrawingsChange?: (drawings: DrawingItem[]) => void;
+  onDeleteDrawing?: (id: string) => void;
 }
 
 const ASSET_DIGITS: Record<string, number> = {
+  "Crypto IDX": 2,
   "AUD/CAD": 5,
   "AUD/CHF": 5,
   "AUD/DKK": 4,
@@ -57,7 +63,6 @@ const ASSET_DIGITS: Record<string, number> = {
   "AUD/SGD": 5,
   "AUD/USD": 5,
   "AUD/ZAR": 4,
-  "Bitcoin Cash (OTC)": 2,
   "CAD/CHF": 5,
 };
 
@@ -75,19 +80,21 @@ function ExpiryCountdownBadge({ expiryTime, x, color }: { expiryTime: number; x:
   return (
     <div style={{
       position: "absolute",
-      left: x + 4,
+      left: x - 6,
       top: 8,
-      background: "rgba(0,0,0,0.72)",
-      border: "1px solid rgba(255,255,255,0.15)",
+      transform: "translateX(-100%)",
+      background: "rgba(0,0,0,0.85)",
+      border: "1px solid rgba(246,70,93,0.5)",
       borderRadius: 5,
-      padding: "2px 5px",
+      padding: "2px 6px",
       fontSize: 10,
-      fontWeight: 700,
-      color: "#fff",
+      fontWeight: 800,
+      color: "#f6465d",
       whiteSpace: "nowrap",
       letterSpacing: "0.03em",
       fontFamily: "monospace",
       pointerEvents: "none",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
     }}>
       {label}
     </div>
@@ -184,6 +191,9 @@ export function CandleChart({
   onRealDataChange,
   onLoadingChange,
   goLiveKey,
+  drawings = [],
+  onDrawingsChange,
+  onDeleteDrawing,
 }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -197,6 +207,8 @@ export function CandleChart({
   const bbDnRef     = useRef<ISeriesApi<"Line"> | null>(null);
   const bbMidRef    = useRef<ISeriesApi<"Line"> | null>(null);
   const activeEntriesRef = useRef<(ActiveEntry & { amount?: number })[]>([]);
+  const drawingsRef = useRef<DrawingItem[]>(drawings);
+  const onDrawingsRef = useRef(onDrawingsChange);
   const rafPendingRef    = useRef(false);
 
   type EntryOverlay = {
@@ -205,8 +217,40 @@ export function CandleChart({
     expiryTime?: number;  // ms
     stableKey: number;    // entryTime ms — unique per trade, used as React key
   };
-  type OverlayState = { dotX: number; dotY: number; entries: EntryOverlay[] };
+
+  type DrawingOverlay = {
+    id: string;
+    type: DrawingType;
+    color: string;
+    width: number;
+    dashed?: boolean;
+    y?: number | null;
+    x?: number | null;
+    p1?: { x: number; y: number } | null;
+    p2?: { x: number; y: number } | null;
+    priceLabel?: string;
+    timeLabel?: string;
+  };
+
+  type OverlayState = {
+    dotX: number;
+    dotY: number;
+    entries: EntryOverlay[];
+    drawings: DrawingOverlay[];
+  };
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
+  const [activeDrawingId, setActiveDrawingId] = useState<string | null>(null);
+
+  const dragRef = useRef<{
+    id: string;
+    handle: "line" | "p1" | "p2" | "mid";
+    startX: number;
+    startY: number;
+    origPrice?: number;
+    origTime?: number;
+    origP1?: { time: number; price: number };
+    origP2?: { time: number; price: number };
+  } | null>(null);
 
   /* data */
   const baseCandlesRef    = useRef<Candle[]>([]);  // raw 5s candles from server
@@ -309,19 +353,73 @@ export function CandleChart({
          is correct: they show exactly where the trade opened and where it expired. */
       const entries: EntryOverlay[] = activeEntriesRef.current
         .map(ae => {
-          const entryY_c  = activeSeries2?.priceToCoordinate(ae.entryPrice) ?? null;
+          const entryY_c = activeSeries2?.priceToCoordinate(ae.entryPrice) ?? null;
+          const currentPrice = live.close;
+          const isWinning = ae.direction === "UP" 
+            ? currentPrice >= ae.entryPrice 
+            : currentPrice <= ae.entryPrice;
+          
+          // Green (#0ecb81) if winning, Red (#f6465d) if losing
+          const statusColor = isWinning ? "#0ecb81" : "#f6465d";
+
           return {
             expiryX:    dotX + (ae.expiryTime / 1000 - live.time) * pxPerSec,
             entryX:     dotX + (ae.entryTime  / 1000 - live.time) * pxPerSec,
             entryY:     entryY_c !== null ? (entryY_c as unknown as number) : undefined,
-            lineColor:  ae.direction === "UP" ? "#0ecb81" : "#f6465d",
+            lineColor:  statusColor,
             amount:     ae.amount,
             expiryTime: ae.expiryTime,
             stableKey:  ae.entryTime,  // ms — unique per trade, stable across re-renders
           };
         });
 
-      setOverlay({ dotX, dotY, entries });
+      const calcX = (tSec: number): number | null => {
+        const coord = ts.timeToCoordinate(tSec as unknown as Time);
+        if (coord !== null) return coord as unknown as number;
+        return dotX + (tSec - live.time) * pxPerSec;
+      };
+
+      const initDigits = digits ?? (symbol ? ASSET_DIGITS[symbol] : undefined) ?? 5;
+      const currentDrawings = drawingsRef.current || [];
+      const dOverlays: DrawingOverlay[] = currentDrawings.map((d) => {
+        const item: DrawingOverlay = {
+          id: d.id,
+          type: d.type,
+          color: d.color,
+          width: d.width,
+          dashed: d.dashed,
+          y: null,
+          x: null,
+          p1: null,
+          p2: null,
+        };
+        if (d.type === "horizontal" && d.price !== undefined) {
+          const y = activeSeries2?.priceToCoordinate(d.price) ?? null;
+          if (y !== null) {
+            item.y = y as unknown as number;
+            item.priceLabel = d.price >= 100 ? d.price.toFixed(2) : d.price.toFixed(initDigits);
+          }
+        } else if (d.type === "vertical" && d.time !== undefined) {
+          const x = calcX(d.time);
+          if (x !== null) {
+            item.x = x;
+            const dt = new Date(d.time * 1000);
+            item.timeLabel = `${dt.getHours().toString().padStart(2, "0")}:${dt.getMinutes().toString().padStart(2, "0")}:${dt.getSeconds().toString().padStart(2, "0")}`;
+          }
+        } else if (d.type === "trend" && d.p1 && d.p2) {
+          const x1 = calcX(d.p1.time);
+          const y1 = activeSeries2?.priceToCoordinate(d.p1.price) ?? null;
+          const x2 = calcX(d.p2.time);
+          const y2 = activeSeries2?.priceToCoordinate(d.p2.price) ?? null;
+          if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+            item.p1 = { x: x1, y: y1 as unknown as number };
+            item.p2 = { x: x2, y: y2 as unknown as number };
+          }
+        }
+        return item;
+      });
+
+      setOverlay({ dotX, dotY, entries, drawings: dOverlays });
     });
   };
 
@@ -487,17 +585,27 @@ export function CandleChart({
           const d = new Date(ts * 1000);
           const hh = d.getHours().toString().padStart(2, "0");
           const mm = d.getMinutes().toString().padStart(2, "0");
-          return `${hh}:${mm}`;
+          const ss = d.getSeconds().toString().padStart(2, "0");
+          return `${hh}:${mm}:${ss}`;
         },
       },
       timeScale: {
         borderColor: "transparent",
         borderVisible: false,
         timeVisible: true,
-        secondsVisible: false,
+        secondsVisible: true,
         fixLeftEdge: false,
         fixRightEdge: false,
         ticksVisible: false,
+        tickMarkFormatter: (time: number, _tickMarkType: number) => {
+          const ts = typeof time === "number" ? time : Number(time);
+          if (!Number.isFinite(ts)) return "";
+          const d = new Date(ts * 1000);
+          const hh = d.getHours().toString().padStart(2, "0");
+          const mm = d.getMinutes().toString().padStart(2, "0");
+          const ss = d.getSeconds().toString().padStart(2, "0");
+          return `${hh}:${mm}:${ss}`;
+        },
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
       handleScale:  { mouseWheel: true, axisPressedMouseMove: true, pinch: true },
@@ -731,6 +839,114 @@ export function CandleChart({
     }
   }, [showBollinger]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ── DRAWINGS SYNC ──────────────────────────────────────────────────── */
+  useEffect(() => {
+    drawingsRef.current = drawings;
+    scheduleOverlayUpdate();
+  }, [drawings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onDrawingsRef.current = onDrawingsChange;
+  }, [onDrawingsChange]);
+
+  /* ── POINTER DRAG FOR DRAWING HANDLES ───────────────────────────────── */
+  const handleStartDrag = (id: string, handle: "line" | "p1" | "p2" | "mid", e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setActiveDrawingId(id);
+    const d = drawingsRef.current.find((x) => x.id === id);
+    if (!d) return;
+    dragRef.current = {
+      id,
+      handle,
+      startX: e.clientX,
+      startY: e.clientY,
+      origPrice: d.price,
+      origTime: d.time,
+      origP1: d.p1 ? { ...d.p1 } : undefined,
+      origP2: d.p2 ? { ...d.p2 } : undefined,
+    };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current || !containerRef.current) return;
+    const { id, handle, startX, startY, origP1, origP2 } = dragRef.current;
+    const isCandle2 = chartTypeRef.current === "candle";
+    const activeSeries2 = isCandle2 ? seriesRef.current : areaRef.current;
+    const ts = chartRef.current?.timeScale();
+    if (!activeSeries2 || !ts) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const curY = Math.max(8, Math.min(rect.height - 8, e.clientY - rect.top));
+    const curX = e.clientX - rect.left;
+
+    const newPrice = activeSeries2.coordinateToPrice(curY);
+    const live = liveBucketRef.current;
+    const bucketSec = bucketSecsRef.current;
+    let newTime = live ? Math.round(live.time + (curX - (overlay?.dotX ?? curX)) * (bucketSec / 8)) : Math.floor(Date.now() / 1000);
+
+    const logical = ts.coordinateToLogical(curX);
+    if (logical !== null) {
+      const totalBars = chartBarsRef.current;
+      if (live && totalBars > 0) {
+        const barDiff = (logical as number) - (totalBars - 1);
+        newTime = Math.round(live.time + barDiff * bucketSec);
+      }
+    }
+
+    const updated = drawingsRef.current.map((item) => {
+      if (item.id !== id) return item;
+      if (item.type === "horizontal") {
+        return { ...item, price: newPrice !== null ? Number(newPrice) : item.price };
+      }
+      if (item.type === "vertical") {
+        return { ...item, time: newTime };
+      }
+      if (item.type === "trend") {
+        if (handle === "p1") {
+          return {
+            ...item,
+            p1: { time: newTime, price: newPrice !== null ? Number(newPrice) : (item.p1?.price ?? 0) },
+          };
+        }
+        if (handle === "p2") {
+          return {
+            ...item,
+            p2: { time: newTime, price: newPrice !== null ? Number(newPrice) : (item.p2?.price ?? 0) },
+          };
+        }
+        if (handle === "mid" && origP1 && origP2) {
+          const startPriceVal = activeSeries2.coordinateToPrice(startY - rect.top) ?? origP1.price;
+          const curPriceVal = activeSeries2.coordinateToPrice(e.clientY - rect.top) ?? origP1.price;
+          const deltaPrice = Number(curPriceVal) - Number(startPriceVal);
+          const deltaTime = Math.round((e.clientX - startX) * (bucketSec / 8));
+          return {
+            ...item,
+            p1: { time: origP1.time + deltaTime, price: origP1.price + deltaPrice },
+            p2: { time: origP2.time + deltaTime, price: origP2.price + deltaPrice },
+          };
+        }
+      }
+      return item;
+    });
+
+    drawingsRef.current = updated;
+    onDrawingsRef.current?.(updated);
+    scheduleOverlayUpdate();
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (dragRef.current) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+      } catch {}
+      dragRef.current = null;
+    }
+  };
+
   /* ── ACTIVE ENTRIES OVERLAY ──────────────────────────────────────────── */
   useEffect(() => {
     activeEntriesRef.current = activeEntries;
@@ -744,56 +960,276 @@ export function CandleChart({
   }, [goLiveKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative w-full h-full">
+    <div
+      className="relative w-full h-full"
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       <div ref={containerRef} className="w-full h-full" style={{ touchAction: "none" }} />
 
-      {/* ── Chart overlay: price dot + trade lines ──────────────────────── */}
+      {/* ── Chart overlay: drawings + price dot + trade lines ───────────── */}
       {overlay && !isLoading && (
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 3 }}>
 
-          {/* Per-entry: solid expiry line + horizontal line + amount bubble at entry */}
+          {/* SVG Drawings Layer */}
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", pointerEvents: "none" }}>
+            {overlay.drawings?.map((d) => {
+              if (d.type === "horizontal" && d.y !== null && d.y !== undefined) {
+                return (
+                  <g key={d.id} style={{ pointerEvents: "auto" }}>
+                    {/* Hit area for dragging horizontal line */}
+                    <line
+                      x1={0} y1={d.y} x2="100%" y2={d.y}
+                      stroke="transparent" strokeWidth={24}
+                      className="cursor-ns-resize"
+                      onPointerDown={(e) => handleStartDrag(d.id, "line", e)}
+                    />
+                    {/* Visual Line */}
+                    <line
+                      x1={0} y1={d.y} x2="100%" y2={d.y}
+                      stroke={d.color} strokeWidth={d.width}
+                      strokeDasharray={d.dashed ? "6,4" : undefined}
+                    />
+                    {/* Center Handle */}
+                    <circle
+                      cx="50%" cy={d.y} r={6}
+                      fill={d.color} stroke="#121318" strokeWidth={2}
+                      className="cursor-ns-resize shadow-md"
+                      onPointerDown={(e) => handleStartDrag(d.id, "line", e)}
+                    />
+                  </g>
+                );
+              }
+              if (d.type === "vertical" && d.x !== null && d.x !== undefined) {
+                return (
+                  <g key={d.id} style={{ pointerEvents: "auto" }}>
+                    {/* Hit area for dragging vertical line */}
+                    <line
+                      x1={d.x} y1={0} x2={d.x} y2="100%"
+                      stroke="transparent" strokeWidth={24}
+                      className="cursor-ew-resize"
+                      onPointerDown={(e) => handleStartDrag(d.id, "line", e)}
+                    />
+                    {/* Visual Line */}
+                    <line
+                      x1={d.x} y1={0} x2={d.x} y2="100%"
+                      stroke={d.color} strokeWidth={d.width}
+                      strokeDasharray={d.dashed ? "6,4" : undefined}
+                    />
+                    {/* Center Handle */}
+                    <circle
+                      cx={d.x} cy="50%" r={6}
+                      fill={d.color} stroke="#121318" strokeWidth={2}
+                      className="cursor-ew-resize shadow-md"
+                      onPointerDown={(e) => handleStartDrag(d.id, "line", e)}
+                    />
+                  </g>
+                );
+              }
+              if (d.type === "trend" && d.p1 && d.p2 && d.p1.x !== null && d.p1.y !== null && d.p2.x !== null && d.p2.y !== null) {
+                const midX = (d.p1.x + d.p2.x) / 2;
+                const midY = (d.p1.y + d.p2.y) / 2;
+                return (
+                  <g key={d.id} style={{ pointerEvents: "auto" }}>
+                    {/* Hit area for trend line (midpoint drag) */}
+                    <line
+                      x1={d.p1.x} y1={d.p1.y} x2={d.p2.x} y2={d.p2.y}
+                      stroke="transparent" strokeWidth={26}
+                      className="cursor-move"
+                      onPointerDown={(e) => handleStartDrag(d.id, "mid", e)}
+                    />
+                    {/* Visual Line */}
+                    <line
+                      x1={d.p1.x} y1={d.p1.y} x2={d.p2.x} y2={d.p2.y}
+                      stroke={d.color} strokeWidth={d.width}
+                      strokeDasharray={d.dashed ? "6,4" : undefined}
+                    />
+                    {/* Midpoint Handle */}
+                    <circle
+                      cx={midX} cy={midY} r={5}
+                      fill={d.color} opacity={0.7}
+                      className="cursor-move"
+                      onPointerDown={(e) => handleStartDrag(d.id, "mid", e)}
+                    />
+                    {/* P1 Handle */}
+                    <circle
+                      cx={d.p1.x} cy={d.p1.y} r={7}
+                      fill={d.color} stroke="#121318" strokeWidth={2}
+                      className="cursor-pointer"
+                      onPointerDown={(e) => handleStartDrag(d.id, "p1", e)}
+                    />
+                    {/* P2 Handle */}
+                    <circle
+                      cx={d.p2.x} cy={d.p2.y} r={7}
+                      fill={d.color} stroke="#121318" strokeWidth={2}
+                      className="cursor-pointer"
+                      onPointerDown={(e) => handleStartDrag(d.id, "p2", e)}
+                    />
+                  </g>
+                );
+              }
+              return null;
+            })}
+          </svg>
+
+          {/* Drawing Badges (Price / Time / Delete) */}
+          {overlay.drawings?.map((d) => (
+            <div key={`badge-${d.id}`}>
+              {/* Horizontal Price Badge & Delete */}
+              {d.type === "horizontal" && d.y !== null && d.y !== undefined && (
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 48,
+                    top: d.y - 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    pointerEvents: "auto",
+                  }}
+                >
+                  <span
+                    style={{
+                      background: d.color,
+                      color: "#000",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                      userSelect: "none",
+                    }}
+                  >
+                    {d.priceLabel}
+                  </span>
+                  {activeDrawingId === d.id && onDeleteDrawing && (
+                    <button
+                      onClick={() => onDeleteDrawing(d.id)}
+                      style={{
+                        background: "#FF3366",
+                        color: "#fff",
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        fontSize: 11,
+                        fontWeight: "bold",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.6)",
+                      }}
+                      title="Sil"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Vertical Time Badge */}
+              {d.type === "vertical" && d.x !== null && d.x !== undefined && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: d.x,
+                    bottom: 22,
+                    transform: "translateX(-50%)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 2,
+                    pointerEvents: "auto",
+                  }}
+                >
+                  <span
+                    style={{
+                      background: d.color,
+                      color: "#000",
+                      fontSize: 9,
+                      fontWeight: 800,
+                      padding: "1px 5px",
+                      borderRadius: 4,
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                      userSelect: "none",
+                    }}
+                  >
+                    {d.timeLabel}
+                  </span>
+                  {activeDrawingId === d.id && onDeleteDrawing && (
+                    <button
+                      onClick={() => onDeleteDrawing(d.id)}
+                      style={{
+                        background: "#FF3366",
+                        color: "#fff",
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        fontSize: 10,
+                        fontWeight: "bold",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title="Sil"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Per-entry: red expiry line + thin dotted level line + semi-transparent amount bubble */}
           {overlay.entries.map((entry) => (
             <div key={entry.stableKey}>
-              {/* Solid vertical expiry line */}
+              {/* Red vertical expiry line */}
               <div style={{
                 position: "absolute",
                 left: entry.expiryX,
                 top: 0, bottom: 0, width: 0,
-                borderLeft: `1.5px solid ${entry.lineColor}cc`,
+                borderLeft: "1.5px solid #f6465d",
+                boxShadow: "0 0 6px rgba(246, 70, 93, 0.35)",
               }} />
 
-              {/* Countdown badge near top of expiry line */}
+              {/* Countdown badge on the LEFT of the expiry line */}
               {entry.expiryTime !== undefined && entry.expiryX > 10 && (
-                <ExpiryCountdownBadge expiryTime={entry.expiryTime} x={entry.expiryX} color={entry.lineColor} />
+                <ExpiryCountdownBadge expiryTime={entry.expiryTime} x={entry.expiryX} color="#f6465d" />
               )}
 
-              {/* Horizontal entry line from entry-time to expiry-time */}
+              {/* Thin dotted horizontal entry line (Green if winning, Red if losing) */}
               {entry.entryY !== undefined && (
                 <div style={{
                   position: "absolute",
                   left: entry.entryX,
                   top: entry.entryY - 0.75,
                   width: Math.max(0, entry.expiryX - entry.entryX),
-                  height: 1.5,
-                  background: entry.lineColor,
-                  opacity: 0.9,
+                  height: 0,
+                  borderTop: `1.5px dotted ${entry.lineColor}`,
+                  opacity: 0.95,
                 }} />
               )}
 
-              {/* Amount bubble at the entry point (left side) */}
+              {/* Semi-transparent amount bubble at entry level */}
               {entry.amount !== undefined && entry.entryY !== undefined && (
                 <div style={{
                   position: "absolute",
                   left: entry.entryX,
                   top: entry.entryY - 22,
                   transform: "translateX(-50%)",
-                  background: entry.lineColor,
-                  borderRadius: 10,
-                  padding: "2px 8px",
+                  background: entry.lineColor === "#0ecb81"
+                    ? "rgba(14, 203, 129, 0.30)"
+                    : "rgba(246, 70, 93, 0.30)",
+                  border: `1px solid ${entry.lineColor}70`,
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  borderRadius: 8,
+                  padding: "2px 7px",
                   fontSize: 10, fontWeight: 800,
-                  color: entry.lineColor === "#0ecb81" ? "#000" : "#fff",
+                  color: "#ffffff",
                   whiteSpace: "nowrap",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.55)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
                   letterSpacing: "0.02em",
                 }}>
                   ${entry.amount}

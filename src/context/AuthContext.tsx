@@ -6,15 +6,16 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import {
-  doc, setDoc, updateDoc, addDoc, collection,
+  doc, setDoc, updateDoc, addDoc, collection, getDocs,
   onSnapshot, query, orderBy, where, increment,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
-const ADMIN_EMAIL    = "admin@gmail.com";
-const ADMIN_PASSWORD = "adminobyo";
+const ADMIN_EMAIL    = "admin@obyo.com";
+const ADMIN_PASSWORD = "ruhi123";
 const LS_IS_ADMIN    = "obyo_is_admin";
+const LS_CUSTOM_UID  = "obyo_custom_user_id";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface ObyoUser {
@@ -23,6 +24,7 @@ export interface ObyoUser {
   name:           string;
   surname:        string;
   birthDate:      string;
+  photoURL?:      string;
   currency:       "TL" | "USD";
   demoBalance:    number;
   realBalance:    number;
@@ -68,6 +70,7 @@ interface AuthContextType {
   addBalanceDirect: (userId: string, amount: number, userName: string, userEmail: string) => Promise<void>;
   placeRealTrade:   (amount: number) => Promise<boolean>;
   settleRealTrade:  (amount: number, won: boolean, payout: number) => Promise<void>;
+  updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -93,28 +96,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Safety fallback timer so loading screen never hangs if Firestore connection is delayed
+    const fallbackTimer = setTimeout(() => {
+      setReady(true);
+    }, 4000);
+
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (localStorage.getItem(LS_IS_ADMIN) === "1") {
+        setIsAdmin(true);
         setReady(true);
+        clearTimeout(fallbackTimer);
         return;
       }
-      if (userUnsubRef.current) { userUnsubRef.current(); userUnsubRef.current = null; }
 
-      if (firebaseUser) {
-        userUnsubRef.current = onSnapshot(doc(db, "users", firebaseUser.uid), (snap) => {
-          if (snap.exists()) {
-            setCurrentUser({ id: snap.id, ...snap.data() } as ObyoUser);
-          } else {
+      if (userUnsubRef.current) {
+        userUnsubRef.current();
+        userUnsubRef.current = null;
+      }
+
+      const uidToFetch = firebaseUser?.uid || localStorage.getItem(LS_CUSTOM_UID);
+
+      if (uidToFetch) {
+        if (firebaseUser) {
+          localStorage.removeItem(LS_CUSTOM_UID);
+        }
+        userUnsubRef.current = onSnapshot(
+          doc(db, "users", uidToFetch),
+          (snap) => {
+            if (snap.exists()) {
+              setCurrentUser({ id: snap.id, ...snap.data() } as ObyoUser);
+            } else {
+              setCurrentUser(null);
+            }
+            setReady(true);
+            clearTimeout(fallbackTimer);
+          },
+          (err) => {
+            if (err.code !== "permission-denied") console.error("Firestore user snapshot error:", err);
             setCurrentUser(null);
+            setReady(true);
+            clearTimeout(fallbackTimer);
           }
-        });
+        );
       } else {
         setCurrentUser(null);
+        setReady(true);
+        clearTimeout(fallbackTimer);
       }
-      setReady(true);
     });
 
     return () => {
+      clearTimeout(fallbackTimer);
       unsubAuth();
       if (userUnsubRef.current) userUnsubRef.current();
     };
@@ -132,6 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .map(d => ({ id: d.id, ...d.data() }) as ObyoRequest)
         .sort((a, b) => b.createdAt - a.createdAt);
       setRequests(sorted);
+    }, (err) => {
+      if (err.code !== "permission-denied") console.error(err);
     });
     return () => unsub();
   }, [currentUser?.id]);
@@ -144,12 +178,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() }) as ObyoUser));
+    }, (err) => {
+      if (err.code !== "permission-denied") console.error(err);
     });
 
     const unsubReqs = onSnapshot(
       query(collection(db, "requests"), orderBy("createdAt", "desc")),
       (snap) => {
         setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }) as ObyoRequest));
+      },
+      (err) => {
+        if (err.code !== "permission-denied") console.error(err);
       }
     );
 
@@ -171,9 +210,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithEmailAndPassword(auth, e, password);
       localStorage.removeItem(LS_IS_ADMIN);
+      localStorage.removeItem(LS_CUSTOM_UID);
       return { success: true };
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
+
+      // Fallback check in Firestore if Firebase Auth is disabled or user created via fallback
+      if (code === "auth/operation-not-allowed" || code === "auth/user-not-found" || code === "auth/invalid-credential") {
+        try {
+          const q = query(collection(db, "users"), where("email", "==", e));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const userDoc = snap.docs[0];
+            const uData = userDoc.data();
+            if (uData.password && uData.password !== password) {
+              return { success: false, error: "Şifre hatalı." };
+            }
+            localStorage.removeItem(LS_IS_ADMIN);
+            localStorage.setItem(LS_CUSTOM_UID, userDoc.id);
+            setCurrentUser({ id: userDoc.id, ...uData } as ObyoUser);
+            return { success: true };
+          }
+        } catch (dbErr) {
+          console.error("Firestore user lookup error:", dbErr);
+        }
+      }
+
       if (code === "auth/user-not-found" || code === "auth/invalid-credential" || code === "auth/invalid-email")
         return { success: false, error: "Bu e-posta ile kayıtlı hesap bulunamadı." };
       if (code === "auth/wrong-password")
@@ -189,40 +251,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!e || !data.password || !data.name || !data.surname || !data.birthDate)
       return { success: false, error: "Lütfen tüm alanları doldurun." };
 
+    const currency    = data.currency ?? "USD";
+    const demoBalance = currency === "TL" ? 120000 : 10000;
+
+    let uid = "";
+    let isFirebaseAuth = false;
+
     try {
       const cred = await createUserWithEmailAndPassword(auth, e, data.password);
-      const uid  = cred.user.uid;
-      const currency    = data.currency ?? "USD";
-      const demoBalance = currency === "TL" ? 120000 : 10000;
-
-      await setDoc(doc(db, "users", uid), {
-        email:          e,
-        name:           data.name.trim(),
-        surname:        data.surname.trim(),
-        birthDate:      data.birthDate,
-        currency,
-        demoBalance,
-        realBalance:    0,
-        totalDeposited: 0,
-        totalWithdrawn: 0,
-        createdAt:      Date.now(),
-      });
-
-      localStorage.removeItem(LS_IS_ADMIN);
-      localStorage.setItem("obyo_tutorial_done", "1");
-      return { success: true };
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? "";
+      uid = cred.user.uid;
+      isFirebaseAuth = true;
+    } catch (authErr: any) {
+      const code = authErr.code ?? "";
       if (code === "auth/email-already-in-use")
         return { success: false, error: "Bu e-posta adresi zaten kayıtlı." };
       if (code === "auth/weak-password")
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
-      return { success: false, error: "Kayıt yapılamadı. Lütfen tekrar deneyin." };
+
+      // Handle operation-not-allowed seamlessly by storing user directly in Firestore
+      if (code === "auth/operation-not-allowed" || code === "auth/admin-restricted-operation" || code === "auth/unauthorized-domain") {
+        try {
+          const q = query(collection(db, "users"), where("email", "==", e));
+          const existingSnap = await getDocs(q);
+          if (!existingSnap.empty) {
+            return { success: false, error: "Bu e-posta adresi zaten kayıtlı." };
+          }
+        } catch (qErr) {
+          console.error("Error checking existing user:", qErr);
+        }
+        uid = "usr_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+      } else {
+        return { success: false, error: `Kayıt yapılamadı (Auth): ${authErr.message || code}` };
+      }
     }
+
+    const userData = {
+      email:          e,
+      password:       data.password,
+      name:           data.name.trim(),
+      surname:        data.surname.trim(),
+      birthDate:      data.birthDate,
+      currency,
+      demoBalance,
+      realBalance:    0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      createdAt:      Date.now(),
+    };
+
+    try {
+      await setDoc(doc(db, "users", uid), userData, { merge: true });
+    } catch (dbErr: any) {
+      console.error("Firebase db setDoc error:", dbErr);
+      return { success: false, error: `Kayıt yapılamadı (DB): ${dbErr.message || "Bilinmeyen veritabanı hatası"}` };
+    }
+
+    localStorage.removeItem(LS_IS_ADMIN);
+    localStorage.setItem("obyo_tutorial_done", "1");
+
+    if (!isFirebaseAuth) {
+      localStorage.setItem(LS_CUSTOM_UID, uid);
+      setCurrentUser({ id: uid, ...userData } as ObyoUser);
+    }
+
+    return { success: true };
   };
 
   const logout = async () => {
     localStorage.removeItem(LS_IS_ADMIN);
+    localStorage.removeItem(LS_CUSTOM_UID);
     if (auth.currentUser) await signOut(auth);
     setCurrentUser(null);
     setIsAdmin(false);
@@ -232,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const addRequest = async (data: Omit<ObyoRequest, "id" | "status" | "createdAt">): Promise<string> => {
     const ref = await addDoc(collection(db, "requests"), {
       ...data,
+      amount: Number(data.amount) || 0,
       status:    "pending",
       createdAt: Date.now(),
     });
@@ -239,45 +337,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const processRequest = async (id: string, accept: boolean) => {
-    const req = requests.find(r => r.id === id);
-    if (!req || req.status !== "pending") return;
+    try {
+      const req = requests.find(r => r.id === id);
+      if (!req) {
+        alert("İstek bulunamadı.");
+        return;
+      }
+      if (req.status !== "pending") {
+        alert("Bu istek zaten işlenmiş veya iptal edilmiş.");
+        return;
+      }
 
-    await updateDoc(doc(db, "requests", id), {
-      status: accept ? "accepted" : "rejected",
-    });
+      const amt = Number(req.amount) || 0;
 
-    if (!accept) return;
+      // Update request status safely with merge
+      await setDoc(doc(db, "requests", id), {
+        status: accept ? "accepted" : "rejected",
+        processedAt: Date.now(),
+      }, { merge: true });
 
-    const userRef = doc(db, "users", req.userId);
-    if (req.type === "deposit") {
-      await updateDoc(userRef, {
-        realBalance:    increment(req.amount),
-        totalDeposited: increment(req.amount),
-      });
-    } else {
-      await updateDoc(userRef, {
-        realBalance:    increment(-req.amount),
-        totalWithdrawn: increment(req.amount),
-      });
+      if (!accept) return;
+
+      if (req.userId) {
+        const userRef = doc(db, "users", req.userId);
+        if (req.type === "deposit") {
+          await setDoc(userRef, {
+            realBalance:    increment(amt),
+            totalDeposited: increment(amt),
+          }, { merge: true });
+        } else {
+          await setDoc(userRef, {
+            realBalance:    increment(-amt),
+            totalWithdrawn: increment(amt),
+          }, { merge: true });
+        }
+      }
+    } catch (err: any) {
+      console.error("[processRequest Error]:", err);
+      alert("İstek işlenirken bir hata oluştu: " + (err?.message || err));
     }
   };
 
   const addBalanceDirect = async (userId: string, amount: number, userName: string, userEmail: string) => {
-    await updateDoc(doc(db, "users", userId), {
-      realBalance:    increment(amount),
-      totalDeposited: increment(amount),
-    });
-    await addDoc(collection(db, "requests"), {
-      userId,
-      userEmail,
-      userName,
-      type:      "deposit",
-      amount,
-      currency:  "USD",
-      method:    "Admin Transferi",
-      status:    "accepted",
-      createdAt: Date.now(),
-    });
+    try {
+      const amt = Number(amount) || 0;
+      await setDoc(doc(db, "users", userId), {
+        realBalance:    increment(amt),
+        totalDeposited: increment(amt),
+      }, { merge: true });
+
+      await addDoc(collection(db, "requests"), {
+        userId,
+        userEmail,
+        userName,
+        type:      "deposit",
+        amount:    amt,
+        currency:  "USD",
+        method:    "Admin Transferi",
+        status:    "accepted",
+        createdAt: Date.now(),
+      });
+    } catch (err: any) {
+      console.error("[addBalanceDirect Error]:", err);
+      alert("Bakiye eklenirken hata oluştu: " + (err?.message || err));
+    }
   };
 
   /* ── Real trade actions ──────────────────────────────────────────────── */
@@ -298,6 +421,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const updateProfilePhoto = async (photoUrl: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: "Oturum açılmamış." };
+    try {
+      const userRef = doc(db, "users", currentUser.id);
+      await setDoc(userRef, { photoURL: photoUrl }, { merge: true });
+      setCurrentUser(prev => prev ? { ...prev, photoURL: photoUrl } : null);
+      return { success: true };
+    } catch (err: any) {
+      console.error("updateProfilePhoto error:", err);
+      return { success: false, error: err?.message || "Profil fotoğrafı kaydedilemedi." };
+    }
+  };
+
   const refreshUser  = () => {};
   const refreshAdmin = () => {};
 
@@ -307,7 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, register, logout,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
-      placeRealTrade, settleRealTrade,
+      placeRealTrade, settleRealTrade, updateProfilePhoto,
       refreshUser, refreshAdmin,
     }}>
       {children}

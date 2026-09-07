@@ -5,6 +5,7 @@ import {
   query, where, limit,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 
 /** Written by home.tsx on every price tick; read at trade settlement to determine win/loss. */
 export const livePriceRegistry: Record<string, number> = {};
@@ -21,6 +22,9 @@ export type CompletedTrade = {
   id: string; asset: string; direction: TradeDirection;
   amount: number; result: TradeResult; profit: number; closedAt: number;
   mode?: "demo" | "real";
+  entryPrice?: number;
+  exitPrice?: number;
+  duration?: number;
 };
 
 type DemoAccountContextType = {
@@ -78,7 +82,8 @@ async function fsRemoveActiveTrade(firestoreId: string) {
 
 /* ─── Provider ─────────────────────────────────────────────────────────────── */
 export function DemoAccountProvider({ children }: { children: ReactNode }) {
-  const uid     = auth.currentUser?.uid ?? "guest";
+  const { currentUser } = useAuth();
+  const uid     = currentUser?.id ?? auth.currentUser?.uid ?? "guest";
   const isGuest = uid === "guest";
 
   const [balance,         setBalance]         = useState<number>(isGuest ? loadGuestBalance() : INITIAL_BALANCE);
@@ -97,6 +102,8 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
         const val = snap.data().demoBalance;
         if (typeof val === "number") setBalance(val);
       }
+    }, (err) => {
+      if (err.code !== "permission-denied") console.error(err);
     });
     return () => unsub();
   }, [uid, isGuest]);
@@ -125,7 +132,9 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
         setTradesLoading(false);
       },
       (err) => {
-        console.error("[DemoAccount] trades onSnapshot error:", err.code, err.message);
+        if (err.code !== "permission-denied") {
+          console.error("[DemoAccount] trades onSnapshot error:", err.code, err.message);
+        }
         setTradesLoading(false);
       }
     );
@@ -137,46 +146,55 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
     if (isGuest) return;
 
     (async () => {
-      const now = Date.now();
-      const q = query(collection(db, "activeTrades"), where("userId", "==", uid));
-      const snap = await getDocs(q);
-      if (snap.empty) return;
+      try {
+        const now = Date.now();
+        const q = query(collection(db, "activeTrades"), where("userId", "==", uid));
+        const snap = await getDocs(q);
+        if (snap.empty) return;
 
-      const expired: (Trade & { fsId: string })[] = [];
-      const still:   (Trade & { fsId: string })[] = [];
+        const expired: (Trade & { fsId: string })[] = [];
+        const still:   (Trade & { fsId: string })[] = [];
 
-      snap.docs.forEach(d => {
-        const t = { fsId: d.id, ...d.data() } as Trade & { fsId: string };
-        if (now >= t.startTime + t.duration * 1000) expired.push(t);
-        else still.push(t);
-      });
+        snap.docs.forEach(d => {
+          const t = { fsId: d.id, ...d.data() } as Trade & { fsId: string };
+          if (now >= t.startTime + t.duration * 1000) expired.push(t);
+          else still.push(t);
+        });
 
-      /* Restore still-running trades into state */
-      if (still.length > 0) {
-        setActiveTrades(still.map(({ fsId: _f, ...t }) => t));
-      }
+        /* Restore still-running trades into state */
+        if (still.length > 0) {
+          setActiveTrades(still.map(({ fsId: _f, ...t }) => t));
+        }
 
-      /* Immediately settle expired trades */
-      for (const trade of expired) {
-        const currentPrice = livePriceRegistry[trade.asset] ?? trade.startPrice;
-        const isWin  = trade.direction === "UP"
-          ? currentPrice >= trade.startPrice
-          : currentPrice <= trade.startPrice;
-        const profit = isWin ? +(trade.amount * 0.85).toFixed(2) : -trade.amount;
+        /* Immediately settle expired trades */
+        for (const trade of expired) {
+          const currentPrice = livePriceRegistry[trade.asset] ?? trade.startPrice;
+          const isWin  = trade.direction === "UP"
+            ? currentPrice >= trade.startPrice
+            : currentPrice <= trade.startPrice;
+          const profit = isWin ? +(trade.amount * 0.85).toFixed(2) : -trade.amount;
 
-        try {
-          if (isWin) {
-            await updateDoc(doc(db, "users", uid), { demoBalance: increment(trade.amount + profit) });
+          try {
+            if (isWin) {
+              await updateDoc(doc(db, "users", uid), { demoBalance: increment(trade.amount + profit) });
+            }
+            await addDoc(collection(db, "trades"), {
+              userId: uid, tradeId: trade.id,
+              asset: trade.asset, direction: trade.direction,
+              amount: trade.amount, result: isWin ? "WIN" : "LOSE", profit, closedAt: now,
+              mode: "demo",
+              entryPrice: trade.startPrice,
+              exitPrice: currentPrice,
+              duration: trade.duration,
+            });
+            await fsRemoveActiveTrade(trade.fsId);
+          } catch (e: unknown) {
+            console.error("[DemoAccount] expired trade settle failed:", e);
           }
-          await addDoc(collection(db, "trades"), {
-            userId: uid, tradeId: trade.id,
-            asset: trade.asset, direction: trade.direction,
-            amount: trade.amount, result: isWin ? "WIN" : "LOSE", profit, closedAt: now,
-            mode: "demo",
-          });
-          await fsRemoveActiveTrade(trade.fsId);
-        } catch (e: unknown) {
-          console.error("[DemoAccount] expired trade settle failed:", e);
+        }
+      } catch (err: any) {
+        if (err?.code !== "permission-denied") {
+          console.error("[DemoAccount] Restore active trades failed:", err);
         }
       }
     })();
@@ -218,6 +236,10 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
           const completed: CompletedTrade = {
             id: trade.id, asset: trade.asset, direction: trade.direction,
             amount: trade.amount, result: isWin ? "WIN" : "LOSE", profit, closedAt: now,
+            mode: "demo",
+            entryPrice: trade.startPrice,
+            exitPrice: currentPrice,
+            duration: trade.duration,
           };
           setCompletedTrades(prev => {
             const next = [completed, ...prev];
@@ -232,6 +254,10 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
           const completed: CompletedTrade = {
             id: trade.id, asset: trade.asset, direction: trade.direction,
             amount: trade.amount, result: isWin ? "WIN" : "LOSE", profit, closedAt: now,
+            mode: "demo",
+            entryPrice: trade.startPrice,
+            exitPrice: currentPrice,
+            duration: trade.duration,
           };
           setCompletedTrades(prev => [completed, ...prev]);
 
@@ -245,6 +271,9 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
               asset: trade.asset, direction: trade.direction,
               amount: trade.amount, result: isWin ? "WIN" : "LOSE", profit, closedAt: now,
               mode: "demo",
+              entryPrice: trade.startPrice,
+              exitPrice: currentPrice,
+              duration: trade.duration,
             });
             /* Remove from activeTrades collection by matching our local id field */
             const aq = query(
@@ -254,8 +283,10 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
             );
             const aSnap = await getDocs(aq);
             for (const d of aSnap.docs) await fsRemoveActiveTrade(d.id);
-          } catch (e: unknown) {
-            console.error("[DemoAccount] trade settle failed:", e);
+          } catch (e: any) {
+            if (e?.code !== "permission-denied") {
+              console.error("[DemoAccount] trade settle failed:", e);
+            }
           }
         }
       });

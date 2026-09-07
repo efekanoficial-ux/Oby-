@@ -38,6 +38,7 @@ export default function Admin() {
   const [tab,      setTab]      = useState<AdminTab>("requests");
   const [filter,   setFilter]   = useState<ReqFilter>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [processingReq, setProcessingReq] = useState<string | null>(null);
 
   /* Direct balance per-user input state */
   const [addAmounts, setAddAmounts]   = useState<Record<string, string>>({});
@@ -75,12 +76,10 @@ export default function Admin() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 overflow-hidden">
-            <img src="/logo.jpg" alt="Obyo" className="h-full w-full object-cover" />
-          </div>
+          <img src="/logo.png" alt="Obyo" className="h-8 w-8 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(255,107,0,0.25)]" />
           <div>
             <p className="text-sm font-black text-white leading-none">Admin Panel</p>
-            <p className="text-[10px] text-[#FF6B00] font-bold">admin@obyo.io</p>
+            <p className="text-[10px] text-[#FF6B00] font-bold">admin@obyo.com</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -233,16 +232,26 @@ export default function Admin() {
                           {req.status === "pending" && (
                             <div className="flex gap-2 mt-1">
                               <motion.button whileTap={{ scale: 0.97 }}
-                                onClick={() => processRequest(req.id, true)}
-                                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black text-black"
+                                disabled={processingReq === req.id}
+                                onClick={async () => {
+                                  setProcessingReq(req.id);
+                                  await processRequest(req.id, true);
+                                  setProcessingReq(null);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black text-black disabled:opacity-50"
                                 style={{ background: "linear-gradient(135deg,#0ecb81,#05a660)" }}>
-                                <Check size={13} /> Onayla
+                                <Check size={13} /> {processingReq === req.id ? "İşleniyor..." : "Onayla"}
                               </motion.button>
                               <motion.button whileTap={{ scale: 0.97 }}
-                                onClick={() => processRequest(req.id, false)}
-                                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black text-white"
+                                disabled={processingReq === req.id}
+                                onClick={async () => {
+                                  setProcessingReq(req.id);
+                                  await processRequest(req.id, false);
+                                  setProcessingReq(null);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black text-white disabled:opacity-50"
                                 style={{ background: "rgba(246,70,93,0.15)", border: "1px solid rgba(246,70,93,0.25)" }}>
-                                <X size={13} className="text-[#f6465d]" /> Reddet
+                                <X size={13} className="text-[#f6465d]" /> {processingReq === req.id ? "İşleniyor..." : "Reddet"}
                               </motion.button>
                             </div>
                           )}
@@ -277,9 +286,13 @@ export default function Admin() {
                   style={{ background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
                   <button onClick={() => setExpanded(isOpen ? null : u.id)}
                     className="flex items-center gap-3 w-full p-4 text-left">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-black"
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-black overflow-hidden"
                       style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}>
-                      {u.name.charAt(0)}{u.surname.charAt(0)}
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt={u.name} className="h-full w-full object-cover" />
+                      ) : (
+                        `${u.name.charAt(0)}${u.surname.charAt(0)}`
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">

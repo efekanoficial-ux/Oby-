@@ -3,6 +3,7 @@ import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { WalletModal } from "@/components/wallet-modal";
+import { AnimatedBalance } from "@/components/animated-balance";
 import {
   Globe, Building2, Bitcoin, Banknote, CreditCard,
   ArrowDownLeft, ArrowUpRight,
@@ -65,6 +66,8 @@ export default function Balance() {
   const { currentUser, requests } = useAuth();
   const { balance: demoBalance }  = useDemoAccount();
   const { isReal }                = useAccountMode();
+  const currency = (currentUser as any)?.currency ?? "USD";
+  const sym = currency === "TL" ? "₺" : "$";
   const [showWallet, setShowWallet]   = useState(false);
   const [activeTab, setActiveTab]     = useState<"deposit" | "withdraw">("deposit");
   const [walletTab, setWalletTab]     = useState<"deposit" | "withdraw">("deposit");
@@ -155,12 +158,12 @@ export default function Balance() {
               Mevcut Bakiye
             </p>
             <div className="flex items-end gap-0.5">
-              <span className="text-2xl font-black mb-0.5"
-                style={{ color: isReal ? "rgba(14,203,129,0.6)" : "rgba(255,107,0,0.6)" }}>$</span>
-              <span className="text-5xl font-black tabular-nums leading-none tracking-tight"
-                style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}>
-                {balance.toFixed(2)}
-              </span>
+              <AnimatedBalance
+                value={balance}
+                currency={currency}
+                className="text-5xl font-black leading-none tracking-tight"
+                style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}
+              />
             </div>
             {!isReal && (
               <p className="text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.22)" }}>
@@ -175,14 +178,14 @@ export default function Balance() {
               <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
                 style={{ color: "rgba(255,255,255,0.2)" }}>Yatırılan</p>
               <p className="text-sm font-black tabular-nums"
-                style={{ color: "rgba(255,255,255,0.5)" }}>${totalDeposited.toFixed(2)}</p>
+                style={{ color: "rgba(255,255,255,0.5)" }}>{sym}{totalDeposited.toFixed(2)}</p>
             </div>
             <div className="w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
                 style={{ color: "rgba(255,255,255,0.2)" }}>Çekilen</p>
               <p className="text-sm font-black tabular-nums"
-                style={{ color: "rgba(255,255,255,0.5)" }}>${totalWithdrawn.toFixed(2)}</p>
+                style={{ color: "rgba(255,255,255,0.5)" }}>{sym}{totalWithdrawn.toFixed(2)}</p>
             </div>
             {pendingReqs.length > 0 && (
               <>
@@ -291,7 +294,7 @@ export default function Balance() {
                       #{r.id.slice(0, 8)}
                     </p>
                   </div>
-                  <span className="text-sm font-black text-[#FFB800]">${r.amount}</span>
+                  <span className="text-sm font-black text-[#FFB800]">{sym}{r.amount}</span>
                 </div>
               ))}
             </motion.div>

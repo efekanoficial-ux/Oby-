@@ -1,24 +1,29 @@
 import { useDemoAccount, type CompletedTrade } from "@/context/DemoAccountContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useState, useEffect } from "react";
 import { onSnapshot, query, collection, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { TrendingUp, Clock, BarChart2, Zap, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
+import { Link } from "wouter";
+import { AssetIcon } from "@/lib/asset-icons";
 
 type Filter = "ALL" | "WIN" | "LOSE";
 
-function fmt(ts: number) {
-  return new Date(ts).toLocaleDateString("tr-TR", {
+function fmt(ts: number, langCode: string) {
+  const locale = langCode === "tr" ? "tr-TR" : "en-US";
+  return new Date(ts).toLocaleDateString(locale, {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
   });
 }
 
-function reltime(ts: number) {
+function reltime(ts: number, langCode: string) {
   const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60)   return `${diff}s önce`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}dk önce`;
-  return `${Math.floor(diff / 3600)}sa önce`;
+  const isTr = langCode === "tr";
+  if (diff < 60)   return `${diff}${isTr ? "s önce" : "s ago"}`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}${isTr ? "dk önce" : "m ago"}`;
+  return `${Math.floor(diff / 3600)}${isTr ? "sa önce" : "h ago"}`;
 }
 
 function fmtCountdown(ms: number) {
@@ -38,30 +43,11 @@ interface RealActiveTrade {
   amount: number; entryPrice: number; entryTime: number; expiryTime: number;
 }
 
-/* ── Win-rate ring ─────────────────────────────────────────────────────── */
-function WinRing({ win, total, accent }: { win: number; total: number; accent: string }) {
-  const pct  = total === 0 ? 0 : Math.round((win / total) * 100);
-  const r    = 28;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
+/* ── Asset Flag Icon Helper ────────────────────────────────────────────── */
+function renderAssetIcon(assetLabel: string) {
   return (
-    <div className="flex flex-col items-center justify-center" style={{ minWidth: 72 }}>
-      <svg width={72} height={72} viewBox="0 0 72 72">
-        <circle cx={36} cy={36} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={6} />
-        <circle cx={36} cy={36} r={r} fill="none"
-          stroke={accent}
-          strokeWidth={6}
-          strokeDasharray={`${dash} ${circ}`}
-          strokeDashoffset={circ / 4}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dasharray 0.6s ease" }}
-        />
-        <text x={36} y={37} textAnchor="middle" dominantBaseline="middle"
-          fill={accent} fontSize={13} fontWeight={900}>
-          {pct}%
-        </text>
-      </svg>
-      <p className="text-[9px] text-white/30 font-bold mt-0.5 uppercase tracking-wider">Başarı</p>
+    <div className="h-9 w-9 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+      <AssetIcon label={assetLabel} size={24} />
     </div>
   );
 }
@@ -70,142 +56,105 @@ export default function History() {
   const { completedTrades, activeTrades, tradesLoading } = useDemoAccount();
   const { isReal } = useAccountMode();
   const { currentUser } = useAuth();
+  const { t, langCode } = useLanguage();
+  const currency = (currentUser as any)?.currency ?? "USD";
+  const sym = currency === "TL" ? "₺" : "$";
+
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [realActiveTrades, setRealActiveTrades] = useState<RealActiveTrade[]>([]);
   const [now, setNow] = useState(Date.now());
 
-  /* Accent color — mirrors balance.tsx logic */
-  const accent = isReal ? "#0ecb81" : "#FF6B00";
+  const viewIsReal = isReal;
+  const accent = viewIsReal ? "#0ecb81" : "#FF6B00";
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (!isReal || !currentUser) { setRealActiveTrades([]); return; }
+    if (!currentUser) { setRealActiveTrades([]); return; }
     const q = query(collection(db, "realActiveTrades"), where("userId", "==", currentUser.id));
     const unsub = onSnapshot(q, snap => {
       setRealActiveTrades(snap.docs.map(d => d.data() as RealActiveTrade));
+    }, (err) => {
+      if (err.code !== "permission-denied") console.error(err);
     });
     return () => unsub();
-  }, [isReal, currentUser?.id]);
+  }, [currentUser?.id]);
 
-  const modeTrades = isReal
-    ? completedTrades.filter(t => t.mode === "real")
-    : completedTrades.filter(t => !t.mode || t.mode === "demo");
+  const modeTrades = viewIsReal
+    ? completedTrades.filter(tr => tr.mode === "real")
+    : completedTrades.filter(tr => !tr.mode || tr.mode === "demo");
 
-  const filtered = modeTrades.filter(t =>
-    filter === "ALL" ? true : t.result === filter
+  const filtered = modeTrades.filter(tr =>
+    filter === "ALL" ? true : tr.result === filter
   );
 
-  const totalWin  = modeTrades.filter(t => t.result === "WIN").length;
-  const totalLose = modeTrades.filter(t => t.result === "LOSE").length;
-  const netProfit = modeTrades.reduce((s, t) => s + t.profit, 0);
+  const totalWin  = modeTrades.filter(tr => tr.result === "WIN").length;
+  const totalLose = modeTrades.filter(tr => tr.result === "LOSE").length;
   const total     = totalWin + totalLose;
 
-  /* Filter expired trades so they don't linger at "0s" */
-  const visibleDemoActive = activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
-  const visibleRealActive = realActiveTrades.filter(t => t.expiryTime > now - 800);
-  const visibleActive     = isReal ? visibleRealActive : visibleDemoActive;
+  const visibleDemoActive = activeTrades.filter(tr => tr.startTime + tr.duration * 1000 > now - 800);
+  const visibleRealActive = realActiveTrades.filter(tr => tr.expiryTime > now - 800);
+  const visibleActive     = viewIsReal ? visibleRealActive : visibleDemoActive;
 
   return (
-    <div className="flex h-full flex-col" style={{ background: "#000" }}>
+    <div className="flex h-full flex-col bg-black text-white">
 
-      {/* ── Stats header ─────────────────────────────────────────────── */}
-      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <WinRing win={totalWin} total={total} accent={accent} />
-          <div className="flex-1 grid grid-cols-2 gap-2">
-            {[
-              { label: "Kazanan",  value: totalWin,  color: "#0ecb81", bg: "rgba(14,203,129,0.08)" },
-              { label: "Kaybeden", value: totalLose, color: "#f6465d", bg: "rgba(246,70,93,0.08)"  },
-              {
-                label: "Net Kâr",
-                value: (netProfit >= 0 ? "+" : "") + "$" + Math.abs(netProfit).toFixed(2),
-                color: netProfit >= 0 ? "#0ecb81" : "#f6465d",
-                bg:    netProfit >= 0 ? "rgba(14,203,129,0.08)" : "rgba(246,70,93,0.08)",
-              },
-              {
-                label: "Toplam",
-                value: total,
-                color: accent,
-                bg:    `${accent}14`,
-              },
-            ].map(s => (
-              <div key={s.label} className="rounded-xl px-3 py-2 flex flex-col justify-center"
-                style={{ background: s.bg, border: "1px solid rgba(255,255,255,0.06)" }}>
-                <p className="text-[13px] font-black leading-none" style={{ color: s.color }}>{s.value}</p>
-                <p className="text-[9px] text-white/30 font-bold mt-0.5 uppercase tracking-wider">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Active trades ─────────────────────────────────────────────── */}
+      {/* ── Active Trades Section ──────────────────────────────────────── */}
       {visibleActive.length > 0 && (
         <div className="shrink-0 px-4 pt-3 pb-1">
-          <p className="text-[9px] font-black uppercase tracking-widest mb-2"
-            style={{ color: `${accent}80` }}>
-            {isReal ? "Açık Gerçek İşlemler" : "Açık Demo İşlemler"}
-          </p>
-          <div className="flex flex-col gap-1.5">
-            {visibleActive.map(t => {
-              const isUp   = t.direction === "UP";
-              const expiry = isReal
-                ? (t as RealActiveTrade).expiryTime
-                : (t as typeof activeTrades[number]).startTime + (t as typeof activeTrades[number]).duration * 1000;
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5" style={{ color: accent }}>
+              <span className="h-2 w-2 rounded-full animate-ping" style={{ background: accent }} />
+              {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {visibleActive.map(tr => {
+              const isUp   = tr.direction === "UP";
+              const expiry = viewIsReal
+                ? (tr as RealActiveTrade).expiryTime
+                : (tr as typeof activeTrades[number]).startTime + (tr as typeof activeTrades[number]).duration * 1000;
               const rem  = Math.max(0, expiry - now);
-              const total = isReal
-                ? ((t as RealActiveTrade).expiryTime - (t as RealActiveTrade).entryTime)
-                : ((t as typeof activeTrades[number]).duration * 1000);
-              const prog   = Math.max(0, Math.min(1, rem / total));
+              const totalTime = viewIsReal
+                ? ((tr as RealActiveTrade).expiryTime - (tr as RealActiveTrade).entryTime)
+                : ((tr as typeof activeTrades[number]).duration * 1000);
+              const prog   = Math.max(0, Math.min(1, rem / totalTime));
               const dirAccent = isUp ? "#0ecb81" : "#f6465d";
-              const entryPrice = isReal
-                ? (t as RealActiveTrade).entryPrice
-                : (t as typeof activeTrades[number]).startPrice;
+
               return (
-                <div key={t.id} className="rounded-2xl overflow-hidden"
-                  style={{ background: "#0d0d0d", border: `1px solid ${isUp ? "rgba(14,203,129,0.18)" : "rgba(246,70,93,0.18)"}` }}>
-                  <div className="flex items-center justify-between px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: isUp ? "rgba(14,203,129,0.1)" : "rgba(246,70,93,0.1)" }}>
-                        {isUp
-                          ? <TrendingUp  size={14} style={{ color: dirAccent }} />
-                          : <TrendingDown size={14} style={{ color: dirAccent }} />}
-                      </div>
-                      <div>
-                        <p className="text-[12px] font-black text-white leading-none">{t.asset}</p>
-                        <p className="text-[9px] text-white/30 mt-0.5">
-                          {isUp ? "▲ YUKARI" : "▼ AŞAĞI"} · ${t.amount}
-                        </p>
-                      </div>
+                <div key={tr.id} className="rounded-full px-5 py-3.5 bg-[#0e0e12] border border-white/10 flex items-center justify-between shadow-lg relative overflow-hidden">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: isUp ? "rgba(14,203,129,0.15)" : "rgba(246,70,93,0.15)" }}>
+                      {isUp ? <ArrowUp size={16} style={{ color: dirAccent }} strokeWidth={3} /> : <ArrowDown size={16} style={{ color: dirAccent }} strokeWidth={3} />}
                     </div>
-                    {/* Countdown in MM:SS */}
-                    <div className="flex flex-col items-end gap-0.5">
-                      <div className="flex items-center gap-1 text-white/70">
-                        <Clock size={9} />
-                        <span className="text-[11px] font-black font-mono">{fmtCountdown(rem)}</span>
+                    <div>
+                      <p className="text-xs font-black text-white leading-none">{tr.asset}</p>
+                      <p className="text-[10px] font-bold text-white/40 mt-1">
+                        {isUp ? `▲ ${t.upBtn}` : `▼ ${t.downBtn}`} · {sym}{tr.amount}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-white font-mono font-black text-xs">
+                        <Clock size={11} className="text-[#FF6B00]" />
+                        <span>{fmtCountdown(rem)}</span>
                       </div>
-                      <span className="text-[9px] text-white/30 font-mono">
-                        Vade {fmtTime(expiry)}
+                      <span className="text-[9px] text-white/30 font-mono block mt-0.5">
+                        {fmtTime(expiry)}
                       </span>
                     </div>
                   </div>
-                  {/* Entry price + expiry row */}
-                  <div className="flex items-center justify-between px-3 pb-2">
-                    <span className="text-[9px] text-white/30">
-                      Giriş: <span className="text-white/55 font-mono">{entryPrice?.toFixed(5) ?? "—"}</span>
-                    </span>
-                    <span className="text-[9px]" style={{ color: `${dirAccent}99` }}>
-                      {isUp ? "▲ CALL" : "▼ PUT"}
-                    </span>
-                  </div>
-                  <div className="h-[2px]" style={{ background: "rgba(255,255,255,0.05)" }}>
-                    <div className="h-full transition-all duration-1000"
-                      style={{ width: `${prog * 100}%`, background: dirAccent }} />
+
+                  {/* Bottom progress bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5">
+                    <div className="h-full transition-all duration-1000" style={{ width: `${prog * 100}%`, background: dirAccent }} />
                   </div>
                 </div>
               );
@@ -214,110 +163,150 @@ export default function History() {
         </div>
       )}
 
-      {/* ── Filter tabs ─────────────────────────────────────────────── */}
-      <div className="shrink-0 flex gap-2 px-4 pt-3 pb-2">
-        {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className="rounded-full px-4 py-1.5 text-xs font-bold transition-all"
-            style={{
-              background: filter === f
-                ? (f === "ALL" ? `${accent}18` : f === "WIN" ? "rgba(14,203,129,0.15)" : "rgba(246,70,93,0.15)")
-                : "rgba(255,255,255,0.04)",
-              color: filter === f
-                ? (f === "ALL" ? accent : f === "WIN" ? "#0ecb81" : "#f6465d")
-                : "rgba(255,255,255,0.28)",
-              border: `1px solid ${filter === f
-                ? (f === "ALL" ? `${accent}45` : f === "WIN" ? "rgba(14,203,129,0.3)" : "rgba(246,70,93,0.3)")
-                : "rgba(255,255,255,0.07)"}`,
-            }}>
-            {f === "ALL" ? "Tümü" : f === "WIN" ? "Kazananlar" : "Kaybedenler"}
-            {f !== "ALL" && (
-              <span className="ml-1.5 text-[10px] opacity-60">
-                {f === "WIN" ? totalWin : totalLose}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* ── Filter Pills ──────────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => {
+            const isActive = filter === f;
+            const label = f === "ALL" ? t.all : f === "WIN" ? t.winners : t.losers;
+            const count = f === "WIN" ? totalWin : f === "LOSE" ? totalLose : total;
 
-      {/* ── Trade list ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 pb-24">
-        <div className="flex flex-col gap-2">
-
-          {tradesLoading && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="animate-spin mb-3" style={{
-                width: 32, height: 32, borderRadius: "50%",
-                border: `3px solid ${accent}25`,
-                borderTopColor: accent,
-              }} />
-              <p className="text-xs font-bold text-white/20">Yükleniyor…</p>
-            </div>
-          )}
-
-          {!tradesLoading && filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="h-14 w-14 rounded-2xl flex items-center justify-center mb-3"
-                style={{ background: `${accent}0d`, border: `1px solid ${accent}20` }}>
-                <TrendingUp size={22} style={{ color: `${accent}60` }} />
-              </div>
-              <p className="text-sm font-bold text-white/20">İşlem geçmişi boş</p>
-              <p className="text-[11px] text-white/12 mt-1">İşlem açtıkça burada görünür</p>
-            </div>
-          )}
-
-          {!tradesLoading && filtered.map((trade: CompletedTrade) => {
-            const isUp  = trade.direction === "UP";
-            const isWin = trade.result === "WIN";
-            const tradeAccent = isWin ? "#0ecb81" : "#f6465d";
             return (
-              <div key={trade.id} className="rounded-2xl overflow-hidden relative"
-                style={{ background: "#0d0d0d", border: "1px solid #1c1c1c" }}>
-
-                {/* Left accent bar */}
-                <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl"
-                  style={{ background: tradeAccent }} />
-
-                <div className="flex items-center gap-3 pl-4 pr-3.5 py-3">
-                  {/* Direction icon */}
-                  <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: isUp ? "rgba(14,203,129,0.09)" : "rgba(246,70,93,0.09)" }}>
-                    <span className="text-base font-black"
-                      style={{ color: isUp ? "#0ecb81" : "#f6465d" }}>
-                      {isUp ? "▲" : "▼"}
-                    </span>
-                  </div>
-
-                  {/* Asset + meta */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-black text-white leading-none truncate">{trade.asset}</span>
-                      <span className="shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full"
-                        style={{
-                          background: isWin ? "rgba(14,203,129,0.12)" : "rgba(246,70,93,0.12)",
-                          color: tradeAccent,
-                          border: `1px solid ${isWin ? "rgba(14,203,129,0.22)" : "rgba(246,70,93,0.22)"}`,
-                        }}>
-                        {isWin ? "KAZANDI" : "KAYBETTİ"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-white/28 mt-0.5 font-mono">
-                      {reltime(trade.closedAt)} · {fmt(trade.closedAt)}
-                    </p>
-                  </div>
-
-                  {/* Profit/loss */}
-                  <div className="shrink-0 text-right">
-                    <p className="text-[15px] font-black leading-none" style={{ color: tradeAccent }}>
-                      {isWin ? `+$${trade.profit.toFixed(2)}` : `-$${trade.amount.toFixed(2)}`}
-                    </p>
-                    <p className="text-[9px] text-white/25 mt-0.5 font-mono">${trade.amount} yatırım</p>
-                  </div>
-                </div>
-              </div>
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`rounded-full px-4 py-1.5 text-xs font-black transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? f === "ALL"
+                      ? "bg-white text-black shadow-md"
+                      : f === "WIN"
+                      ? "bg-[#0ecb81] text-black shadow-md"
+                      : "bg-[#f6465d] text-white shadow-md"
+                    : "bg-white/5 text-white/50 hover:text-white border border-white/10"
+                }`}
+              >
+                <span>{label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isActive ? "bg-black/20 text-current" : "bg-white/10 text-white/40"
+                }`}>
+                  {count}
+                </span>
+              </button>
             );
           })}
         </div>
+
+        <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
+          {filtered.length} {t.tradesRecords}
+        </span>
+      </div>
+
+      {/* ── Trade List (Oval Cards) ────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-24 space-y-2.5">
+
+        {tradesLoading && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin mb-3 h-8 w-8 rounded-full border-2 border-white/10 border-t-[#FF6B00]" />
+            <p className="text-xs font-bold text-white/30">...</p>
+          </div>
+        )}
+
+        {!tradesLoading && filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center my-4 rounded-3xl border border-white/5 bg-white/[0.02] p-6">
+            <div className="h-12 w-12 rounded-full flex items-center justify-center mb-3 bg-white/5 border border-white/10">
+              <BarChart2 size={22} style={{ color: accent }} />
+            </div>
+            <p className="text-sm font-black text-white/80">{t.noHistoryTitle}</p>
+            <p className="text-xs text-white/40 mt-1 max-w-xs">
+              {viewIsReal ? t.noHistoryRealDesc : t.noHistoryDemoDesc}
+            </p>
+            <Link href="/">
+              <button
+                className="mt-4 flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-black text-black shadow-lg transition-transform active:scale-95"
+                style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
+              >
+                <TrendingUp size={15} />
+                <span>{t.tradeNow}</span>
+              </button>
+            </Link>
+          </div>
+        )}
+
+        {!tradesLoading && filtered.map((trade: CompletedTrade) => {
+          const isUp   = trade.direction === "UP";
+          const isWin  = trade.result === "WIN";
+          const tradeAccent = isWin ? "#0ecb81" : "#f6465d";
+          const isExpanded  = expandedId === trade.id;
+
+          return (
+            <div key={trade.id} className="flex flex-col">
+              {/* OVAL TRADE CARD */}
+              <div
+                onClick={() => setExpandedId(isExpanded ? null : trade.id)}
+                className={`rounded-full px-4 py-3 bg-[#0d0d11] border transition-all cursor-pointer flex items-center justify-between hover:border-white/20 active:scale-[0.99] ${
+                  isWin ? "border-[#0ecb81]/25 hover:border-[#0ecb81]/40" : "border-[#f6465d]/25 hover:border-[#f6465d]/40"
+                }`}
+                style={{ boxShadow: "0 4px 18px rgba(0,0,0,0.4)" }}
+              >
+                {/* Left: Asset Icon + Info */}
+                <div className="flex items-center gap-3 min-w-0">
+                  {renderAssetIcon(trade.asset)}
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-white truncate leading-none">{trade.asset}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black leading-none shrink-0 ${
+                        isUp ? "bg-[#0ecb81]/15 text-[#0ecb81]" : "bg-[#f6465d]/15 text-[#f6465d]"
+                      }`}>
+                        {isUp ? `▲ ${t.upBtn}` : `▼ ${t.downBtn}`}
+                      </span>
+                    </div>
+
+                    <p className="text-[10px] text-white/35 mt-1 font-mono font-medium truncate">
+                      {reltime(trade.closedAt, langCode)} · {fmt(trade.closedAt, langCode)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Outcome badge + Profit */}
+                <div className="flex items-center gap-3 shrink-0 text-right">
+                  <div>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                        isWin ? "bg-[#0ecb81]/20 text-[#0ecb81]" : "bg-[#f6465d]/20 text-[#f6465d]"
+                      }`}>
+                        {isWin ? t.won : t.lost}
+                      </span>
+                    </div>
+                    <p className="text-sm font-black leading-tight mt-0.5 font-mono" style={{ color: tradeAccent }}>
+                      {isWin ? `+${sym}${trade.profit.toFixed(2)}` : `-${sym}${trade.amount.toFixed(2)}`}
+                    </p>
+                  </div>
+
+                  <ChevronDown size={14} className={`text-white/30 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                </div>
+              </div>
+
+              {/* EXPANDED DETAILS DRAWER */}
+              {isExpanded && (
+                <div className="mx-4 -mt-3 pt-5 pb-3 px-4 bg-[#121217] rounded-b-2xl border-x border-b border-white/10 grid grid-cols-3 gap-2 text-[10px] text-white/60">
+                  <div className="rounded-xl bg-white/5 p-2">
+                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.entryPrice}</span>
+                    <span className="font-mono font-bold text-white text-xs">{trade.entryPrice ? trade.entryPrice.toFixed(5) : "—"}</span>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-2">
+                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.exitPrice}</span>
+                    <span className="font-mono font-bold text-white text-xs">{trade.exitPrice ? trade.exitPrice.toFixed(5) : "—"}</span>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-2">
+                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.closeTime}</span>
+                    <span className="font-mono text-white/80">{fmt(trade.closedAt, langCode)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

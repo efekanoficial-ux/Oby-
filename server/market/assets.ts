@@ -17,11 +17,11 @@ export interface AssetConfig {
 }
 
 /**
- * The only 13 instruments the platform trades. Forex pairs have no free live
- * feed, so they run on the OTC random-walk engine anchored to realistic rates.
- * Bitcoin Cash attempts genuine Binance data and falls back to OTC.
+ * The only 13 instruments the platform trades. All pairs run on the OTC
+ * random-walk engine anchored to realistic market rates and continuous history.
  */
 export const ASSETS: AssetConfig[] = [
+  { symbol: "Crypto IDX",         base: 6850.25, vol: 0.00030, revert: 0.0008, digits: 2 },
   { symbol: "AUD/CAD",            base: 0.9080,  vol: 0.00010, revert: 0.0010, digits: 5 },
   { symbol: "AUD/CHF",            base: 0.5520,  vol: 0.00011, revert: 0.0010, digits: 5 },
   { symbol: "AUD/DKK",            base: 4.4200,  vol: 0.00009, revert: 0.0010, digits: 4 },
@@ -33,7 +33,7 @@ export const ASSETS: AssetConfig[] = [
   { symbol: "AUD/SGD",            base: 0.8650,  vol: 0.00009, revert: 0.0010, digits: 5 },
   { symbol: "AUD/USD",            base: 0.6600,  vol: 0.00010, revert: 0.0010, digits: 5 },
   { symbol: "AUD/ZAR",            base: 12.050,  vol: 0.00016, revert: 0.0009, digits: 4 },
-  { symbol: "Bitcoin Cash (OTC)", base: 450.00,  vol: 0.00045, revert: 0.0006, digits: 2, binance: "BCHUSDT" },
+  { symbol: "Bitcoin Cash (OTC)", base: 450.00,  vol: 0.00035, revert: 0.0008, digits: 2 },
   { symbol: "CAD/CHF",            base: 0.6080,  vol: 0.00010, revert: 0.0010, digits: 5 },
 ];
 

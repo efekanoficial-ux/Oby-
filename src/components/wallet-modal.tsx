@@ -451,7 +451,7 @@ export function WalletModal({ show, onClose, defaultTab = "deposit" }: WalletMod
                               className="flex-1 bg-transparent text-2xl font-black text-white outline-none placeholder:text-white/15" />
                             <span className="text-sm font-bold text-white/30">{method.currency}</span>
                           </div>
-                          <p className="text-[10px] text-white/25 mt-1.5 px-1">Maks: ${currentUser.realBalance.toFixed(2)}</p>
+                          <p className="text-[10px] text-white/25 mt-1.5 px-1">Maks: {currentUser?.currency === "TL" ? "₺" : "$"}{currentUser.realBalance.toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">
@@ -519,7 +519,7 @@ export function WalletModal({ show, onClose, defaultTab = "deposit" }: WalletMod
                                   <span className="text-sm font-black text-white">{isD ? "Para Yatırma" : "Para Çekme"}</span>
                                 </div>
                                 <span className="text-sm font-black" style={{ color: isD ? "#0ecb81" : "#FF6B00" }}>
-                                  {isD ? "+" : "-"}${req.amount} {req.currency}
+                                  {isD ? "+" : "-"}{currentUser?.currency === "TL" ? "₺" : "$"}{req.amount} {req.currency}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">

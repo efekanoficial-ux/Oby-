@@ -3,26 +3,34 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   User, Settings, Bell, Shield, ChevronRight,
-  HelpCircle, LogOut, X, Hash, Wallet,
+  HelpCircle, LogOut, X, Hash, Wallet, Camera,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WalletModal } from "@/components/wallet-modal";
+import { ProfilePhotoModal } from "@/components/profile-photo-modal";
+import { LanguageModal } from "@/components/language-modal";
 
+
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Profile() {
   const [, navigate]   = useLocation();
   const { currentUser, logout } = useAuth();
-  const [showAbout, setShowAbout]   = useState(false);
-  const [showWallet, setShowWallet] = useState(false);
+  const { language, t } = useLanguage();
+  const [showAbout, setShowAbout]             = useState(false);
+  const [showWallet, setShowWallet]           = useState(false);
+  const [showPhotoModal, setShowPhotoModal]   = useState(false);
+  const [showLangModal, setShowLangModal]     = useState(false);
+  const [notifState, setNotifState]           = useState(true);
 
   const handleLogout = () => { logout(); navigate("/auth"); };
 
   const menuItems = [
-    { icon: Wallet,      label: "Para Yatır / Çek",     value: "",        action: () => setShowWallet(true),   href: undefined         },
-    { icon: Settings,    label: "Dil",                   value: "Türkçe",  action: () => {},                    href: undefined         },
-    { icon: Bell,        label: "Bildirimler",            value: "Açık",    action: () => {},                    href: undefined         },
-    { icon: Shield,      label: "Gizlilik Politikası",    value: "",         action: () => navigate("/privacy"),  href: "/privacy"        },
-    { icon: HelpCircle,  label: "Hakkında",               value: "",         action: () => setShowAbout(true),    href: undefined         },
+    { icon: Wallet,      label: t.depositWithdraw,      value: "",                       action: () => setShowWallet(true),          href: undefined },
+    { icon: Settings,    label: t.language,             value: language,                 action: () => setShowLangModal(true),       href: undefined },
+    { icon: Bell,        label: t.notifications,        value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined },
+    { icon: Shield,      label: t.privacyPolicy,        value: "",                       action: () => navigate("/privacy"),         href: "/privacy" },
+    { icon: HelpCircle,  label: t.about,                value: "",                       action: () => setShowAbout(true),           href: undefined },
   ];
 
   const displayName = currentUser
@@ -44,13 +52,38 @@ export default function Profile() {
           {/* ── Profile header ───────────────────────────────────────── */}
           <div className="flex flex-col items-center py-8 px-4">
             <div className="relative mb-4">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full"
-                style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)", boxShadow: "0 0 28px rgba(255,107,0,0.30)" }}>
-                {currentUser
-                  ? <span className="text-3xl font-black text-black">{initials}</span>
-                  : <User size={40} className="text-black" />
-                }
-              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => currentUser && setShowPhotoModal(true)}
+                className="relative flex h-24 w-24 items-center justify-center rounded-full overflow-hidden cursor-pointer group border-2 border-white/10"
+                style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)", boxShadow: "0 0 28px rgba(255,107,0,0.30)" }}
+                title="Profil Fotoğrafını Değiştir"
+              >
+                {currentUser?.photoURL ? (
+                  <img src={currentUser.photoURL} alt="Profile" className="h-full w-full object-cover" />
+                ) : currentUser ? (
+                  <span className="text-3xl font-black text-black">{initials}</span>
+                ) : (
+                  <User size={40} className="text-black" />
+                )}
+                {currentUser && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Camera size={22} className="text-white" />
+                  </div>
+                )}
+              </motion.button>
+
+              {/* Edit Camera Badge */}
+              {currentUser && (
+                <button
+                  onClick={() => setShowPhotoModal(true)}
+                  className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#FF6B00] text-black shadow-lg border border-black hover:scale-110 transition-transform"
+                  title="Fotoğraf Yükle"
+                >
+                  <Camera size={13} />
+                </button>
+              )}
+
               <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-black text-black"
                 style={{ background: currentUser ? "#0ecb81" : "#FFB800" }}>
                 {currentUser ? "GERÇEK" : "DEMO"}
@@ -65,22 +98,6 @@ export default function Profile() {
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <Hash size={9} className="text-white/25" />
                 <span className="text-[10px] font-mono text-white/30">{currentUser.id}</span>
-              </div>
-            )}
-
-            {/* Real balance */}
-            {currentUser && (
-              <div className="mt-4 flex gap-3">
-                <div className="flex flex-col items-center rounded-xl px-5 py-3 border border-[#0ecb81]/20"
-                  style={{ background: "rgba(14,203,129,0.06)" }}>
-                  <span className="text-[10px] font-bold text-white/30 mb-0.5">Gerçek Bakiye</span>
-                  <span className="text-lg font-black text-[#0ecb81]">${currentUser.realBalance.toFixed(2)}</span>
-                </div>
-                <div className="flex flex-col items-center rounded-xl px-5 py-3 border border-[#FFB800]/20"
-                  style={{ background: "rgba(255,184,0,0.06)" }}>
-                  <span className="text-[10px] font-bold text-white/30 mb-0.5">Toplam Yatırım</span>
-                  <span className="text-lg font-black text-[#FFB800]">${currentUser.totalDeposited.toFixed(2)}</span>
-                </div>
               </div>
             )}
 
@@ -131,7 +148,7 @@ export default function Profile() {
                   <LogOut size={15} style={{ color: "#f6465d" }} />
                 </div>
                 <span className="text-sm font-bold" style={{ color: "#f6465d" }}>
-                  {currentUser ? "Çıkış Yap" : "Giriş Yap / Kayıt Ol"}
+                  {currentUser ? t.logout : t.loginRegister}
                 </span>
               </motion.button>
             </div>
@@ -177,6 +194,11 @@ export default function Profile() {
       </AnimatePresence>
 
       <WalletModal show={showWallet} onClose={() => setShowWallet(false)} />
+      <ProfilePhotoModal show={showPhotoModal} onClose={() => setShowPhotoModal(false)} />
+      <LanguageModal
+        show={showLangModal}
+        onClose={() => setShowLangModal(false)}
+      />
     </>
   );
 }

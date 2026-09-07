@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, Wallet } from "lucide-react";
 import { t } from "@/i18n";
+import { AssetIcon } from "@/lib/asset-icons";
 
 const css = `
 @keyframes tut-spin-slow { to { transform: rotate(360deg); } }
@@ -18,13 +19,12 @@ const css = `
 /* ─── Illustrations ──────────────────────────────────────────────────────── */
 
 const TUTORIAL_ASSETS = [
+  { label: "Crypto IDX",         flag: "₿",      payout: 90, color: "#F7931A", price: "6,850.25" },
   { label: "AUD/USD",            flag: "🇦🇺🇺🇸", payout: 86, color: "#0084C7", price: "0.66000" },
   { label: "AUD/JPY",            flag: "🇦🇺🇯🇵", payout: 86, color: "#BC002D", price: "97.200"  },
-  { label: "Bitcoin Cash (OTC)", flag: "₿",      payout: 88, color: "#8DC351", price: "450.00"  },
   { label: "AUD/CAD",            flag: "🇦🇺🇨🇦", payout: 85, color: "#D4202C", price: "0.90800" },
   { label: "CAD/CHF",            flag: "🇨🇦🇨🇭", payout: 85, color: "#FF0000", price: "0.60800" },
   { label: "AUD/CHF",            flag: "🇦🇺🇨🇭", payout: 85, color: "#E84142", price: "0.55200" },
-  { label: "AUD/NZD",            flag: "🇦🇺🇳🇿", payout: 85, color: "#00247D", price: "1.08200" },
 ];
 
 function IllustrationAsset() {
@@ -73,7 +73,7 @@ function IllustrationAsset() {
               boxShadow: i === selected ? `0 4px 16px ${a.color}30` : "none",
               cursor: "pointer",
             }}>
-            <span style={{ fontSize: 20, lineHeight: 1 }}>{a.flag}</span>
+            <AssetIcon label={a.label} size={22} />
             <span style={{ fontSize: 8, fontWeight: 900, color: "#fff", whiteSpace: "nowrap", maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis" }}>{a.label}</span>
             <span style={{ fontSize: 8, fontWeight: 700, color: a.color }}>%{a.payout}</span>
           </motion.button>
@@ -99,11 +99,13 @@ function IllustrationAsset() {
             }}>
             <div style={{
               width: 52, height: 52, borderRadius: 14,
-              background: `${sel.color}20`,
+              background: "rgba(255,255,255,0.05)",
               border: `1px solid ${sel.color}44`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 26, flexShrink: 0,
-            }}>{sel.flag}</div>
+              flexShrink: 0,
+            }}>
+              <AssetIcon label={sel.label} size={36} glow />
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 900, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sel.label}</div>
               <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.38)", marginTop: 2, fontFamily: "monospace" }}>{sel.price}</div>
@@ -382,125 +384,5 @@ const STEPS = [
 ];
 
 export function Tutorial() {
-  const [, navigate]    = useLocation();
-  const alreadySeen = typeof window !== "undefined" && (
-    !!localStorage.getItem("obyo_tutorial_done") ||
-    !!localStorage.getItem("obyo_current_user_id")
-  );
-  const [visible, setVisible] = useState(false);
-  const [step, setStep]       = useState(0);
-  const [dir, setDir]         = useState(1);
-
-  useEffect(() => {
-    if (alreadySeen) return;
-    const t = setTimeout(() => setVisible(true), 600);
-    return () => clearTimeout(t);
-  }, [alreadySeen]);
-
-  const dismiss = () => {
-    localStorage.setItem("obyo_tutorial_done", "1");
-    setVisible(false);
-  };
-
-  const finish = () => {
-    dismiss();
-    const isLoggedIn = !!localStorage.getItem("obyo_current_user_id");
-    if (!isLoggedIn) {
-      setTimeout(() => navigate("/auth"), 400);
-    }
-  };
-
-  const s = STEPS[step];
-  const goTo = (next: number) => {
-    if (next < 0 || next >= STEPS.length) return;
-    setDir(next > step ? 1 : -1);
-    setStep(next);
-  };
-
-  const slideVariants = {
-    enter:  (d: number) => ({ x: d * 48, opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit:   (d: number) => ({ x: -d * 48, opacity: 0 }),
-  };
-
-  if (!visible) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        key="tut-root"
-        initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-        transition={{ duration:0.18 }}
-        className="fixed inset-0 z-[90] flex flex-col"
-        style={{ background:"rgba(0,0,0,0.92)", backdropFilter:"blur(4px)", WebkitBackdropFilter:"blur(4px)" }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-2 shrink-0">
-          <div className="flex items-center gap-2">
-            {STEPS.map((_, i) => (
-              <motion.button key={i} onClick={() => goTo(i)}
-                animate={{ width:i===step?28:7, backgroundColor:i===step?s.color:i<step?"#444":"#1e1e1e" }}
-                transition={{ type:"spring", stiffness:400, damping:30 }}
-                className="h-2 rounded-full" />
-            ))}
-          </div>
-          <button onClick={dismiss} className="flex items-center justify-center w-8 h-8 rounded-full" style={{ background:"rgba(255,255,255,0.07)" }}>
-            <X size={15} className="text-white/50" />
-          </button>
-        </div>
-
-        {/* Illustration */}
-        <AnimatePresence mode="wait" custom={dir}>
-          <motion.div
-            key={`ill-${step}`} custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit"
-            transition={{ type:"spring", stiffness:380, damping:34 }}
-            className="flex-1 min-h-0 mx-4 rounded-2xl overflow-hidden relative"
-            style={{ background:s.bg, border:`1px solid ${s.color}22` }}>
-            {s.illustration}
-            <div className="absolute top-3 right-4 text-[10px] font-black opacity-25" style={{ color:s.color }}>
-              {step+1} / {STEPS.length}
-            </div>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Text card */}
-        <AnimatePresence mode="wait" custom={dir}>
-          <motion.div
-            key={`txt-${step}`} custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit"
-            transition={{ type:"spring", stiffness:380, damping:34, delay:0.03 }}
-            className="shrink-0 mx-4 my-3 rounded-2xl p-5"
-            style={{ background:"#0c0c0c", border:`1px solid ${s.color}22`, boxShadow:"0 8px 28px rgba(0,0,0,0.6)" }}>
-            <div className="flex items-start gap-3 mb-2">
-              <div className="w-1 h-6 rounded-full mt-0.5 shrink-0" style={{ backgroundColor:s.color }} />
-              <div>
-                <h2 className="text-lg font-black text-white leading-tight">{s.title}</h2>
-                <p className="text-sm font-semibold mt-0.5" style={{ color:s.color }}>{s.subtitle}</p>
-              </div>
-            </div>
-            <p className="text-sm text-white/75 leading-relaxed mt-2 mb-3 pl-4">{s.body}</p>
-            <div className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ml-4 mb-4"
-              style={{ background:`${s.color}14`, color:s.color }}>
-              <span>→</span><span>{s.tip}</span>
-            </div>
-            <div className="flex items-center justify-between pl-2">
-              <button onClick={dismiss} className="text-sm text-white/25 hover:text-white/50 transition-colors px-2 py-1.5">{t.tutSkip}</button>
-              <div className="flex items-center gap-2">
-                {step > 0 && (
-                  <button onClick={() => goTo(step-1)} className="rounded-xl px-4 py-2 text-sm font-black border border-white/10 text-white/45">{t.tutBack}</button>
-                )}
-                <motion.button
-                  whileTap={{ scale:0.95 }}
-                  onClick={() => { if (step < STEPS.length-1) goTo(step+1); else finish(); }}
-                  className="flex items-center gap-2 rounded-xl px-6 py-2 text-sm font-black text-black"
-                  style={{ backgroundColor:s.color, boxShadow:`0 4px 14px ${s.color}45` }}>
-                  {step === STEPS.length-1 ? t.tutStart : t.tutNext}
-                  {step < STEPS.length-1 && <ChevronRight size={14}/>}
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </motion.div>
-    </AnimatePresence>
-  );
+  return null;
 }
