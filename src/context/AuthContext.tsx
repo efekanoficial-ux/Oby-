@@ -103,7 +103,7 @@ interface AuthContextType {
   paymentSettings:  PaymentSettings;
   updatePaymentSettings: (settings: Partial<PaymentSettings>) => Promise<{ success: boolean; error?: string }>;
   login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle:  () => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle:  () => Promise<{ success: boolean; error?: string; googleUser?: { email: string; name: string; surname: string; photoURL: string } }>;
   register:         (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   sendFirebaseVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
   checkFirebaseEmailVerified: () => Promise<{ isVerified: boolean; error?: string }>;
@@ -149,6 +149,16 @@ function cleanForFirestore<T>(obj: T): T {
     return cleaned;
   }
   return obj;
+}
+
+function isProfileComplete(data: any): boolean {
+  if (!data) return false;
+  const hasName = data.name && data.name.trim() !== "" && data.name.trim().toLowerCase() !== "kullanıcı";
+  const hasSurname = data.surname && data.surname.trim() !== "";
+  const hasBirthDate = data.birthDate && data.birthDate !== "2000-01-01";
+  const hasPassword = data.password && data.password.trim() !== "";
+  const hasCurrency = data.currency && (data.currency === "USD" || data.currency === "TL");
+  return !!(hasName && hasSurname && hasBirthDate && hasPassword && hasCurrency);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -229,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const emailDocRef = doc(db, "users", email);
           const emailSnap = await getDoc(emailDocRef);
+          let finalUserDoc: any = null;
 
           if (!emailSnap.exists()) {
             let foundData: any = null;
@@ -253,43 +264,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (foundData) {
               console.log(`Auto-migrating user doc from old ID ${foundOldId} to unified email: ${email}`);
-              await setDoc(emailDocRef, cleanForFirestore({
+              const migratedData = {
                 ...foundData,
                 id: email,
-              }), { merge: true });
+              };
+              await setDoc(emailDocRef, cleanForFirestore(migratedData), { merge: true });
 
               if (foundOldId && foundOldId !== email) {
                 await deleteDoc(doc(db, "users", foundOldId)).catch(() => {});
               }
+              finalUserDoc = migratedData;
             } else {
-              const displayNameParts = (firebaseUser?.displayName || "").trim().split(" ");
-              const name = displayNameParts[0] || "Kullanıcı";
-              const surname = displayNameParts.slice(1).join(" ") || "";
-
-              const newUser: ObyoUser = {
-                id: email,
-                email,
-                name,
-                surname,
-                birthDate: "2000-01-01",
-                currency: "USD",
-                demoBalance: 10000,
-                realBalance: 0,
-                totalDeposited: 0,
-                totalWithdrawn: 0,
-                createdAt: Date.now(),
-                kycStatus: "none",
-                emailVerified: true,
-                photoUrl: firebaseUser?.photoURL || undefined,
-                photoURL: firebaseUser?.photoURL || undefined,
-              };
-              await setDoc(emailDocRef, cleanForFirestore(newUser), { merge: true });
+              console.log("No user document found for this Firebase user. Signing out.");
+              await signOut(auth).catch(() => {});
+              localStorage.removeItem("obyo_active_email");
+              localStorage.removeItem("obyo_active_uid");
+              localStorage.removeItem(LS_CUSTOM_UID);
+              localStorage.removeItem(LS_IS_ADMIN);
+              setCurrentUser(null);
+              setReady(true);
+              clearTimeout(fallbackTimer);
+              return;
             }
           } else {
-            const currentData = emailSnap.data();
-            if (currentData.id !== email) {
+            finalUserDoc = emailSnap.data();
+            if (finalUserDoc.id !== email) {
               await setDoc(emailDocRef, cleanForFirestore({ id: email }), { merge: true });
             }
+          }
+
+          // Enforce profile completeness check
+          if (finalUserDoc && !isProfileComplete(finalUserDoc)) {
+            console.log("User profile is incomplete. Signing out to complete registration.");
+            await signOut(auth).catch(() => {});
+            localStorage.removeItem("obyo_active_email");
+            localStorage.removeItem("obyo_active_uid");
+            localStorage.removeItem(LS_CUSTOM_UID);
+            localStorage.removeItem(LS_IS_ADMIN);
+            setCurrentUser(null);
+            setReady(true);
+            clearTimeout(fallbackTimer);
+            return;
           }
         } catch (migErr) {
           console.error("User document migration/setup error:", migErr);
@@ -424,7 +439,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string; googleUser?: { email: string; name: string; surname: string; photoURL: string } }> => {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -457,26 +472,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (!userDocData) {
-        const displayNameParts = (user.displayName || "").trim().split(" ");
-        const name = displayNameParts[0] || "Kullanıcı";
-        const surname = displayNameParts.slice(1).join(" ") || "";
-
-        userDocData = {
-          email,
-          name,
-          surname,
-          birthDate: "2000-01-01",
-          currency: "USD",
-          demoBalance: 10000,
-          realBalance: 0,
-          totalDeposited: 0,
-          totalWithdrawn: 0,
-          createdAt: Date.now(),
-          kycStatus: "none",
-          emailVerified: true,
-          photoUrl: user.photoURL || undefined,
-          photoURL: user.photoURL || undefined,
+      if (!userDocData || !isProfileComplete(userDocData)) {
+        await signOut(auth).catch(() => {});
+        localStorage.removeItem("obyo_active_email");
+        localStorage.removeItem("obyo_active_uid");
+        localStorage.removeItem(LS_CUSTOM_UID);
+        localStorage.removeItem(LS_IS_ADMIN);
+        setCurrentUser(null);
+        return {
+          success: false,
+          error: "registration_required",
+          googleUser: {
+            email,
+            name: (userDocData?.name && userDocData.name !== "Kullanıcı" ? userDocData.name : (user.displayName || "").split(" ")[0]) || "Kullanıcı",
+            surname: (userDocData?.surname ? userDocData.surname : (user.displayName || "").split(" ").slice(1).join(" ")) || "",
+            photoURL: userDocData?.photoURL || userDocData?.photoUrl || user.photoURL || ""
+          }
         };
       }
 
@@ -571,7 +582,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name:           data.name.trim() || existingData.name || "Kullanıcı",
       surname:        data.surname.trim() || existingData.surname || "",
       birthDate:      data.birthDate || existingData.birthDate || "2000-01-01",
-      currency:       existingData.currency || currency,
+      currency:       data.currency || existingData.currency || currency,
       demoBalance:    existingData.demoBalance !== undefined ? existingData.demoBalance : demoBalance,
       realBalance:    existingData.realBalance !== undefined ? existingData.realBalance : 0,
       totalDeposited: existingData.totalDeposited !== undefined ? existingData.totalDeposited : 0,

@@ -128,27 +128,15 @@ export default function Privacy() {
           <h1 className="text-sm font-black text-white">Gizlilik Politikası</h1>
           <p className="text-[10px] text-white/30">Son güncelleme: 15 Ocak 2025</p>
         </div>
-        <div className="ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-[#0ecb81]"
-          style={{ background: "rgba(14,203,129,0.1)", border: "1px solid rgba(14,203,129,0.2)" }}>
-          <div className="h-1.5 w-1.5 rounded-full bg-[#0ecb81] animate-pulse" />
-          Güncel & Aktif
-        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto">
         {/* Trust banner */}
         <div className="px-4 pt-5 pb-3">
-          <div className="rounded-2xl p-4 border border-[#FF6B00]/20"
-            style={{ background: "linear-gradient(135deg, rgba(255,107,0,0.08), rgba(255,184,0,0.04))" }}>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: "rgba(255,107,0,0.15)" }}>
-                <Shield size={20} className="text-[#FF6B00]" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-white">Obyo Option Güvenlik Taahhüdü</p>
-                <p className="text-[11px] text-white/40">Verileriniz bizim için önceliktir</p>
-              </div>
+          <div className="rounded-2xl p-4 border border-white/10 bg-white/[0.02]">
+            <div className="mb-2">
+              <p className="text-sm font-black text-white">Obyo Option Güvenlik Taahhüdü</p>
+              <p className="text-[11px] text-white/40">Verileriniz bizim için önceliktir</p>
             </div>
             <p className="text-xs text-white/50 leading-relaxed">
               Obyo Option olarak kullanıcı gizliliğini en yüksek önceliğimiz olarak kabul ediyoruz. 
@@ -163,36 +151,20 @@ export default function Privacy() {
           <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-3">Sertifikalar & Lisanslar</p>
           <div className="flex flex-col gap-3">
             {CERTS.map((cert, i) => {
-              const Icon = cert.icon;
               return (
-                <motion.div
+                <div
                   key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                  className="rounded-2xl p-4 border"
-                  style={{
-                    background: `${cert.color}09`,
-                    borderColor: `${cert.color}22`,
-                  }}
+                  className="rounded-2xl p-4 border border-white/10 bg-white/[0.02]"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                      style={{ background: `${cert.color}18` }}>
-                      <Icon size={16} style={{ color: cert.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-white">{cert.title}</p>
-                      <p className="text-[11px] font-semibold mb-1.5" style={{ color: cert.color }}>{cert.sub}</p>
-                      <p className="text-xs text-white/45 leading-relaxed mb-2">{cert.body}</p>
-                      <div className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold"
-                        style={{ background: `${cert.color}14`, color: cert.color }}>
-                        <CheckCircle2 size={9} />
-                        {cert.badge}
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white">{cert.title}</p>
+                    <p className="text-[11px] font-semibold mb-1.5 text-white/60">{cert.sub}</p>
+                    <p className="text-xs text-white/45 leading-relaxed mb-2">{cert.body}</p>
+                    <div className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold bg-white/5 text-white/40">
+                      {cert.badge}
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
@@ -203,11 +175,9 @@ export default function Privacy() {
           <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-3">Politika Detayları</p>
           <div className="flex flex-col gap-3">
             {SECTIONS.map((sec, i) => {
-              const Icon = sec.icon;
               return (
                 <section key={i} className="rounded-2xl p-4 border border-white/6 bg-white/[0.02]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon size={14} className="text-[#FF6B00] shrink-0" />
+                  <div className="mb-2">
                     <h2 className="text-sm font-black text-white">{sec.title}</h2>
                   </div>
                   <div className="text-xs text-white/45 leading-relaxed whitespace-pre-line">

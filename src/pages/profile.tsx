@@ -94,10 +94,12 @@ export default function Profile() {
                 </button>
               )}
 
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-black text-black"
-                style={{ background: currentUser ? "#0ecb81" : "#FFB800" }}>
-                {currentUser ? "GERÇEK" : "DEMO"}
-              </div>
+              {!currentUser && (
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-black text-black"
+                  style={{ background: "#FFB800" }}>
+                  DEMO
+                </div>
+              )}
             </div>
             <h2 className="mt-1 text-xl font-black text-white">{displayName}</h2>
             <p className="mt-0.5 text-xs text-white/30">{displayEmail}</p>
@@ -234,7 +236,7 @@ export default function Profile() {
               </div>
               <div className="flex flex-col gap-3 text-sm leading-relaxed" style={{ color: "#666" }}>
                 <p>Obyo Option, kullanıcıların kripto para, döviz ve emtia piyasalarında ikili opsiyon işlemleri yapmasına olanak tanıyan bir ticaret platformudur.</p>
-                <p>Platform yalnızca <span className="font-bold" style={{ color: "#FFB800" }}>eğitim ve simülasyon amaçlıdır</span>. Gerçek para işlemi yapılmaz.</p>
+                <p>Platform yalnızca <span className="font-bold" style={{ color: "#FFB800" }}>eğitim ve simülasyon amaçlıdır</span>.</p>
                 <div className="rounded-xl p-3" style={{ backgroundColor: "#171717", border: "1px solid #222" }}>
                   <p className="mb-1 text-xs font-bold text-white">Yasal Uyarı</p>
                   <p className="text-xs leading-relaxed" style={{ color: "#555" }}>İkili opsiyonlar yüksek risk içerir. Bu platform yatırım tavsiyesi vermez. Simülasyon sonuçları gerçek piyasa performansını garanti etmez.</p>

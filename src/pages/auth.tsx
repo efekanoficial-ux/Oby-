@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff, Mail, Lock, User, Calendar, ChevronRight } from "lucide-react";
 import { t } from "@/i18n";
 
-type Mode = "login" | "register";
+type Mode = "login" | "register" | "complete-google";
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
@@ -18,7 +18,7 @@ export default function AuthPage() {
 
   const [currency, setCurrency] = useState<"USD" | "TL">("USD");
   const [form, setForm] = useState({
-    email: "", password: "", name: "", surname: "", birthDate: "",
+    email: "", password: "", name: "", surname: "", birthDate: "", photoUrl: "",
   });
 
   useEffect(() => {
@@ -68,6 +68,20 @@ export default function AuthPage() {
 
     const res = await loginWithGoogle();
     if (!res.success) {
+      if (res.error === "registration_required" && res.googleUser) {
+        setForm({
+          email: res.googleUser.email,
+          password: "",
+          name: res.googleUser.name,
+          surname: res.googleUser.surname,
+          birthDate: "",
+          photoUrl: res.googleUser.photoURL || "",
+        });
+        setMode("complete-google");
+        setErr("");
+        setLoading(false);
+        return;
+      }
       setErr(res.error || "Google ile giriş yapılırken bir hata oluştu.");
       setLoading(false);
       return;
@@ -107,23 +121,30 @@ export default function AuthPage() {
         style={{ background: "#0a0a0a", border: "1px solid #1a1a1a" }}
       >
         {/* Tabs */}
-        <div className="flex border-b border-[#111]">
-          {(["login", "register"] as Mode[]).map(m => (
-            <button key={m} onClick={() => switchMode(m)}
-              className="flex-1 py-3.5 text-sm font-black transition-colors relative cursor-pointer"
-              style={{ color: mode === m ? "#FF6B00" : "#444" }}>
-              {m === "login" ? t.signIn : t.signUp}
-              {mode === m && (
-                <motion.div layoutId="auth-tab" className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                  style={{ background: "#FF6B00" }} />
-              )}
-            </button>
-          ))}
-        </div>
+        {mode === "complete-google" ? (
+          <div className="px-6 pt-5 pb-3 border-b border-[#111] text-center bg-white/[0.01]">
+            <h2 className="text-sm font-black text-[#FF6B00]">Google Kaydını Tamamla</h2>
+            <p className="text-[11px] text-white/40 mt-1 font-medium">Devam etmek için lütfen aşağıdaki eksik alanları doldurun.</p>
+          </div>
+        ) : (
+          <div className="flex border-b border-[#111]">
+            {(["login", "register"] as Mode[]).map(m => (
+              <button key={m} onClick={() => switchMode(m)}
+                className="flex-1 py-3.5 text-sm font-black transition-colors relative cursor-pointer"
+                style={{ color: mode === m ? "#FF6B00" : "#444" }}>
+                {m === "login" ? t.signIn : t.signUp}
+                {mode === m && (
+                  <motion.div layoutId="auth-tab" className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
+                    style={{ background: "#FF6B00" }} />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-3">
           <AnimatePresence mode="wait">
-            {mode === "register" && (
+            {(mode === "register" || mode === "complete-google") && (
               <motion.div key="reg-fields"
                 initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                 className="flex flex-col gap-3 overflow-hidden">
@@ -167,8 +188,9 @@ export default function AuthPage() {
 
           <div className="relative">
             <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
-            <input required type="email" className={inputClass} style={{ paddingLeft: 36 }}
-              placeholder={t.email} value={form.email} onChange={set("email")} autoComplete="email" />
+            <input required type="email" className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`} style={{ paddingLeft: 36 }}
+              placeholder={t.email} value={form.email} onChange={set("email")} autoComplete="email"
+              disabled={mode === "complete-google"} />
           </div>
 
           <div className="relative">
@@ -213,7 +235,7 @@ export default function AuthPage() {
               <div className="h-4 w-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />
             ) : (
               <>
-                {mode === "login" ? t.signIn : t.createAccount}
+                {mode === "login" ? t.signIn : mode === "complete-google" ? "Kayıt İşlemini Tamamla" : t.createAccount}
                 <ChevronRight size={15} />
               </>
             )}
@@ -250,15 +272,24 @@ export default function AuthPage() {
         </form>
 
         {/* Footer */}
-        <div className="px-6 pb-6 text-center">
-          <p className="text-xs text-white/20">
-            {mode === "login" ? t.noAccount : t.alreadyMember}
-            <button onClick={() => switchMode(mode === "login" ? "register" : "login")}
-              className="font-bold text-[#FF6B00] hover:text-[#FFB800] transition-colors ml-1 cursor-pointer">
-              {mode === "login" ? t.signUp : t.signIn}
+        {mode === "complete-google" ? (
+          <div className="px-6 pb-6 text-center">
+            <button type="button" onClick={() => { setMode("login"); setForm({ email: "", password: "", name: "", surname: "", birthDate: "", photoUrl: "" }); }}
+              className="text-xs font-bold text-white/30 hover:text-[#FF6B00] transition-colors cursor-pointer">
+              ← Geri Dön / İptal Et
             </button>
-          </p>
-        </div>
+          </div>
+        ) : (
+          <div className="px-6 pb-6 text-center">
+            <p className="text-xs text-white/20">
+              {mode === "login" ? t.noAccount : t.alreadyMember}
+              <button onClick={() => switchMode(mode === "login" ? "register" : "login")}
+                className="font-bold text-[#FF6B00] hover:text-[#FFB800] transition-colors ml-1 cursor-pointer">
+                {mode === "login" ? t.signUp : t.signIn}
+              </button>
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
   );
