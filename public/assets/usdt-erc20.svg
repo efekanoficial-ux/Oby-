@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Base Tether Circle -->
+  <circle cx="128" cy="128" r="120" fill="#26A17B" stroke="#E2E8F0" stroke-width="3"/>
+
+  <!-- Tether 'T' & Ring -->
+  <g fill="#FFFFFF">
+    <!-- Top Bar -->
+    <path d="M60 62 H196 V88 H60 Z"/>
+    <!-- Vertical Bar Upper -->
+    <path d="M113 88 H143 V105 H113 Z"/>
+    <!-- Ring / Ellipse Ring (Torus) -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M128 92 C172 92 208 101.5 208 113.5 C208 125.5 172 135 128 135 C84 135 48 125.5 48 113.5 C48 101.5 84 92 128 92 Z M128 103 C161 103 189 108 189 113.5 C189 119 161 124 128 124 C95 124 67 119 67 113.5 C67 108 95 103 128 103 Z"/>
+    <!-- Vertical Bar Lower -->
+    <path d="M113 120 H143 V200 H113 Z"/>
+  </g>
+
+  <!-- ETH Badge Bottom-Right -->
+  <g transform="translate(4, 4)">
+    <circle cx="192" cy="192" r="50" fill="#384148" stroke="#FFFFFF" stroke-width="5.5" filter="url(#shadow)"/>
+    <!-- Top Pyramid -->
+    <path d="M192 162 L172 194 L192 203 Z" fill="#C0C6CC"/>
+    <path d="M192 162 L212 194 L192 203 Z" fill="#FFFFFF"/>
+    <!-- Bottom Inverted Pyramid -->
+    <path d="M192 207 L172 198 L192 224 Z" fill="#9DA4AB"/>
+    <path d="M192 207 L212 198 L192 224 Z" fill="#DCE0E5"/>
+  </g>
+</svg>

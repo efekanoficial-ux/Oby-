@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DemoAccountProvider } from "@/context/DemoAccountContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountModeProvider } from "@/context/AccountModeContext";
-import { LanguageProvider } from "@/context/LanguageContext";
+import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 import { Layout } from "@/components/layout";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -17,6 +17,7 @@ import History from "@/pages/history";
 import Profile from "@/pages/profile";
 import LeaderboardPage from "@/pages/leaderboard";
 import WalletPage from "@/pages/wallet";
+import BalancePage from "@/pages/balance";
 import Privacy from "@/pages/privacy";
 import AuthPage from "@/pages/auth";
 import Admin   from "@/pages/admin";
@@ -61,7 +62,7 @@ function MainRoutes() {
       </div>
       {!atHome && (
         <Switch>
-          <Route path="/balance" component={WalletPage} />
+          <Route path="/balance" component={BalancePage} />
           <Route path="/wallet"  component={WalletPage} />
           <Route path="/leaderboard" component={LeaderboardPage} />
           <Route path="/history" component={History} />
@@ -87,6 +88,7 @@ function Router() {
 
 function AppContent() {
   const { ready, currentUser } = useAuth();
+  const { t } = useLanguage();
   const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
@@ -103,7 +105,7 @@ function AppContent() {
   if (!ready || !showApp) {
     const rawName = currentUser?.name;
     const displayName = rawName ? rawName.trim().toUpperCase() : null;
-    const greetingText = displayName ? `Merhaba, ${displayName}` : "Merhaba";
+    const greetingText = displayName ? `${t.hello}, ${displayName}` : t.hello;
 
     return (
       <div
@@ -127,7 +129,7 @@ function AppContent() {
 
           {/* Status text */}
           <p className="text-sm sm:text-base text-white/60 font-normal tracking-wide">
-            Grafikler ve piyasa verileri hazırlanıyor...
+            {t.loadingStatus}
           </p>
         </div>
 

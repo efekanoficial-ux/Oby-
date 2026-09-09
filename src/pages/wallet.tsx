@@ -4,6 +4,10 @@ import { useLocation } from "wouter";
 import { useAuth, type PaymentSettings } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
+import { UsdtErc20Icon } from "@/components/usdt-erc20-icon";
+import { BankTransferIcon } from "@/components/bank-transfer-icon";
+import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowLeft, Copy, Check, Clock, AlertCircle, CheckCircle2,
   Landmark, Zap, Bitcoin, ArrowDownCircle, ArrowUpCircle,
@@ -118,35 +122,39 @@ export default function WalletPage() {
   const USD_TRY_RATE = 38.0;
   const withdrawMin = isTL ? 150 : 5;
 
-  const METHODS: MethodConfig[] = [
+  const isTurkey = useIsTurkey();
+
+  const ALL_METHODS: MethodConfig[] = [
     {
       id: "iban",
-      icon: Landmark,
-      label: isTL ? "Havale / EFT" : "Banka Havalesi / Wire (TRY)",
-      sub: isTL ? "TR Banka Transferi (Anında)" : "TR Banka Transferi · 1 USD = 38.00 TL",
-      color: "#0ecb81",
+      icon: BankTransferIcon,
+      label: isTL ? t.bankWire : t.wireTransfer,
+      sub: isTL ? t.bankWireTr : t.bankWireTrSub,
+      color: "#FFA800",
       min: isTL ? 350 : 5,
       currency: isTL ? "TL" : "USD"
     },
     {
       id: "trc20",
-      icon: Zap,
+      icon: UsdtTrc20Icon,
       label: "USDT (TRC-20)",
-      sub: "Tron Ağı · Düşük Komisyon · ~1 dk",
+      sub: t.tronSub,
       color: "#27AE60",
       min: isTL ? 500 : 10,
       currency: isTL ? "TL" : "USDT"
     },
     {
       id: "crypto",
-      icon: Bitcoin,
+      icon: UsdtErc20Icon,
       label: "USDT / Kripto (ERC-20)",
-      sub: "Ethereum & Çoklu Ağ · ~3 dk",
+      sub: t.ethSub,
       color: "#627EEA",
       min: isTL ? 500 : 10,
       currency: isTL ? "TL" : "USDT"
     },
   ];
+
+  const METHODS = ALL_METHODS.filter(m => isTurkey || m.id !== "iban");
 
   // Read tab parameter from URL search or default to "deposit"
   const getInitialTab = (): WalletTab => {
@@ -311,20 +319,15 @@ export default function WalletPage() {
         {/* Top bar */}
         <header className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 bg-black/60 backdrop-blur-md sticky top-0 z-20">
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs font-bold text-white/60 hover:text-white transition-colors cursor-pointer">
-            <ArrowLeft size={16} /> Geri Dön
+            <ArrowLeft size={16} /> {t.back}
           </button>
-          <span className="text-sm font-black text-white">Cüzdan & Transfer</span>
           <div className="w-16" />
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl mb-5"
-            style={{ background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)" }}>
-            <LogIn size={32} className="text-[#FF6B00]" />
-          </div>
-          <h2 className="text-xl font-black text-white mb-2">Oturum Açmanız Gerekiyor</h2>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto my-auto">
+          <h2 className="text-xl font-black text-white mb-2">{t.needLogin}</h2>
           <p className="text-sm text-white/45 leading-relaxed mb-6">
-            Para yatırma, para çekme ve transfer geçmişinizi takip edebilmek için hesabınıza giriş yapın.
+            {t.needLoginDesc}
           </p>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -332,7 +335,7 @@ export default function WalletPage() {
             className="w-full py-4 rounded-2xl text-sm font-black text-black cursor-pointer shadow-lg"
             style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
           >
-            Giriş Yap / Kayıt Ol
+            {t.loginRegister}
           </motion.button>
         </div>
       </div>
@@ -357,7 +360,7 @@ export default function WalletPage() {
 
           <div className="relative flex items-center justify-between mb-3">
             <span className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
-              Gerçek Cüzdan Bakiyesi
+              {t.realWalletBalance}
             </span>
           </div>
 
@@ -374,24 +377,24 @@ export default function WalletPage() {
               onClick={() => { setTab("deposit"); resetDeposit(); }}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 tab === "deposit"
-                  ? "bg-[#0ecb81] text-black shadow-md shadow-[#0ecb81]/20"
+                  ? "bg-white/15 text-white shadow-md"
                   : "text-white/40 hover:text-white/80"
               }`}
             >
               <ArrowDownLeft size={13} strokeWidth={2.6} />
-              <span>Para Yatır</span>
+              <span>{t.depositBtn}</span>
             </button>
 
             <button
               onClick={() => { setTab("withdraw"); resetWithdraw(); }}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 tab === "withdraw"
-                  ? "bg-[#FF6B00] text-black shadow-md shadow-[#FF6B00]/20"
+                  ? "bg-white/15 text-white shadow-md"
                   : "text-white/40 hover:text-white/80"
               }`}
             >
               <ArrowUpRight size={13} strokeWidth={2.6} />
-              <span>Para Çek</span>
+              <span>{t.withdrawBtn}</span>
             </button>
 
             <button
@@ -403,7 +406,7 @@ export default function WalletPage() {
               }`}
             >
               <Clock size={13} strokeWidth={2.4} />
-              <span>İşlemler</span>
+              <span>{t.transactionsTab}</span>
               {pendingRequests.length > 0 && (
                 <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1.5 right-1.5" />
               )}
@@ -430,9 +433,9 @@ export default function WalletPage() {
                 >
                   <div className="flex items-center justify-between px-1">
                     <p className="text-xs font-black uppercase tracking-wider text-white/40">
-                      Yatırım Yöntemi Seçin
+                      {t.selectDepositMethod}
                     </p>
-                    <span className="text-[11px] text-white/30">0 Komisyon</span>
+                    <span className="text-[11px] text-white/30">{t.zeroFee}</span>
                   </div>
 
                   <div className="flex flex-col gap-2.5">
@@ -449,11 +452,8 @@ export default function WalletPage() {
                             borderColor: `${m.color}25`,
                           }}
                         >
-                          <div
-                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                            style={{ background: `${m.color}18`, border: `1px solid ${m.color}35` }}
-                          >
-                            <Icon size={22} style={{ color: m.color }} />
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+                            <Icon size={34} />
                           </div>
 
                           <div className="flex-1 min-w-0">
@@ -500,9 +500,8 @@ export default function WalletPage() {
 
                   <div className="rounded-2xl p-4 border border-white/10 bg-black/50">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl"
-                        style={{ background: `${method.color}1a` }}>
-                        <method.icon size={20} style={{ color: method.color }} />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <method.icon size={28} />
                       </div>
                       <div>
                         <p className="text-xs font-black text-white">{method.label}</p>
@@ -849,9 +848,8 @@ export default function WalletPage() {
                             borderColor: `${m.color}25`,
                           }}
                         >
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                            style={{ background: `${m.color}18`, border: `1px solid ${m.color}35` }}>
-                            <Icon size={22} style={{ color: m.color }} />
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+                            <Icon size={34} />
                           </div>
 
                           <div className="flex-1 min-w-0">
@@ -886,9 +884,8 @@ export default function WalletPage() {
                   {/* Selected method card */}
                   <div className="rounded-2xl p-3.5 border border-white/8 bg-black/60">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{ background: `${method.color}1a` }}>
-                        <method.icon size={20} style={{ color: method.color }} />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <method.icon size={28} />
                       </div>
                       <div>
                         <p className="text-xs font-black text-white">{method.label}</p>

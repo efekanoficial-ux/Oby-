@@ -3,27 +3,18 @@ import { useLocation } from "wouter";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { AnimatedBalance } from "@/components/animated-balance";
+import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
+import { UsdtErc20Icon } from "@/components/usdt-erc20-icon";
+import { BankTransferIcon } from "@/components/bank-transfer-icon";
+import { useIsTurkey } from "@/lib/use-country";
 import {
-  Globe, Building2, Bitcoin, Banknote, CreditCard,
   ArrowDownLeft, ArrowUpRight,
   Clock, ArrowDownLeft as DepIcon, ArrowUpRight as WithIcon,
   Hourglass, TrendingUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-/* ── payment methods ─────────────────────────────────────────────────────── */
-const DEPOSIT_METHODS = [
-  { icon: Globe,     label: "USDT TRC-20",   sub: "Anında onay",      color: "#26A17B", badge: "HIZLI" },
-  { icon: Building2, label: "IBAN / Havale",  sub: "1-24 saat",        color: "#4C8DFF", badge: null   },
-  { icon: Bitcoin,   label: "Kripto",         sub: "BTC · ETH · BNB",  color: "#F7931A", badge: null   },
-] as const;
-
-const WITHDRAW_METHODS = [
-  { icon: Banknote,    label: "Banka Transferi", sub: "1-3 iş günü", color: "#0ecb81", badge: null    },
-  { icon: Globe,       label: "USDT TRC-20",     sub: "Anında",      color: "#26A17B", badge: "HIZLI" },
-  { icon: CreditCard,  label: "Kripto Cüzdan",   sub: "BTC · ETH",   color: "#F7931A", badge: null    },
-] as const;
 
 /* ── Method row ─────────────────────────────────────────────────────────── */
 function MethodRow({
@@ -39,9 +30,8 @@ function MethodRow({
       className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
       style={!isLast ? { borderBottom: "1px solid #131313" } : {}}
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-        style={{ background: `${color}15`, border: `1px solid ${color}28` }}>
-        <Icon size={17} style={{ color }} />
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+        <Icon size={32} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -67,9 +57,23 @@ export default function Balance() {
   const { currentUser, requests } = useAuth();
   const { balance: demoBalance }  = useDemoAccount();
   const { isReal }                = useAccountMode();
+  const { t }                     = useLanguage();
+  const isTurkey                  = useIsTurkey();
   const currency = (currentUser as any)?.currency ?? "USD";
   const sym = currency === "TL" ? "₺" : "$";
   const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
+
+  const depositMethods = [
+    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",    sub: t.instantApprove,  color: "#26A17B", badge: t.fastBadge },
+    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",    sub: t.ethNetwork,      color: "#627EEA", badge: null   },
+    { id: "iban",  icon: BankTransferIcon,label: t.wireTransfer,   sub: t.hours1to24,      color: "#FFA800", badge: null   },
+  ];
+
+  const withdrawMethods = [
+    { id: "iban",  icon: BankTransferIcon,label: t.bankWire,       sub: t.businessDays1to3, color: "#FFA800", badge: null    },
+    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",     sub: t.instant,          color: "#26A17B", badge: t.fastBadge },
+    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",     sub: t.ethChain,         color: "#627EEA", badge: null    },
+  ];
 
   const allReqs     = currentUser ? requests.filter(r => r.userId === currentUser.id) : [];
   const pendingReqs = allReqs.filter(r => r.status === "pending");
@@ -82,9 +86,15 @@ export default function Balance() {
   const realBalance    = currentUser?.realBalance    ?? 0;
 
   const accent    = isReal ? "#0ecb81" : "#FF6B00";
-  const accentMid = isReal ? "#06a860" : "#FFB800";
   const balance   = isReal ? realBalance : demoBalance;
-  const methods   = activeTab === "deposit" ? DEPOSIT_METHODS : WITHDRAW_METHODS;
+  
+  const rawMethods = activeTab === "deposit" ? depositMethods : withdrawMethods;
+  const methods    = rawMethods.filter((m) => {
+    if (!isTurkey && m.id === "iban") {
+      return false;
+    }
+    return true;
+  });
 
   const openWallet = (tab: "deposit" | "withdraw") => {
     navigate(`/wallet?tab=${tab}`);
@@ -99,13 +109,13 @@ export default function Balance() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "rgba(255,255,255,0.3)" }}>Obyo Option</p>
-            <p className="text-lg font-black text-white mt-0.5">Bakiye</p>
+            <p className="text-lg font-black text-white mt-0.5">{t.balanceTitle}</p>
           </div>
           <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5"
             style={{ background: `${accent}12`, border: `1px solid ${accent}28` }}>
             <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: accent }} />
             <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: accent }}>
-              {isReal ? "GERÇEK" : "DEMO"}
+              {isReal ? t.realAcc : t.demoAcc}
             </span>
           </div>
         </div>
@@ -153,7 +163,7 @@ export default function Balance() {
           <div className="relative mb-6">
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
               style={{ color: isReal ? "rgba(14,203,129,0.45)" : "rgba(255,107,0,0.45)" }}>
-              Mevcut Bakiye
+              {t.currentBalance}
             </p>
             <div className="flex items-end gap-0.5">
               <AnimatedBalance
@@ -165,7 +175,7 @@ export default function Balance() {
             </div>
             {!isReal && (
               <p className="text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.22)" }}>
-                Gerçek hesap için para yatır
+                {t.depositForReal}
               </p>
             )}
           </div>
@@ -174,14 +184,14 @@ export default function Balance() {
           <div className="relative flex gap-5 mb-6">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: "rgba(255,255,255,0.2)" }}>Yatırılan</p>
+                style={{ color: "rgba(255,255,255,0.2)" }}>{t.deposited}</p>
               <p className="text-sm font-black tabular-nums"
                 style={{ color: "rgba(255,255,255,0.5)" }}>{sym}{totalDeposited.toFixed(2)}</p>
             </div>
             <div className="w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: "rgba(255,255,255,0.2)" }}>Çekilen</p>
+                style={{ color: "rgba(255,255,255,0.2)" }}>{t.withdrawn}</p>
               <p className="text-sm font-black tabular-nums"
                 style={{ color: "rgba(255,255,255,0.5)" }}>{sym}{totalWithdrawn.toFixed(2)}</p>
             </div>
@@ -190,7 +200,7 @@ export default function Balance() {
                 <div className="w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
-                    style={{ color: "rgba(255,255,255,0.2)" }}>Bekleyen</p>
+                    style={{ color: "rgba(255,255,255,0.2)" }}>{t.pending}</p>
                   <p className="text-sm font-black tabular-nums" style={{ color: "#FFB800" }}>
                     {pendingReqs.length}
                   </p>
@@ -211,7 +221,7 @@ export default function Balance() {
                 style={{ background: isReal ? "rgba(14,203,129,0.18)" : "rgba(255,107,0,0.18)" }}>
                 <ArrowDownLeft size={17} strokeWidth={2.5} style={{ color: isReal ? "#0ecb81" : "#FF6B00" }} />
               </div>
-              <span className="text-xs font-black" style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}>Para Yatır</span>
+              <span className="text-xs font-black" style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}>{t.depositBtn}</span>
             </motion.button>
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => openWallet("withdraw")}
               className="flex flex-col items-center gap-2 rounded-2xl py-4"
@@ -220,7 +230,7 @@ export default function Balance() {
                 style={{ background: "rgba(255,255,255,0.06)" }}>
                 <ArrowUpRight size={17} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.4)" }} />
               </div>
-              <span className="text-xs font-black" style={{ color: "rgba(255,255,255,0.35)" }}>Para Çek</span>
+              <span className="text-xs font-black" style={{ color: "rgba(255,255,255,0.35)" }}>{t.withdrawBtn}</span>
             </motion.button>
           </div>
         </motion.div>
@@ -228,7 +238,7 @@ export default function Balance() {
         {/* ── Section label ────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-5 mb-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] shrink-0"
-            style={{ color: "rgba(255,255,255,0.22)" }}>Yatırım Yöntemleri</p>
+            style={{ color: "rgba(255,255,255,0.22)" }}>{t.depositMethods}</p>
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.05)" }} />
         </div>
 
@@ -240,7 +250,7 @@ export default function Balance() {
               style={activeTab === tab
                 ? { background: `${accent}15`, border: `1px solid ${accent}30`, color: accent }
                 : { background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)" }}>
-              {tab === "deposit" ? "Para Yatır" : "Para Çek"}
+              {tab === "deposit" ? t.depositBtn : t.withdrawBtn}
             </button>
           ))}
         </div>
@@ -279,14 +289,14 @@ export default function Balance() {
                   <Clock size={12} style={{ color: "#FFB800" }} />
                 </div>
                 <span className="text-xs font-black text-[#FFB800]">
-                  {pendingReqs.length} Bekleyen İşlem
+                  {pendingReqs.length} {t.pendingTransactions}
                 </span>
               </div>
               {pendingReqs.map(r => (
                 <div key={r.id} className="flex items-center justify-between px-4 py-3">
                   <div>
                     <span className="text-xs font-bold text-white">
-                      {r.type === "deposit" ? "Para Yatırma" : "Para Çekme"}
+                      {r.type === "deposit" ? t.depositTx : t.withdrawTx}
                     </span>
                     <p className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,0.18)" }}>
                       #{r.id.slice(0, 8)}
@@ -302,34 +312,34 @@ export default function Balance() {
         {/* ── Stats grid ───────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-5 mt-5 mb-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] shrink-0"
-            style={{ color: "rgba(255,255,255,0.22)" }}>Hesap Özeti</p>
+            style={{ color: "rgba(255,255,255,0.22)" }}>{t.accountSummary}</p>
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.05)" }} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 px-4">
           {[
             {
-              icon: DepIcon,  label: "Toplam Yatırılan",
+              icon: DepIcon,  label: t.totalDepositedLabel,
               value: `$${totalDeposited.toFixed(2)}`,
-              sub: `${approvedDep.length} onaylı`,
+              sub: `${approvedDep.length} ${t.approvedCount}`,
               color: "#0ecb81",
             },
             {
-              icon: WithIcon, label: "Toplam Çekilen",
+              icon: WithIcon, label: t.totalWithdrawnLabel,
               value: `$${totalWithdrawn.toFixed(2)}`,
-              sub: `${approvedWit.length} onaylı`,
+              sub: `${approvedWit.length} ${t.approvedCount}`,
               color: "#4C8DFF",
             },
             {
-              icon: Hourglass, label: "Bekleyen Yatırım",
-              value: pendingDep.length > 0 ? `${pendingDep.length} işlem` : "—",
-              sub: "onay bekleniyor",
+              icon: Hourglass, label: t.pendingDepositLabel,
+              value: pendingDep.length > 0 ? `${pendingDep.length} ${t.txCount}` : "—",
+              sub: t.pendingApproval,
               color: "#FFB800",
             },
             {
-              icon: TrendingUp, label: "Net Durum",
+              icon: TrendingUp, label: t.netStatusLabel,
               value: `$${(totalDeposited - totalWithdrawn).toFixed(2)}`,
-              sub: "yatırılan − çekilen",
+              sub: t.netSubText,
               color: (totalDeposited - totalWithdrawn) >= 0 ? "#0ecb81" : "#f6465d",
             },
           ].map((s, i) => {
