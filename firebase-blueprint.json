@@ -37,6 +37,20 @@
         "createdAt": { "type": "number" }
       },
       "required": ["userId", "userEmail", "userName", "type", "amount", "currency", "method", "status", "createdAt"]
+    },
+    "PaymentSettings": {
+      "title": "PaymentSettings",
+      "description": "Admin-configured deposit payment accounts and wallet addresses",
+      "type": "object",
+      "properties": {
+        "ibanBank": { "type": "string" },
+        "ibanHolder": { "type": "string" },
+        "ibanNumber": { "type": "string" },
+        "ibanSwift": { "type": "string" },
+        "trc20Address": { "type": "string" },
+        "erc20Address": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -47,6 +61,10 @@
     "/requests/{requestId}": {
       "schema": "ObyoRequest",
       "description": "Deposit and withdrawal transaction requests"
+    },
+    "/settings/payment": {
+      "schema": "PaymentSettings",
+      "description": "Global payment deposit details"
     }
   }
 }

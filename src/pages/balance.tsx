@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
-import { WalletModal } from "@/components/wallet-modal";
 import { AnimatedBalance } from "@/components/animated-balance";
 import {
   Globe, Building2, Bitcoin, Banknote, CreditCard,
@@ -63,14 +63,13 @@ function MethodRow({
 
 /* ── main page ─────────────────────────────────────────────────────────── */
 export default function Balance() {
+  const [, navigate] = useLocation();
   const { currentUser, requests } = useAuth();
   const { balance: demoBalance }  = useDemoAccount();
   const { isReal }                = useAccountMode();
   const currency = (currentUser as any)?.currency ?? "USD";
   const sym = currency === "TL" ? "₺" : "$";
-  const [showWallet, setShowWallet]   = useState(false);
-  const [activeTab, setActiveTab]     = useState<"deposit" | "withdraw">("deposit");
-  const [walletTab, setWalletTab]     = useState<"deposit" | "withdraw">("deposit");
+  const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
 
   const allReqs     = currentUser ? requests.filter(r => r.userId === currentUser.id) : [];
   const pendingReqs = allReqs.filter(r => r.status === "pending");
@@ -88,8 +87,7 @@ export default function Balance() {
   const methods   = activeTab === "deposit" ? DEPOSIT_METHODS : WITHDRAW_METHODS;
 
   const openWallet = (tab: "deposit" | "withdraw") => {
-    setWalletTab(tab);
-    setShowWallet(true);
+    navigate(`/wallet?tab=${tab}`);
   };
 
   return (
@@ -359,8 +357,6 @@ export default function Balance() {
         </div>
 
       </div>
-
-      <WalletModal show={showWallet} onClose={() => setShowWallet(false)} defaultTab={walletTab} />
     </>
   );
 }

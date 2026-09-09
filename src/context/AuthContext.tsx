@@ -47,6 +47,25 @@ export interface ObyoRequest {
   createdAt:   number;
 }
 
+export interface PaymentSettings {
+  ibanBank:     string;
+  ibanHolder:   string;
+  ibanNumber:   string;
+  ibanSwift:    string;
+  trc20Address: string;
+  erc20Address: string;
+  updatedAt?:   number;
+}
+
+export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
+  ibanBank:     "Garanti BBVA",
+  ibanHolder:   "Obyo Financial Technologies Ltd.",
+  ibanNumber:   "TR88 0006 2000 8765 4321 0099 73",
+  ibanSwift:    "TGBATRISXXX",
+  trc20Address: "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S",
+  erc20Address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+};
+
 interface RegisterData {
   email:     string;
   password:  string;
@@ -60,6 +79,8 @@ interface AuthContextType {
   ready:            boolean;
   currentUser:      ObyoUser | null;
   isAdmin:          boolean;
+  paymentSettings:  PaymentSettings;
+  updatePaymentSettings: (settings: Partial<PaymentSettings>) => Promise<{ success: boolean; error?: string }>;
   login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register:         (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout:           () => Promise<void>;
@@ -84,9 +105,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin,     setIsAdmin]     = useState(false);
   const [users,       setUsers]       = useState<ObyoUser[]>([]);
   const [requests,    setRequests]    = useState<ObyoRequest[]>([]);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
 
   const userUnsubRef  = useRef<(() => void) | null>(null);
   const adminUnsubs   = useRef<(() => void)[]>([]);
+  const realBalanceRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (currentUser?.realBalance !== undefined) {
+      realBalanceRef.current = currentUser.realBalance;
+    }
+  }, [currentUser?.realBalance]);
+
+  /* ── Payment Settings real-time listener ─────────────────────────────── */
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "payment"), (snap) => {
+      if (snap.exists()) {
+        setPaymentSettings({ ...DEFAULT_PAYMENT_SETTINGS, ...snap.data() } as PaymentSettings);
+      }
+    }, (err) => {
+      if (err.code !== "permission-denied") console.error("Payment settings listener error:", err);
+    });
+    return () => unsub();
+  }, []);
 
   /* ── Firebase Auth listener (regular users) ─────────────────────────── */
   useEffect(() => {
@@ -405,11 +446,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ── Real trade actions ──────────────────────────────────────────────── */
   const placeRealTrade = async (amount: number): Promise<boolean> => {
-    if (!currentUser || currentUser.realBalance < amount) return false;
-    await updateDoc(doc(db, "users", currentUser.id), {
-      realBalance: increment(-amount),
-    });
-    return true;
+    if (!currentUser) return false;
+    if (realBalanceRef.current < amount) return false;
+
+    // Synchronously deduct from ref to prevent rapid click double-spending
+    realBalanceRef.current -= amount;
+    setCurrentUser(prev => prev ? { ...prev, realBalance: Math.max(0, prev.realBalance - amount) } : null);
+
+    try {
+      await updateDoc(doc(db, "users", currentUser.id), {
+        realBalance: increment(-amount),
+      });
+      return true;
+    } catch (err) {
+      realBalanceRef.current += amount;
+      return false;
+    }
   };
 
   const settleRealTrade = async (amount: number, won: boolean, payout: number) => {
@@ -434,12 +486,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePaymentSettings = async (settings: Partial<PaymentSettings>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const settingsRef = doc(db, "settings", "payment");
+      const updated = {
+        ...settings,
+        updatedAt: Date.now(),
+      };
+      await setDoc(settingsRef, updated, { merge: true });
+      setPaymentSettings(prev => ({ ...prev, ...settings }));
+      return { success: true };
+    } catch (err: any) {
+      console.error("updatePaymentSettings error:", err);
+      return { success: false, error: err?.message || "Ödeme bilgileri kaydedilemedi." };
+    }
+  };
+
   const refreshUser  = () => {};
   const refreshAdmin = () => {};
 
   return (
     <AuthContext.Provider value={{
       ready, currentUser, isAdmin,
+      paymentSettings, updatePaymentSettings,
       login, register, logout,
       users, requests,
       addRequest, processRequest, addBalanceDirect,

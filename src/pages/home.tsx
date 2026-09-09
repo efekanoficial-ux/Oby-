@@ -241,6 +241,9 @@ interface ChartNotif {
 }
 
 function ChartNotification({ notif }: { notif: ChartNotif | null }) {
+  const { currencySymbol } = useAccountMode();
+  const cs = currencySymbol;
+
   return (
     <AnimatePresence mode="wait">
       {notif && (
@@ -260,8 +263,8 @@ function ChartNotification({ notif }: { notif: ChartNotif | null }) {
               : (won ? "#0ecb81" : "#f6465d");
             const total = notif.amount + (notif.payout ?? 0);
             const amtStr = isOpen
-              ? `$${notif.amount}`
-              : (won ? `+$${total.toFixed(2)}` : `-$${notif.amount}`);
+              ? `${cs}${notif.amount}`
+              : (won ? `+${cs}${total.toFixed(2)}` : `-${cs}${notif.amount}`);
             const label = isOpen
               ? (notif.direction === "UP" ? "▲" : "▼")
               : (won ? "▲" : "▼");
@@ -391,7 +394,7 @@ function TradeControls({
 
   const commitAmount = (raw: string) => {
     const parsed = parseFloat(raw.replace(",", "."));
-    const valid = isNaN(parsed) ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
+    const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
     setAmount(valid);
     setAmountStr(String(valid));
   };
@@ -887,7 +890,7 @@ function MobileTradePanel({
 
   const commitAmount = (raw: string) => {
     const parsed = parseFloat(raw.replace(",", "."));
-    const valid = isNaN(parsed) ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
+    const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
     setAmount(valid);
     setAmountStr(String(valid));
   };
@@ -1153,10 +1156,10 @@ export default function Home() {
 
   const { balance, activeTrades, completedTrades, tradesLoading, placeTrade } = useDemoAccount();
   const { placeRealTrade, settleRealTrade, currentUser } = useAuth();
-  const { displayBalance, isReal } = useAccountMode();
+  const { displayBalance, isReal, currency, currencySymbol } = useAccountMode();
   const isMobile = useIsMobile();
-  const currency  = (currentUser as any)?.currency ?? "USD";
   const minAmount = currency === "TL" ? 34 : 1;
+  const sym = currencySymbol;
   const [, navigate] = useLocation();
 
   const [openAssets,     setOpenAssets]     = useState<(typeof ASSETS)[0][]>(() => {
@@ -1293,11 +1296,18 @@ export default function Home() {
 
   const setAmountPersist = useCallback((v: number | ((prev: number) => number)) => {
     setAmount(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
+      const nextRaw = typeof v === "function" ? v(prev) : v;
+      const next = isNaN(nextRaw) ? minAmount : Math.max(minAmount, nextRaw);
       try { localStorage.setItem("obyo_trade_amount", String(next)); } catch {}
       return next;
     });
-  }, []);
+  }, [minAmount]);
+
+  useEffect(() => {
+    if (amount < minAmount) {
+      setAmountPersist(minAmount);
+    }
+  }, [minAmount, amount, setAmountPersist]);
 
   /* Update now every second — used to filter expired active trades from the UI
      before the 500ms settlement interval fires (prevents "stuck at 00:00" cards). */
@@ -1539,16 +1549,34 @@ export default function Home() {
     });
   }, [asset.label]);
 
-  /* For demo: up to 5 simultaneous LIVE trades (exclude already-expired ones that
-     haven't been settled yet by the 500ms interval, so they don't eat into the limit). */
+  /* For demo & real: up to 5 simultaneous LIVE trades (exclude already-expired ones that
+     haven't been settled yet by the interval, so they don't eat into the limit). */
   const liveTradeCount = activeTrades.filter(
     t => t.startTime + t.duration * 1000 > Date.now()
   ).length;
-  const tradeBlocked = isReal ? realEntries.length >= 5 : liveTradeCount >= 5;
+  const liveRealCount = realEntries.filter(
+    r => r.expiryTime > Date.now()
+  ).length;
+  const currentActiveCount = isReal ? liveRealCount : liveTradeCount;
+  const tradeBlocked = currentActiveCount >= 5;
+
+  const isTradingRef = useRef(false);
 
   const handleTrade = async (dir: "UP" | "DOWN") => {
-    if (tradeBlocked || amount < minAmount) return;
-    if (balanceWarn) {
+    if (isTradingRef.current) return;
+
+    if (currentActiveCount >= 5) {
+      alert("Aynı anda en fazla 5 aktif işlem açabilirsiniz.");
+      return;
+    }
+
+    const tradeAmount = Math.max(minAmount, isNaN(amount) ? minAmount : amount);
+    if (amount < minAmount) {
+      setAmountPersist(minAmount);
+    }
+
+    const currentBal = isReal ? (currentUser?.realBalance ?? 0) : balance;
+    if (currentBal < tradeAmount || balanceWarn) {
       alert(isReal ? "Yetersiz Bakiye. Lütfen cüzdanınıza para yatırın." : "Demo bakiyeniz yetersiz.");
       return;
     }
@@ -1563,27 +1591,33 @@ export default function Home() {
     const id       = `${now}-${Math.random().toString(36).slice(2, 8)}`;
     const expiryMs = now + tf.secs * 1000;
 
-    if (isReal) {
-      const ok = await placeRealTrade(amount);
-      if (!ok) return;
-      const re = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount, payoutRate: asset.payout, assetLabel: asset.label };
-      setRealEntries(prev => [...prev, re]);
-      setChartEntries(prev => [...prev, { ...re, isReal: true }]);
-      /* Save to Firestore immediately so trade persists across sessions */
-      const currentUid = currentUser?.id ?? auth.currentUser?.uid;
-      if (currentUid) {
-        addDoc(collection(db, "realActiveTrades"), {
-          userId: currentUid, tradeId: id, id, asset: asset.label, direction: dir,
-          amount, entryPrice: price, entryTime: now, expiryTime: expiryMs,
-          payoutRate: asset.payout,
-        }).then(ref => { realEntryFsIdMapRef.current.set(id, ref.id); }).catch(() => {});
+    isTradingRef.current = true;
+    try {
+      if (isReal) {
+        const ok = await placeRealTrade(tradeAmount);
+        if (!ok) return;
+        const re = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
+        setRealEntries(prev => [...prev, re]);
+        setChartEntries(prev => [...prev, { ...re, isReal: true }]);
+        /* Save to Firestore immediately so trade persists across sessions */
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
+        if (currentUid) {
+          addDoc(collection(db, "realActiveTrades"), {
+            userId: currentUid, tradeId: id, id, asset: asset.label, direction: dir,
+            amount: tradeAmount, entryPrice: price, entryTime: now, expiryTime: expiryMs,
+            payoutRate: asset.payout,
+          }).then(ref => { realEntryFsIdMapRef.current.set(id, ref.id); }).catch(() => {});
+        }
+      } else {
+        /* Pass the same id to placeTrade so activeTrades and chartEntries share the same id.
+           This lets the activeTrades sync effect (above) remove the overlay at settlement. */
+        const tradeId = placeTrade(asset.label, dir, tradeAmount, tf.secs, price, id);
+        if (!tradeId) return;
+        const entry = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, isReal: false };
+        setChartEntries(prev => [...prev, entry]);
       }
-    } else {
-      /* Pass the same id to placeTrade so activeTrades and chartEntries share the same id.
-         This lets the activeTrades sync effect (above) remove the overlay at settlement. */
-      placeTrade(asset.label, dir, amount, tf.secs, price, id);
-      const entry = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount, isReal: false };
-      setChartEntries(prev => [...prev, entry]);
+    } finally {
+      isTradingRef.current = false;
     }
   };
 
@@ -1596,6 +1630,7 @@ export default function Home() {
         digits={asset.digits}
         chartInterval={CHART_INTERVALS[chartIntervalIdx].value}
         onPriceChange={handlePrice}
+        currencySymbol={sym}
         activeEntries={chartEntries.filter(e => !!e.isReal === isReal)}
         onPanChange={setIsPanned}
         onZoomChange={handleZoom}
@@ -1776,8 +1811,13 @@ export default function Home() {
                     type="text"
                     value={amount}
                     onChange={(e) => {
-                      const n = parseFloat(e.target.value);
+                      const n = parseFloat(e.target.value.replace(",", "."));
                       if (!isNaN(n)) setAmountPersist(n);
+                    }}
+                    onBlur={() => {
+                      if (amount < minAmount || isNaN(amount)) {
+                        setAmountPersist(minAmount);
+                      }
                     }}
                     className="w-full text-center font-bold text-white text-xs bg-transparent outline-none tabular-nums"
                   />

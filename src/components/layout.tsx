@@ -6,7 +6,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { WalletModal } from "@/components/wallet-modal";
 import { NotificationsModal } from "@/components/notifications-modal";
 import { LanguageModal } from "@/components/language-modal";
 import { AnimatedBalance } from "@/components/animated-balance";
@@ -223,13 +222,14 @@ function BlueDiamond3D({ size = 36, className = "" }: { size?: number; className
 
 /* ── Account Mode Switcher ───────────────────────────────────────────────── */
 function AccountSwitcher({
-  show, onClose, mode, onSelect, demoBalance, realBalance, hasRealAccount, align = "left", onRealClick
+  show, onClose, mode, onSelect, demoBalance, realBalance, hasRealAccount, align = "left", onRealClick, currency = "TL"
 }: {
   show: boolean; onClose: () => void;
   mode: AccMode; onSelect: (m: AccMode) => void;
   demoBalance: number; realBalance: number; hasRealAccount: boolean;
   align?: "left" | "right";
   onRealClick?: () => void;
+  currency?: string;
 }) {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
@@ -266,7 +266,7 @@ function AccountSwitcher({
             </div>
             <div className="flex-1 text-left">
               <p className="text-xs font-black" style={{ color: mode === "demo" ? "#FF6B00" : "#888" }}>{t.demoAccount}</p>
-              <AnimatedBalance value={demoBalance} className="text-[10px] font-bold text-[#FFB800]" />
+              <AnimatedBalance value={demoBalance} currency={currency} className="text-[10px] font-bold text-[#FFB800]" />
             </div>
             {mode === "demo" && (
               <div className="h-1.5 w-1.5 rounded-full bg-[#FF6B00]" />
@@ -290,7 +290,7 @@ function AccountSwitcher({
                 {t.realAccount}
               </p>
               {hasRealAccount ? (
-                <AnimatedBalance value={realBalance} className="text-[10px] font-bold text-[#0ecb81]" />
+                <AnimatedBalance value={realBalance} currency={currency} className="text-[10px] font-bold text-[#0ecb81]" />
               ) : (
                 <p className="text-[10px] font-bold text-[#333]">{t.loginRegister}</p>
               )}
@@ -323,7 +323,7 @@ function DesktopSidebar({
   const navItems = [
     { path: "/",        icon: BarChart2, label: t.navTrade    },
     { path: "/history", icon: Clock,    label: t.navHistory  },
-    { path: "/balance", icon: Wallet,   label: t.navBalance  },
+    { path: "/wallet",  icon: Wallet,   label: t.navBalance  },
     { path: "/profile", icon: Gem,      label: t.navVip      },
   ];
 
@@ -404,12 +404,11 @@ function DesktopHeader({
   const { t } = useLanguage();
   const [, navigate] = useLocation();
   const { currentUser } = useAuth();
-  const { mode, setMode, displayBalance, isReal } = useAccountMode();
+  const { mode, setMode, displayBalance, isReal, currency } = useAccountMode();
   const { balance: demoBalance } = useDemoAccount();
   const [showSwitcher, setShowSwitcher] = useState(false);
 
   const realBalance = currentUser?.realBalance ?? 0;
-  const currency = (currentUser as any)?.currency ?? "USD";
   const modeColor = isReal ? "#0ecb81" : "#FF6B00";
   const modeLabel = isReal ? t.realAccount : t.demoAccount;
 
@@ -457,6 +456,7 @@ function DesktopHeader({
             realBalance={realBalance}
             hasRealAccount={!!currentUser}
             onRealClick={() => navigate("/auth")}
+            currency={currency}
           />
         </div>
 
@@ -511,9 +511,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const [location, navigate] = useLocation();
   const { currentUser } = useAuth();
-  const { mode, setMode, displayBalance, isReal } = useAccountMode();
+  const { mode, setMode, displayBalance, isReal, currency } = useAccountMode();
   const { balance: demoBalance } = useDemoAccount();
-  const [showWallet,        setShowWallet]        = useState(false);
   const [showSwitcher,      setShowSwitcher]       = useState(false);
   const [sidebarCollapsed,  setSidebarCollapsed]   = useState(false);
   const [showNotifModal,    setShowNotifModal]     = useState(false);
@@ -524,7 +523,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const tabs = [
     { path: "/history", icon: Clock,    label: t.navHistory },
     { path: "/",        icon: BarChart2, label: t.navTrade   },
-    { path: "/balance", icon: Wallet,   label: t.navBalance  },
+    { path: "/wallet",  icon: Wallet,   label: t.navBalance  },
     { path: "/profile", icon: Gem,      label: t.navVip      },
   ];
 
@@ -534,7 +533,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const realBalance = currentUser?.realBalance ?? 0;
-  const currency = (currentUser as any)?.currency ?? "USD";
   const sym = currency === "TL" ? "₺" : "$";
   const modeColor   = isReal ? "#0ecb81" : "#FF6B00";
   const modeLabel   = isReal ? t.realAccount : t.demoAccount;
@@ -577,7 +575,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {/* Bakiye Kısmı */}
             <motion.button
               whileTap={{ scale: 0.94 }}
-              onClick={() => currentUser ? setShowSwitcher(s => !s) : setShowWallet(true)}
+              onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg hover:bg-white/5 transition-colors text-left"
             >
               <div className="flex flex-col items-end justify-center">
@@ -596,7 +594,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {/* Cüzdan Butonu */}
             <motion.button
               whileTap={{ scale: 0.92 }}
-              onClick={() => setShowWallet(true)}
+              onClick={() => navigate("/wallet")}
               className="flex h-[34px] items-center gap-1.5 rounded-xl px-2.5 font-black text-black text-xs shrink-0"
               style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)", boxShadow: "0 4px 14px rgba(255,107,0,0.35)" }}
               title="Cüzdan"
@@ -612,6 +610,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               demoBalance={demoBalance} realBalance={realBalance}
               hasRealAccount={!!currentUser}
               onRealClick={() => navigate("/auth")}
+              currency={currency}
             />
           </div>
         </header>
@@ -677,8 +676,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-
-        <WalletModal show={showWallet} onClose={() => setShowWallet(false)} />
       </div>
     );
   }
@@ -693,7 +690,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <DesktopHeader
-          onWallet={() => setShowWallet(true)}
+          onWallet={() => navigate("/wallet")}
           onNotif={() => setShowNotifModal(v => !v)}
           onSettings={() => setShowLangModal(true)}
         />
@@ -703,7 +700,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <WalletModal show={showWallet} onClose={() => setShowWallet(false)} />
       <NotificationsModal show={showNotifModal} onClose={() => setShowNotifModal(false)} />
       <LanguageModal
         show={showLangModal}

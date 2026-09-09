@@ -40,6 +40,8 @@ interface Props {
   onCandlesChange?: (candles: Candle[]) => void;
   onRealDataChange?: (isReal: boolean) => void;
   onLoadingChange?: (loading: boolean) => void;
+  /** Currency symbol to display on trade bubbles (e.g. ₺ or $) */
+  currencySymbol?: string;
   /** All open trade entries to overlay on the chart (lines + bubbles). */
   activeEntries?: (ActiveEntry & { amount?: number })[];
   /** Increment to trigger a scroll-to-live (recenter) from outside. */
@@ -182,6 +184,7 @@ export function CandleChart({
   chartInterval = "5s",
   onPriceChange,
   activeEntries = [],
+  currencySymbol = "$",
   onPanChange,
   onZoomChange,
   showBollinger,
@@ -1232,7 +1235,7 @@ export function CandleChart({
                   boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
                   letterSpacing: "0.02em",
                 }}>
-                  ${entry.amount}
+                  {currencySymbol}{entry.amount}
                 </div>
               )}
             </div>

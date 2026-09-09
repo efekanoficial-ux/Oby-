@@ -12,14 +12,16 @@ interface AnimatedBalanceProps {
 
 export function AnimatedBalance({
   value,
-  currency = "USD",
+  currency,
   className = "",
   showSymbol = true,
   symbol,
   prefix = "",
   style,
 }: AnimatedBalanceProps) {
-  const sym = symbol ?? (currency === "TL" ? "₺" : "$");
+  // Determine effective currency & symbol
+  const effectiveCurrency = currency ?? (typeof window !== "undefined" && localStorage.getItem("obyo_guest_currency") === "USD" ? "USD" : "TL");
+  const sym = symbol ?? (effectiveCurrency === "TL" || effectiveCurrency === "TRY" ? "₺" : "$");
   const [displayValue, setDisplayValue] = useState(value);
 
   const prevValRef = useRef(value);
@@ -67,7 +69,8 @@ export function AnimatedBalance({
     };
   }, [value]);
 
-  const formattedNum = displayValue.toLocaleString("en-US", {
+  const locale = sym === "₺" || effectiveCurrency === "TL" || effectiveCurrency === "TRY" ? "tr-TR" : "en-US";
+  const formattedNum = displayValue.toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

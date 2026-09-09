@@ -94,6 +94,11 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
   const activeTradesRef = useRef(activeTrades);
   activeTradesRef.current = activeTrades;
 
+  const balanceRef = useRef(balance);
+  useEffect(() => {
+    balanceRef.current = balance;
+  }, [balance]);
+
   /* ── Firestore balance listener (non-guest) ──────────────────────────── */
   useEffect(() => {
     if (isGuest) return;
@@ -303,10 +308,20 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
     amount: number, duration: number, currentPrice: number,
     tradeId?: string,
   ): string => {
-    if (balance < amount) return tradeId ?? Math.random().toString(36).slice(2, 9);
+    // Check available balance synchronously to avoid negative balance from rapid clicks
+    if (balanceRef.current < amount) return "";
+
+    // Maximum 5 simultaneous live active trades
+    const liveCount = activeTradesRef.current.filter(
+      t => t.startTime + t.duration * 1000 > Date.now()
+    ).length;
+    if (liveCount >= 5) return "";
+
+    // Synchronously deduct from ref
+    balanceRef.current -= amount;
 
     setBalance(b => {
-      const next = b - amount;
+      const next = Math.max(0, b - amount);
       if (isGuest) saveGuestBalance(next);
       return next;
     });

@@ -13,9 +13,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { DesktopAuthGate } from "@/components/desktop-auth-gate";
 import Home    from "@/pages/home";
 import Chart   from "@/pages/chart";
-import Balance from "@/pages/balance";
 import History from "@/pages/history";
 import Profile from "@/pages/profile";
+import LeaderboardPage from "@/pages/leaderboard";
+import WalletPage from "@/pages/wallet";
 import Privacy from "@/pages/privacy";
 import AuthPage from "@/pages/auth";
 import Admin   from "@/pages/admin";
@@ -60,7 +61,9 @@ function MainRoutes() {
       </div>
       {!atHome && (
         <Switch>
-          <Route path="/balance" component={Balance} />
+          <Route path="/balance" component={WalletPage} />
+          <Route path="/wallet"  component={WalletPage} />
+          <Route path="/leaderboard" component={LeaderboardPage} />
           <Route path="/history" component={History} />
           <Route path="/profile" component={Profile} />
           <Route path="/chart"   component={Chart}   />

@@ -3,13 +3,12 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   User, Settings, Bell, Shield, ChevronRight,
-  HelpCircle, LogOut, X, Hash, Wallet, Camera,
+  HelpCircle, LogOut, X, Hash, Wallet, Camera, Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { WalletModal } from "@/components/wallet-modal";
+import { LeaderboardModal } from "@/components/leaderboard-modal";
 import { ProfilePhotoModal } from "@/components/profile-photo-modal";
 import { LanguageModal } from "@/components/language-modal";
-
 
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -18,7 +17,7 @@ export default function Profile() {
   const { currentUser, logout } = useAuth();
   const { language, t } = useLanguage();
   const [showAbout, setShowAbout]             = useState(false);
-  const [showWallet, setShowWallet]           = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showPhotoModal, setShowPhotoModal]   = useState(false);
   const [showLangModal, setShowLangModal]     = useState(false);
   const [notifState, setNotifState]           = useState(true);
@@ -26,11 +25,12 @@ export default function Profile() {
   const handleLogout = () => { logout(); navigate("/auth"); };
 
   const menuItems = [
-    { icon: Wallet,      label: t.depositWithdraw,      value: "",                       action: () => setShowWallet(true),          href: undefined },
-    { icon: Settings,    label: t.language,             value: language,                 action: () => setShowLangModal(true),       href: undefined },
-    { icon: Bell,        label: t.notifications,        value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined },
-    { icon: Shield,      label: t.privacyPolicy,        value: "",                       action: () => navigate("/privacy"),         href: "/privacy" },
-    { icon: HelpCircle,  label: t.about,                value: "",                       action: () => setShowAbout(true),           href: undefined },
+    { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: "Günlük",             action: () => navigate("/leaderboard"),     href: undefined },
+    { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined },
+    { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined },
+    { icon: Bell,        label: t.notifications,                  value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined },
+    { icon: Shield,      label: t.privacyPolicy,                  value: "",                   action: () => navigate("/privacy"),         href: "/privacy" },
+    { icon: HelpCircle,  label: t.about,                          value: "",                   action: () => setShowAbout(true),           href: undefined },
   ];
 
   const displayName = currentUser
@@ -193,7 +193,7 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      <WalletModal show={showWallet} onClose={() => setShowWallet(false)} />
+      <LeaderboardModal show={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
       <ProfilePhotoModal show={showPhotoModal} onClose={() => setShowPhotoModal(false)} />
       <LanguageModal
         show={showLangModal}
