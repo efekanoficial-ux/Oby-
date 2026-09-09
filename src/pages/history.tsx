@@ -240,13 +240,13 @@ export default function History() {
 
           return (
             <div key={trade.id} className="flex flex-col">
-              {/* OVAL TRADE CARD */}
+              {/* TRADE CARD (BORDERLESS & CLEAN) */}
               <div
                 onClick={() => setExpandedId(isExpanded ? null : trade.id)}
-                className={`rounded-full px-4 py-3 bg-[#0d0d11] border transition-all cursor-pointer flex items-center justify-between hover:border-white/20 active:scale-[0.99] ${
-                  isWin ? "border-[#0ecb81]/25 hover:border-[#0ecb81]/40" : "border-[#f6465d]/25 hover:border-[#f6465d]/40"
+                className={`px-4 py-3 bg-[#0d0d11] transition-all cursor-pointer flex items-center justify-between hover:bg-[#131318] active:scale-[0.99] ${
+                  isExpanded ? "rounded-t-2xl bg-[#111116]" : "rounded-2xl"
                 }`}
-                style={{ boxShadow: "0 4px 18px rgba(0,0,0,0.4)" }}
+                style={{ boxShadow: "0 4px 18px rgba(0,0,0,0.25)" }}
               >
                 {/* Left: Asset Icon + Info */}
                 <div className="flex items-center gap-3 min-w-0">
@@ -283,24 +283,24 @@ export default function History() {
                     </p>
                   </div>
 
-                  <ChevronDown size={14} className={`text-white/30 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                  <ChevronDown size={14} className={`text-white/30 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                 </div>
               </div>
 
-              {/* EXPANDED DETAILS DRAWER */}
+              {/* EXPANDED DETAILS ACCORDION (NATURALLY UNDERNEATH) */}
               {isExpanded && (
-                <div className="mx-4 -mt-3 pt-5 pb-3 px-4 bg-[#121217] rounded-b-2xl border-x border-b border-white/10 grid grid-cols-3 gap-2 text-[10px] text-white/60">
-                  <div className="rounded-xl bg-white/5 p-2">
-                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.entryPrice}</span>
+                <div className="bg-[#111116] rounded-b-2xl pt-2 pb-3.5 px-4 grid grid-cols-3 gap-2 text-[10px] text-white/60">
+                  <div className="rounded-xl bg-white/[0.03] p-2.5">
+                    <span className="text-white/30 block text-[9px] mb-1 uppercase font-bold">{t.entryPrice}</span>
                     <span className="font-mono font-bold text-white text-xs">{trade.entryPrice ? trade.entryPrice.toFixed(5) : "—"}</span>
                   </div>
-                  <div className="rounded-xl bg-white/5 p-2">
-                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.exitPrice}</span>
+                  <div className="rounded-xl bg-white/[0.03] p-2.5">
+                    <span className="text-white/30 block text-[9px] mb-1 uppercase font-bold">{t.exitPrice}</span>
                     <span className="font-mono font-bold text-white text-xs">{trade.exitPrice ? trade.exitPrice.toFixed(5) : "—"}</span>
                   </div>
-                  <div className="rounded-xl bg-white/5 p-2">
-                    <span className="text-white/30 block text-[9px] mb-0.5 uppercase font-bold">{t.closeTime}</span>
-                    <span className="font-mono text-white/80">{fmt(trade.closedAt, langCode)}</span>
+                  <div className="rounded-xl bg-white/[0.03] p-2.5">
+                    <span className="text-white/30 block text-[9px] mb-1 uppercase font-bold">{t.closeTime}</span>
+                    <span className="font-mono text-white/80 text-[11px] block mt-0.5">{fmt(trade.closedAt, langCode)}</span>
                   </div>
                 </div>
               )}
