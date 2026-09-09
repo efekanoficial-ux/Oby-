@@ -11,12 +11,15 @@
         "surname": { "type": "string" },
         "birthDate": { "type": "string" },
         "photoURL": { "type": "string" },
+        "photoUrl": { "type": "string" },
         "currency": { "type": "string", "enum": ["TL", "USD"] },
         "demoBalance": { "type": "number" },
         "realBalance": { "type": "number" },
         "totalDeposited": { "type": "number" },
         "totalWithdrawn": { "type": "number" },
-        "createdAt": { "type": "number" }
+        "createdAt": { "type": "number" },
+        "kycStatus": { "type": "string", "enum": ["none", "pending", "verified", "rejected"] },
+        "kycDetails": { "type": "object" }
       },
       "required": ["email", "name", "surname", "birthDate", "currency", "demoBalance", "realBalance", "createdAt"]
     },

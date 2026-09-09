@@ -40,6 +40,7 @@ export default function Admin() {
     ready,
     paymentSettings,
     updatePaymentSettings,
+    adminUpdateKYC,
   } = useAuth();
 
   useEffect(() => {
@@ -404,6 +405,97 @@ export default function Admin() {
                                 <span className="text-xs font-bold text-white/70 break-all">{row.value}</span>
                               </div>
                             ))}
+                          </div>
+
+                          {/* KYC / Kimlik Doğrulama Bölümü */}
+                          <div className="rounded-xl p-3.5 flex flex-col gap-3"
+                            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-white/40 uppercase">Kimlik Doğrulama (KYC)</span>
+                              <span className="rounded-full px-2 py-0.5 text-[9px] font-black"
+                                style={{
+                                  backgroundColor: u.kycStatus === "verified" ? "rgba(14,203,129,0.12)" : u.kycStatus === "pending" ? "rgba(255,184,0,0.12)" : u.kycStatus === "rejected" ? "rgba(246,70,93,0.12)" : "rgba(255,255,255,0.04)",
+                                  color: u.kycStatus === "verified" ? "#0ecb81" : u.kycStatus === "pending" ? "#FFB800" : u.kycStatus === "rejected" ? "#f6465d" : "#777"
+                                }}>
+                                {u.kycStatus === "verified" ? "Doğrulanmış" : u.kycStatus === "pending" ? "Onay Bekliyor" : u.kycStatus === "rejected" ? "Reddedildi" : "Başvuru Yok"}
+                              </span>
+                            </div>
+
+                            {u.kycDetails ? (
+                              <div className="flex flex-col gap-2 pt-2 border-t border-white/5 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-white/30">Ad Soyad (Kimlik):</span>
+                                  <span className="font-bold text-white/80">{u.kycDetails.fullName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-white/30">Doğum Tarihi:</span>
+                                  <span className="font-bold text-white/80">{u.kycDetails.birthDate}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-white/30">T.C. / Kimlik No:</span>
+                                  <span className="font-bold text-white/80">{u.kycDetails.idNumber || "Belirtilmemiş"}</span>
+                                </div>
+
+                                {/* Kimlik Fotoğrafları */}
+                                {(u.kycDetails.documentFrontUrl || u.kycDetails.documentBackUrl) && (
+                                  <div className="flex flex-col gap-1.5 mt-1">
+                                    <span className="text-[10px] text-white/20 font-bold uppercase">Kimlik Belgeleri</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {u.kycDetails.documentFrontUrl && (
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[9px] text-white/40">Ön Yüz</span>
+                                          <a href={u.kycDetails.documentFrontUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10 aspect-video hover:opacity-85 transition-opacity">
+                                            <img src={u.kycDetails.documentFrontUrl} alt="Kimlik Ön" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                          </a>
+                                        </div>
+                                      )}
+                                      {u.kycDetails.documentBackUrl && (
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[9px] text-white/40">Arka Yüz</span>
+                                          <a href={u.kycDetails.documentBackUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10 aspect-video hover:opacity-85 transition-opacity">
+                                            <img src={u.kycDetails.documentBackUrl} alt="Kimlik Arka" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Rejection Reason if any */}
+                                {u.kycStatus === "rejected" && u.kycDetails.rejectionReason && (
+                                  <div className="rounded-lg p-2 mt-1 text-[11px] text-[#f6465d] bg-[#f6465d]/10 border border-[#f6465d]/20">
+                                    <span className="font-black">Red Nedeni:</span> {u.kycDetails.rejectionReason}
+                                  </div>
+                                )}
+
+                                {/* Onay / Red Butonları */}
+                                {u.kycStatus === "pending" && (
+                                  <div className="flex gap-2 mt-2 pt-2 border-t border-white/5">
+                                    <motion.button whileTap={{ scale: 0.97 }}
+                                      onClick={async () => {
+                                        if (confirm(`${u.name} ${u.surname} kullanıcısının kimlik başvurusunu onaylamak istiyor musunuz?`)) {
+                                          await adminUpdateKYC(u.id, "verified");
+                                        }
+                                      }}
+                                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black text-black cursor-pointer"
+                                      style={{ background: "linear-gradient(135deg,#0ecb81,#05a660)" }}>
+                                      <Check size={12} /> KYC Onayla
+                                    </motion.button>
+                                    <motion.button whileTap={{ scale: 0.97 }}
+                                      onClick={async () => {
+                                        const r = prompt("Reddetme nedeni (Opsiyonel):") || "";
+                                        await adminUpdateKYC(u.id, "rejected", r);
+                                      }}
+                                      className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-white cursor-pointer"
+                                      style={{ background: "rgba(246,70,93,0.15)", border: "1px solid rgba(246,70,93,0.25)" }}>
+                                      <X size={12} className="text-[#f6465d]" /> KYC Reddet
+                                    </motion.button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-white/30 italic">Henüz kimlik doğrulama başvurusu yapılmamış.</p>
+                            )}
                           </div>
 
                           {/* Direct balance addition */}

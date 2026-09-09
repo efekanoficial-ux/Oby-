@@ -87,7 +87,7 @@ export function KycModal({ show, onClose }: KycModalProps) {
     }
   };
 
-  const isVerified = currentUser?.kycStatus === "verified" || currentUser?.kycStatus === "approved";
+  const isVerified = currentUser?.kycStatus === "verified";
 
   return (
     <AnimatePresence>

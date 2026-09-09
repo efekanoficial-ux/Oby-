@@ -40,6 +40,8 @@ export interface ObyoUser {
   surname:        string;
   birthDate:      string;
   photoURL?:      string;
+  photoUrl?:      string;
+  password?:      string;
   currency:       "TL" | "USD";
   demoBalance:    number;
   realBalance:    number;
@@ -116,6 +118,7 @@ interface AuthContextType {
   settleRealTrade:  (amount: number, won: boolean, payout: number) => Promise<void>;
   updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
+  adminUpdateKYC:   (userId: string, status: "verified" | "rejected", reason?: string) => Promise<{ success: boolean; error?: string }>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -179,9 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userUnsubRef.current = null;
       }
 
-      const uidToFetch = firebaseUser?.uid || localStorage.getItem(LS_CUSTOM_UID);
+      const uidToFetch = localStorage.getItem("obyo_active_uid") || firebaseUser?.uid || localStorage.getItem(LS_CUSTOM_UID);
 
       if (uidToFetch) {
+        if (firebaseUser && !localStorage.getItem("obyo_active_uid")) {
+          localStorage.setItem("obyo_active_uid", firebaseUser.uid);
+        }
         if (firebaseUser) {
           localStorage.removeItem(LS_CUSTOM_UID);
         }
@@ -294,9 +300,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, e, password);
+      const cred = await signInWithEmailAndPassword(auth, e, password);
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
+      if (cred.user) {
+        localStorage.setItem("obyo_active_uid", cred.user.uid);
+      }
       return { success: true };
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
@@ -314,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             localStorage.removeItem(LS_IS_ADMIN);
             localStorage.setItem(LS_CUSTOM_UID, userDoc.id);
+            localStorage.setItem("obyo_active_uid", userDoc.id);
             setCurrentUser({ id: userDoc.id, ...uData } as ObyoUser);
             return { success: true };
           }
@@ -423,6 +433,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           kycStatus: "none",
           emailVerified: true,
           photoUrl: user.photoURL || undefined,
+          photoURL: user.photoURL || undefined,
         };
         userDocId = uid;
       }
@@ -433,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...userDocData,
         emailVerified: true,
         photoUrl: user.photoURL || userDocData.photoUrl || undefined,
+        photoURL: user.photoURL || userDocData.photoURL || userDocData.photoUrl || undefined,
       };
 
       try {
@@ -452,6 +464,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
+      localStorage.setItem("obyo_active_uid", userDocId || uid);
       localStorage.setItem("obyo_tutorial_done", "1");
       setCurrentUser(matchedUserObj);
       return { success: true };
@@ -601,6 +614,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.setItem("obyo_tutorial_done", "1");
     localStorage.setItem(LS_CUSTOM_UID, uid);
+    localStorage.setItem("obyo_active_uid", uid);
     setCurrentUser(fullUserObj);
 
     return { success: true };
@@ -664,6 +678,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.removeItem(LS_CUSTOM_UID);
+    localStorage.removeItem("obyo_active_uid");
     if (auth.currentUser) await signOut(auth);
     setCurrentUser(null);
     setIsAdmin(false);
@@ -849,12 +864,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } else {
-      let failMsg = `Girilen ad ve soyad, hesap kayıtlarınızdaki isimle (${currentUser.name} ${currentUser.surname}) eşleşmiyor.`;
-      return {
-        success: false,
-        isVerified: false,
-        message: failMsg,
+      // If name does not match, don't fail outright; submit as 'pending' for manual admin review
+      const kycDetails = {
+        fullName: data.fullName,
+        birthDate: data.birthDate,
+        idNumber: data.idNumber,
+        documentFrontUrl: data.documentFrontUrl || "",
+        documentBackUrl: data.documentBackUrl || "",
+        submittedAt: Date.now(),
       };
+
+      try {
+        const userRef = doc(db, "users", currentUser.id);
+        await setDoc(userRef, {
+          kycStatus: "pending",
+          kycDetails,
+        }, { merge: true });
+
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          kycStatus: "pending",
+          kycDetails,
+        } : null);
+
+        return {
+          success: true,
+          isVerified: false,
+          message: "Kimlik bilgileriniz sistemdeki kayıtlarınızla tam uyuşmadı. Ancak belgeleriniz yöneticilerimiz tarafından incelenmek üzere 'Beklemede' (Pending) olarak başarıyla kaydedildi!",
+        };
+      } catch (err: any) {
+        console.error("KYC pending submit error:", err);
+        return {
+          success: false,
+          isVerified: false,
+          message: "Veritabanı güncellenirken hata oluştu: " + (err?.message || "Bilinmeyen hata"),
+        };
+      }
     }
   };
 
@@ -862,12 +907,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return { success: false, error: "Oturum açılmamış." };
     try {
       const userRef = doc(db, "users", currentUser.id);
-      await setDoc(userRef, { photoURL: photoUrl }, { merge: true });
-      setCurrentUser(prev => prev ? { ...prev, photoURL: photoUrl } : null);
+      await setDoc(userRef, { photoURL: photoUrl, photoUrl: photoUrl }, { merge: true });
+      setCurrentUser(prev => prev ? { ...prev, photoURL: photoUrl, photoUrl: photoUrl } : null);
       return { success: true };
     } catch (err: any) {
       console.error("updateProfilePhoto error:", err);
       return { success: false, error: err?.message || "Profil fotoğrafı kaydedilemedi." };
+    }
+  };
+
+  const adminUpdateKYC = async (userId: string, status: "verified" | "rejected", reason?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const userRef = doc(db, "users", userId);
+      const updates: any = {
+        kycStatus: status,
+      };
+      if (status === "rejected") {
+        updates["kycDetails.rejectionReason"] = reason || "";
+      } else if (status === "verified") {
+        updates["kycDetails.verifiedAt"] = Date.now();
+      }
+      await setDoc(userRef, updates, { merge: true });
+      return { success: true };
+    } catch (err: any) {
+      console.error("adminUpdateKYC error:", err);
+      return { success: false, error: err?.message || "KYC durumu güncellenemedi." };
     }
   };
 
@@ -898,7 +962,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendFirebaseVerificationEmail, checkFirebaseEmailVerified, confirmEmailVerified,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
-      placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC,
+      placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
       refreshUser, refreshAdmin,
     }}>
       {children}
