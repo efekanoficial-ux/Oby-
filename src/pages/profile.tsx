@@ -32,16 +32,18 @@ export default function Profile() {
 
   const handleLogout = () => { logout(); navigate("/auth"); };
 
-  const isVerified = currentUser?.kycStatus === "verified";
+  const isVerified = currentUser?.kycStatus === "verified" || currentUser?.kycStatus === "approved";
 
-  const menuItems = [
+  const allMenuItems = [
     {
+      id: "kyc",
       icon: ShieldCheck,
       label: t.kycTitle,
       value: isVerified ? t.kycVerified : t.kycNotVerified,
       customColor: isVerified ? "#0ecb81" : "#FF6B00",
       action: () => setShowKycModal(true),
-      href: undefined
+      href: undefined,
+      hideWhenVerified: true,
     },
     { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: "Günlük",             action: () => navigate("/leaderboard"),     href: undefined },
     { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined },
@@ -50,6 +52,8 @@ export default function Profile() {
     { icon: Shield,      label: t.privacyPolicy,                  value: "",                   action: () => navigate("/privacy"),         href: "/privacy" },
     { icon: HelpCircle,  label: t.about,                          value: "",                   action: () => setShowAbout(true),           href: undefined },
   ];
+
+  const menuItems = allMenuItems.filter(item => !(item.hideWhenVerified && isVerified));
 
   const displayName = currentUser
     ? `${currentUser.name} ${currentUser.surname}`

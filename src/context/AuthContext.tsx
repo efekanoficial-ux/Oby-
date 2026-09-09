@@ -4,9 +4,13 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendEmailVerification,
+  reload,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import {
-  doc, setDoc, updateDoc, addDoc, collection, getDocs,
+  doc, setDoc, getDoc, updateDoc, addDoc, collection, getDocs,
   onSnapshot, query, orderBy, where, increment,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -97,7 +101,11 @@ interface AuthContextType {
   paymentSettings:  PaymentSettings;
   updatePaymentSettings: (settings: Partial<PaymentSettings>) => Promise<{ success: boolean; error?: string }>;
   login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle:  () => Promise<{ success: boolean; error?: string }>;
   register:         (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
+  sendFirebaseVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
+  checkFirebaseEmailVerified: () => Promise<{ isVerified: boolean; error?: string }>;
+  confirmEmailVerified: (userId?: string) => Promise<{ success: boolean; error?: string }>;
   logout:           () => Promise<void>;
   users:            ObyoUser[];
   requests:         ObyoRequest[];
@@ -303,6 +311,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const uid = user.uid;
+      const email = (user.email || "").trim().toLowerCase();
+
+      if (!email) {
+        return { success: false, error: "Google hesabınızdan e-posta adresi alınamadı." };
+      }
+
+      const userRef = doc(db, "users", uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // Look up if an existing user document in Firestore matches this email address
+        let existingDocData: any = null;
+        let existingDocId: string | null = null;
+
+        try {
+          const q = query(collection(db, "users"), where("email", "==", email));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            existingDocId = qSnap.docs[0].id;
+            existingDocData = qSnap.docs[0].data();
+          }
+        } catch (qErr) {
+          console.error("Existing user query error in Google login:", qErr);
+        }
+
+        if (existingDocData) {
+          // Sync existing user profile data onto Google UID document so user gets exact same account & balances
+          const mergedData = {
+            ...existingDocData,
+            emailVerified: true,
+            photoUrl: user.photoURL || existingDocData.photoUrl || undefined,
+          };
+          await setDoc(userRef, mergedData, { merge: true });
+          if (existingDocId && existingDocId !== uid) {
+            await updateDoc(doc(db, "users", existingDocId), {
+              photoUrl: user.photoURL || existingDocData.photoUrl || undefined,
+              emailVerified: true,
+            }).catch(() => {});
+          }
+        } else {
+          // Brand new user
+          const displayNameParts = (user.displayName || "").trim().split(" ");
+          const name = displayNameParts[0] || "Kullanıcı";
+          const surname = displayNameParts.slice(1).join(" ") || "";
+          const currency = "USD";
+          const demoBalance = 10000;
+
+          const newUserData = {
+            email,
+            name,
+            surname,
+            birthDate: "2000-01-01",
+            currency,
+            demoBalance,
+            realBalance: 0,
+            totalDeposited: 0,
+            totalWithdrawn: 0,
+            createdAt: Date.now(),
+            kycStatus: "none" as const,
+            emailVerified: true,
+            photoUrl: user.photoURL || undefined,
+          };
+
+          await setDoc(userRef, newUserData, { merge: true });
+        }
+      }
+
+      localStorage.removeItem(LS_IS_ADMIN);
+      localStorage.removeItem(LS_CUSTOM_UID);
+      localStorage.setItem("obyo_tutorial_done", "1");
+      return { success: true };
+    } catch (err: any) {
+      console.error("Google sign in error:", err);
+      if (err.code === "auth/popup-closed-by-user") {
+        return { success: false, error: "Giriş penceresi kapatıldı." };
+      }
+      return { success: false, error: err.message || "Google ile giriş yapılırken bir hata oluştu." };
+    }
+  };
+
   const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
     const e = data.email.trim().toLowerCase();
     if (!e || !data.password || !data.name || !data.surname || !data.birthDate)
@@ -310,6 +404,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const currency    = data.currency ?? "USD";
     const demoBalance = currency === "TL" ? 120000 : 10000;
+
+    // First check if an account with this exact email already exists in Firestore (e.g. created via Google)
+    try {
+      const q = query(collection(db, "users"), where("email", "==", e));
+      const existingSnap = await getDocs(q);
+      if (!existingSnap.empty) {
+        const existingDoc = existingSnap.docs[0];
+        const existingId = existingDoc.id;
+        const existingData = existingDoc.data();
+
+        // Connect password & profile info to the existing user account
+        await updateDoc(doc(db, "users", existingId), {
+          password: data.password,
+          name: data.name.trim() || existingData.name,
+          surname: data.surname.trim() || existingData.surname,
+          birthDate: data.birthDate || existingData.birthDate,
+        });
+
+        localStorage.removeItem(LS_IS_ADMIN);
+        localStorage.setItem(LS_CUSTOM_UID, existingId);
+        setCurrentUser({ id: existingId, ...existingData, password: data.password } as ObyoUser);
+        return { success: true };
+      }
+    } catch (checkErr) {
+      console.error("Error checking existing user in register:", checkErr);
+    }
 
     let uid = "";
     let isFirebaseAuth = false;
@@ -320,22 +440,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isFirebaseAuth = true;
     } catch (authErr: any) {
       const code = authErr.code ?? "";
-      if (code === "auth/email-already-in-use")
-        return { success: false, error: "Bu e-posta adresi zaten kayıtlı." };
+      if (code === "auth/email-already-in-use") {
+        try {
+          const q = query(collection(db, "users"), where("email", "==", e));
+          const existingSnap = await getDocs(q);
+          if (!existingSnap.empty) {
+            const existingDoc = existingSnap.docs[0];
+            await updateDoc(doc(db, "users", existingDoc.id), { password: data.password });
+            localStorage.removeItem(LS_IS_ADMIN);
+            localStorage.setItem(LS_CUSTOM_UID, existingDoc.id);
+            setCurrentUser({ id: existingDoc.id, ...existingDoc.data(), password: data.password } as ObyoUser);
+            return { success: true };
+          }
+        } catch (e2) {}
+        return { success: false, error: "Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın." };
+      }
       if (code === "auth/weak-password")
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
 
       // Handle operation-not-allowed seamlessly by storing user directly in Firestore
       if (code === "auth/operation-not-allowed" || code === "auth/admin-restricted-operation" || code === "auth/unauthorized-domain") {
-        try {
-          const q = query(collection(db, "users"), where("email", "==", e));
-          const existingSnap = await getDocs(q);
-          if (!existingSnap.empty) {
-            return { success: false, error: "Bu e-posta adresi zaten kayıtlı." };
-          }
-        } catch (qErr) {
-          console.error("Error checking existing user:", qErr);
-        }
         uid = "usr_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
       } else {
         return { success: false, error: `Kayıt yapılamadı (Auth): ${authErr.message || code}` };
@@ -355,7 +479,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       totalWithdrawn: 0,
       createdAt:      Date.now(),
       kycStatus:      "none" as const,
-      emailVerified:  data.emailVerified ?? true,
+      emailVerified:  true,
     };
 
     try {
@@ -374,6 +498,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return { success: true };
+  };
+
+  const sendFirebaseVerificationEmail = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        return { success: true };
+      }
+      return { success: false, error: "Firebase kullanıcı oturumu bulunamadı." };
+    } catch (err: any) {
+      console.error("sendFirebaseVerificationEmail error:", err);
+      return { success: false, error: err?.message || "Doğrulama e-postası gönderilemedi." };
+    }
+  };
+
+  const checkFirebaseEmailVerified = async (): Promise<{ isVerified: boolean; error?: string }> => {
+    try {
+      if (auth.currentUser) {
+        await reload(auth.currentUser);
+        if (auth.currentUser.emailVerified) {
+          await updateDoc(doc(db, "users", auth.currentUser.uid), {
+            emailVerified: true,
+          }).catch(() => {});
+          if (currentUser) {
+            setCurrentUser({ ...currentUser, emailVerified: true });
+          }
+          return { isVerified: true };
+        } else {
+          return { isVerified: false, error: "E-posta henüz doğrulanmadı. Lütfen gelen kutunuzdaki/spam klasörünüzdeki doğrulama bağlantısına tıklayıp tekrar kontrol edin." };
+        }
+      }
+      return { isVerified: true };
+    } catch (err: any) {
+      console.error("checkFirebaseEmailVerified error:", err);
+      return { isVerified: false, error: err?.message || "Doğrulama durumu kontrol edilemedi." };
+    }
+  };
+
+  const confirmEmailVerified = async (userId?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const targetUid = userId || currentUser?.id || auth.currentUser?.uid;
+      if (!targetUid) return { success: false, error: "Kullanıcı ID bulunamadı." };
+
+      await updateDoc(doc(db, "users", targetUid), {
+        emailVerified: true,
+      });
+
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, emailVerified: true });
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.error("confirmEmailVerified error:", err);
+      return { success: false, error: err?.message || "Doğrulama durumu güncellenemedi." };
+    }
   };
 
   const logout = async () => {
@@ -618,7 +797,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       ready, currentUser, isAdmin,
       paymentSettings, updatePaymentSettings,
-      login, register, logout,
+      login, loginWithGoogle, register, logout,
+      sendFirebaseVerificationEmail, checkFirebaseEmailVerified, confirmEmailVerified,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC,
