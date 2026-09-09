@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.obyotrade.twa",
+    "sha256_cert_fingerprints": ["B7:F3:92:E6:49:BE:41:16:24:62:2A:98:77:34:A3:0B:FE:E6:79:80:17:75:9C:73:45:A3:4A:E7:B8:29:3D:C9"]
+  }
+}]
