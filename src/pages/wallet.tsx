@@ -259,6 +259,7 @@ export default function WalletPage() {
 
   const handleWithdraw = async () => {
     if (!currentUser || !method || !amount || !destination) return;
+    if (currentUser.kycStatus !== "verified") return;
     const val = parseFloat(amount);
     if (isNaN(val) || val < withdrawMin || val > currentUser.realBalance) return;
     setIsSubmitting(true);
@@ -804,7 +805,28 @@ export default function WalletPage() {
           {/* ═════════════════ TAB: WITHDRAW ═════════════════ */}
           {tab === "withdraw" && (
             <AnimatePresence mode="wait">
-              {/* STEP 1: Method selection */}
+              {currentUser && currentUser.kycStatus !== "verified" ? (
+                <motion.div
+                  key="kyc-blocked"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center text-center p-6 rounded-3xl border border-white/10 bg-transparent my-2"
+                >
+                  <h3 className="text-base font-black text-white mb-2">{t.kycRequiredWithdraw}</h3>
+                  <p className="text-xs text-white/60 leading-relaxed max-w-sm mb-6">
+                    {t.kycRequiredDesc}
+                  </p>
+                  <button
+                    onClick={() => navigate("/profile?kyc=open")}
+                    className="w-full max-w-xs py-3.5 rounded-2xl font-black text-xs text-black cursor-pointer shadow-lg transition-transform active:scale-95"
+                    style={{ background: "linear-gradient(135deg, #FF6B00, #FFB800)", boxShadow: "0 6px 20px rgba(255,107,0,0.25)" }}
+                  >
+                    {t.verifyNow}
+                  </button>
+                </motion.div>
+              ) : (
+                <>
+                  {/* STEP 1: Method selection */}
               {wStep === "method" && (
                 <motion.div
                   key="wit-method"
@@ -1015,6 +1037,8 @@ export default function WalletPage() {
                     </button>
                   </div>
                 </motion.div>
+              )}
+                </>
               )}
             </AnimatePresence>
           )}

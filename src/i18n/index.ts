@@ -195,6 +195,28 @@ const tr = {
   statusRejected: "Reddedildi",
   appLangSelect: "Dil Seçimi / Language",
   selectLangSub: "Uygulama dilini seçiniz",
+
+  // KYC & Verification
+  kycTitle: "Kimlik Doğrulama (KYC)",
+  kycVerified: "Onaylandı",
+  kycNotVerified: "Doğrulanmadı",
+  kycRequiredWithdraw: "Para Çekme İçin KYC Gerekli",
+  kycRequiredDesc: "Güvenlik ve yasal düzenlemeler gereği para çekme işlemi yapabilmek için kimlik doğrulamanızı tamamlamanız gerekmektedir. Para yatırma işlemini doğrulamada olmadan yapabilirsiniz.",
+  verifyNow: "Şimdi Doğrula",
+  kycFormTitle: "Kimlik Doğrulama Formu",
+  kycSubtitle: "Kimlik bilgilerinizi girin ve belge yükleyin. İsim ve doğum tarihi eşleşirse otomatik onaylanır.",
+  fullNameLabel: "Adınız ve Soyadınız",
+  idNumberLabel: "T.C. Kimlik / Seri No",
+  uploadFrontDoc: "Kimlik Ön Yüzü Yükle",
+  uploadBackDoc: "Kimlik Arka Yüzü Yükle (Opsiyonel)",
+  submitKYCBtn: "Kimlik Bilgilerini Onayla",
+  kycSuccessMsg: "Kimlik bilgileriniz başarıyla doğrulandı ve hesabınız onaylandı!",
+  emailVerification: "E-posta Doğrulama",
+  emailCodeSent: "Doğrulama kodu e-posta adresinize gönderildi:",
+  enterCode: "6 Haneli Kod",
+  verifyAndComplete: "Doğrula ve Kaydı Tamamla",
+  resendCode: "Yeniden Kod Gönder",
+  invalidCode: "Geçersiz doğrulama kodu. Lütfen tekrar deneyin.",
 };
 
 const en: typeof tr = {
@@ -382,6 +404,28 @@ const en: typeof tr = {
   statusRejected: "Rejected",
   appLangSelect: "Language Selection",
   selectLangSub: "Select application language",
+
+  // KYC & Verification
+  kycTitle: "Identity Verification (KYC)",
+  kycVerified: "Verified",
+  kycNotVerified: "Not Verified",
+  kycRequiredWithdraw: "KYC Required for Withdrawal",
+  kycRequiredDesc: "For security and regulatory compliance, you must complete identity verification to make a withdrawal. Deposits do not require verification.",
+  verifyNow: "Verify Now",
+  kycFormTitle: "Identity Verification Form",
+  kycSubtitle: "Enter your identity details and upload document. Automatically approved if name and birthdate match.",
+  fullNameLabel: "Full Name",
+  idNumberLabel: "ID / Passport Serial Number",
+  uploadFrontDoc: "Upload ID Front",
+  uploadBackDoc: "Upload ID Back (Optional)",
+  submitKYCBtn: "Confirm Identity Info",
+  kycSuccessMsg: "Your identity has been verified successfully and your account is approved!",
+  emailVerification: "Email Verification",
+  emailCodeSent: "Verification code sent to your email address:",
+  enterCode: "6-Digit Code",
+  verifyAndComplete: "Verify & Complete Registration",
+  resendCode: "Resend Code",
+  invalidCode: "Invalid verification code. Please try again.",
 };
 
 const de: typeof tr = {
@@ -569,6 +613,28 @@ const de: typeof tr = {
   statusRejected: "Abgelehnt",
   appLangSelect: "Sprachauswahl",
   selectLangSub: "Anwendungssprache wählen",
+
+  // KYC & Verification
+  kycTitle: "Identitätsprüfung (KYC)",
+  kycVerified: "Verifiziert",
+  kycNotVerified: "Nicht verifiziert",
+  kycRequiredWithdraw: "KYC für Auszahlung erforderlich",
+  kycRequiredDesc: "Aus Sicherheits- und Regulierungsgründen müssen Sie die Identitätsprüfung abschließen, um Auszahlungen vorzunehmen. Einzahlungen erfordern keine Verifizierung.",
+  verifyNow: "Jetzt verifizieren",
+  kycFormTitle: "Identitätsprüfungsformular",
+  kycSubtitle: "Geben Sie Ihre Identitätsdaten ein und laden Sie das Dokument hoch. Automatisch genehmigt, wenn Name und Geburtsdatum übereinstimmen.",
+  fullNameLabel: "Vollständiger Name",
+  idNumberLabel: "Personalausweisnummer",
+  uploadFrontDoc: "Vorderseite des Ausweises hochladen",
+  uploadBackDoc: "Rückseite des Ausweises hochladen (Optional)",
+  submitKYCBtn: "Identitätsdaten bestätigen",
+  kycSuccessMsg: "Ihre Identität wurde erfolgreich verifiziert und Ihr Konto ist genehmigt!",
+  emailVerification: "E-Mail-Bestätigung",
+  emailCodeSent: "Bestätigungscode an Ihre E-Mail-Adresse gesendet:",
+  enterCode: "6-stelliger Code",
+  verifyAndComplete: "Bestätigen und Registrierung abschließen",
+  resendCode: "Code erneut senden",
+  invalidCode: "Ungültiger Bestätigungscode. Bitte versuchen Sie es erneut.",
 };
 const es: typeof tr = { ...en, navHistory: "Historial", navTrade: "Operar", navBalance: "Saldo", navVip: "VIP / Perfil", upBtn: "SUBE", downBtn: "BAJA", selectAccount: "Seleccionar cuenta", demoAccount: "Cuenta Demo", realAccount: "Cuenta Real" };
 const ru: typeof tr = { ...en, navHistory: "История", navTrade: "Торговля", navBalance: "Баланс", navVip: "VIP / Профиль", upBtn: "BЫШЕ", downBtn: "НИЖЕ", selectAccount: "Выбрать счет", demoAccount: "Демо счет", realAccount: "Реальный счет" };

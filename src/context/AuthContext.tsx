@@ -18,6 +18,17 @@ const LS_IS_ADMIN    = "obyo_is_admin";
 const LS_CUSTOM_UID  = "obyo_custom_user_id";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
+export interface KYCDetails {
+  fullName: string;
+  birthDate: string;
+  idNumber?: string;
+  documentFrontUrl?: string;
+  documentBackUrl?: string;
+  submittedAt: number;
+  verifiedAt?: number;
+  rejectionReason?: string;
+}
+
 export interface ObyoUser {
   id:             string;
   email:          string;
@@ -31,6 +42,9 @@ export interface ObyoUser {
   totalDeposited: number;
   totalWithdrawn: number;
   createdAt:      number;
+  kycStatus?:     "none" | "pending" | "verified" | "rejected";
+  kycDetails?:    KYCDetails;
+  emailVerified?: boolean;
 }
 
 export interface ObyoRequest {
@@ -67,12 +81,13 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
 };
 
 interface RegisterData {
-  email:     string;
-  password:  string;
-  name:      string;
-  surname:   string;
-  birthDate: string;
-  currency:  "TL" | "USD";
+  email:          string;
+  password:       string;
+  name:           string;
+  surname:        string;
+  birthDate:      string;
+  currency:       "TL" | "USD";
+  emailVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -92,6 +107,7 @@ interface AuthContextType {
   placeRealTrade:   (amount: number) => Promise<boolean>;
   settleRealTrade:  (amount: number, won: boolean, payout: number) => Promise<void>;
   updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
+  submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -338,6 +354,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       totalDeposited: 0,
       totalWithdrawn: 0,
       createdAt:      Date.now(),
+      kycStatus:      "none" as const,
+      emailVerified:  data.emailVerified ?? true,
     };
 
     try {
@@ -473,6 +491,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const submitKYC = async (data: {
+    fullName: string;
+    birthDate: string;
+    idNumber: string;
+    documentFrontUrl?: string;
+    documentBackUrl?: string;
+  }): Promise<{ success: boolean; isVerified: boolean; message: string }> => {
+    if (!currentUser) return { success: false, isVerified: false, message: "Oturum açılmamış." };
+
+    const normalize = (str: string) =>
+      str
+        .trim()
+        .toLowerCase()
+        .replace(/i̇/g, "i")
+        .replace(/ı/g, "i")
+        .replace(/ğ/g, "g")
+        .replace(/ü/g, "u")
+        .replace(/ş/g, "s")
+        .replace(/ö/g, "o")
+        .replace(/ç/g, "c")
+        .replace(/\s+/g, " ");
+
+    const enteredNameNorm = normalize(data.fullName);
+    const firstNameNorm   = normalize(currentUser.name);
+    const surnameNorm     = normalize(currentUser.surname);
+    const registeredNameNorm = `${firstNameNorm} ${surnameNorm}`;
+
+    const enteredDate = data.birthDate.trim();
+    const registeredDate = (currentUser.birthDate || "").trim();
+
+    // Check if name contains both registered first name and surname or matches registered full name
+    const nameMatches =
+      enteredNameNorm === registeredNameNorm ||
+      (enteredNameNorm.includes(firstNameNorm) && enteredNameNorm.includes(surnameNorm));
+
+    const dateMatches = enteredDate === registeredDate;
+
+    if (nameMatches && dateMatches) {
+      const kycDetails = {
+        fullName: data.fullName,
+        birthDate: data.birthDate,
+        idNumber: data.idNumber,
+        documentFrontUrl: data.documentFrontUrl || "",
+        documentBackUrl: data.documentBackUrl || "",
+        submittedAt: Date.now(),
+        verifiedAt: Date.now(),
+      };
+
+      try {
+        const userRef = doc(db, "users", currentUser.id);
+        await setDoc(userRef, {
+          kycStatus: "verified",
+          kycDetails,
+        }, { merge: true });
+
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          kycStatus: "verified",
+          kycDetails,
+        } : null);
+
+        return {
+          success: true,
+          isVerified: true,
+          message: "Kimlik bilgileriniz başarıyla doğrulandı ve hesabınız onaylandı!",
+        };
+      } catch (err: any) {
+        console.error("KYC update error:", err);
+        return {
+          success: false,
+          isVerified: false,
+          message: "Veritabanı güncellenirken hata oluştu: " + (err?.message || "Bilinmeyen hata"),
+        };
+      }
+    } else {
+      let failMsg = "Girilen kimlik bilgileri hesap kayıtlarınızla eşleşmedi. ";
+      if (!nameMatches && !dateMatches) {
+        failMsg += "İsim - soyisim ve doğum tarihi eşleşmiyor.";
+      } else if (!nameMatches) {
+        failMsg += "Ad ve soyad hesap kayıtlarınızdaki isimle (" + currentUser.name + " " + currentUser.surname + ") eşleşmiyor.";
+      } else {
+        failMsg += "Doğum tarihi hesap kayıtlarınızdaki tarihle (" + currentUser.birthDate + ") eşleşmiyor.";
+      }
+      return {
+        success: false,
+        isVerified: false,
+        message: failMsg,
+      };
+    }
+  };
+
   const updateProfilePhoto = async (photoUrl: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: "Oturum açılmamış." };
     try {
@@ -512,7 +621,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, register, logout,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
-      placeRealTrade, settleRealTrade, updateProfilePhoto,
+      placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC,
       refreshUser, refreshAdmin,
     }}>
       {children}

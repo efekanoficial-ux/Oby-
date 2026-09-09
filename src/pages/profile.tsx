@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   User, Settings, Bell, Shield, ChevronRight,
-  HelpCircle, LogOut, X, Hash, Wallet, Camera, Trophy,
+  HelpCircle, LogOut, X, Hash, Wallet, Camera, Trophy, ShieldCheck, CheckCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LeaderboardModal } from "@/components/leaderboard-modal";
 import { ProfilePhotoModal } from "@/components/profile-photo-modal";
 import { LanguageModal } from "@/components/language-modal";
+import { KycModal } from "@/components/kyc-modal";
 
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -20,11 +21,28 @@ export default function Profile() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showPhotoModal, setShowPhotoModal]   = useState(false);
   const [showLangModal, setShowLangModal]     = useState(false);
+  const [showKycModal, setShowKycModal]       = useState(false);
   const [notifState, setNotifState]           = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("kyc=open")) {
+      setShowKycModal(true);
+    }
+  }, []);
 
   const handleLogout = () => { logout(); navigate("/auth"); };
 
+  const isVerified = currentUser?.kycStatus === "verified";
+
   const menuItems = [
+    {
+      icon: ShieldCheck,
+      label: t.kycTitle,
+      value: isVerified ? t.kycVerified : t.kycNotVerified,
+      customColor: isVerified ? "#0ecb81" : "#FF6B00",
+      action: () => setShowKycModal(true),
+      href: undefined
+    },
     { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: "Günlük",             action: () => navigate("/leaderboard"),     href: undefined },
     { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined },
     { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined },
@@ -112,12 +130,16 @@ export default function Profile() {
                   <>
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: "#1e1e1e" }}>
-                        <Icon size={15} style={{ color: "#666" }} />
+                        <Icon size={15} style={{ color: item.customColor || "#666" }} />
                       </div>
                       <span className="text-sm font-semibold text-white">{item.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {item.value && <span className="text-xs" style={{ color: "#555" }}>{item.value}</span>}
+                      {item.value && (
+                        <span className="text-xs font-bold" style={{ color: item.customColor || "#555" }}>
+                          {item.value}
+                        </span>
+                      )}
                       <ChevronRight size={14} style={{ color: "#333" }} />
                     </div>
                   </>
@@ -195,6 +217,7 @@ export default function Profile() {
 
       <LeaderboardModal show={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
       <ProfilePhotoModal show={showPhotoModal} onClose={() => setShowPhotoModal(false)} />
+      <KycModal show={showKycModal} onClose={() => setShowKycModal(false)} />
       <LanguageModal
         show={showLangModal}
         onClose={() => setShowLangModal(false)}
