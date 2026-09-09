@@ -22,6 +22,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve .well-known/assetlinks.json explicitly
+app.get('/.well-known/assetlinks.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(process.cwd(), 'public', '.well-known', 'assetlinks.json'));
+});
+
 // API routes
 app.use("/api", router);
 
