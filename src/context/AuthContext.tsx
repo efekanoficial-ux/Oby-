@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 import {
   doc, setDoc, getDoc, updateDoc, addDoc, collection, getDocs,
-  onSnapshot, query, orderBy, where, increment,
+  onSnapshot, query, orderBy, where, increment, deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -126,6 +126,31 @@ interface AuthContextType {
 /* ─── Context ────────────────────────────────────────────────────────────── */
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function cleanForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanForFirestore) as any;
+  }
+  if (typeof obj === "object") {
+    if (obj instanceof Date) {
+      return obj as any;
+    }
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          cleaned[key] = cleanForFirestore(val);
+        }
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready,       setReady]       = useState(false);
   const [currentUser, setCurrentUser] = useState<ObyoUser | null>(null);
@@ -169,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
     }, 4000);
 
-    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (localStorage.getItem(LS_IS_ADMIN) === "1") {
         setIsAdmin(true);
         setReady(true);
@@ -182,17 +207,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userUnsubRef.current = null;
       }
 
-      const uidToFetch = localStorage.getItem("obyo_active_uid") || firebaseUser?.uid || localStorage.getItem(LS_CUSTOM_UID);
+      // Determine unified email identifier
+      let email = firebaseUser?.email?.trim().toLowerCase() ||
+                  localStorage.getItem("obyo_active_email")?.trim().toLowerCase();
 
-      if (uidToFetch) {
-        if (firebaseUser && !localStorage.getItem("obyo_active_uid")) {
-          localStorage.setItem("obyo_active_uid", firebaseUser.uid);
+      if (!email) {
+        const activeUid = localStorage.getItem("obyo_active_uid") || localStorage.getItem(LS_CUSTOM_UID);
+        if (activeUid && activeUid.includes("@")) {
+          email = activeUid.trim().toLowerCase();
         }
+      }
+
+      if (email && email.includes("@")) {
+        localStorage.setItem("obyo_active_email", email);
+        localStorage.setItem("obyo_active_uid", email);
         if (firebaseUser) {
           localStorage.removeItem(LS_CUSTOM_UID);
         }
+
+        // Auto-migration check: Make sure user document exists under unified email path
+        try {
+          const emailDocRef = doc(db, "users", email);
+          const emailSnap = await getDoc(emailDocRef);
+
+          if (!emailSnap.exists()) {
+            let foundData: any = null;
+            let foundOldId: string | null = null;
+
+            // Search by email field in query
+            const q = query(collection(db, "users"), where("email", "==", email));
+            const qSnap = await getDocs(q);
+            if (!qSnap.empty) {
+              foundOldId = qSnap.docs[0].id;
+              foundData = qSnap.docs[0].data();
+            }
+
+            // Also check under firebaseUser.uid
+            if (!foundData && firebaseUser?.uid) {
+              const uidSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+              if (uidSnap.exists()) {
+                foundOldId = firebaseUser.uid;
+                foundData = uidSnap.data();
+              }
+            }
+
+            if (foundData) {
+              console.log(`Auto-migrating user doc from old ID ${foundOldId} to unified email: ${email}`);
+              await setDoc(emailDocRef, cleanForFirestore({
+                ...foundData,
+                id: email,
+              }), { merge: true });
+
+              if (foundOldId && foundOldId !== email) {
+                await deleteDoc(doc(db, "users", foundOldId)).catch(() => {});
+              }
+            } else {
+              const displayNameParts = (firebaseUser?.displayName || "").trim().split(" ");
+              const name = displayNameParts[0] || "Kullanıcı";
+              const surname = displayNameParts.slice(1).join(" ") || "";
+
+              const newUser: ObyoUser = {
+                id: email,
+                email,
+                name,
+                surname,
+                birthDate: "2000-01-01",
+                currency: "USD",
+                demoBalance: 10000,
+                realBalance: 0,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                createdAt: Date.now(),
+                kycStatus: "none",
+                emailVerified: true,
+                photoUrl: firebaseUser?.photoURL || undefined,
+                photoURL: firebaseUser?.photoURL || undefined,
+              };
+              await setDoc(emailDocRef, cleanForFirestore(newUser), { merge: true });
+            }
+          } else {
+            const currentData = emailSnap.data();
+            if (currentData.id !== email) {
+              await setDoc(emailDocRef, cleanForFirestore({ id: email }), { merge: true });
+            }
+          }
+        } catch (migErr) {
+          console.error("User document migration/setup error:", migErr);
+        }
+
         userUnsubRef.current = onSnapshot(
-          doc(db, "users", uidToFetch),
+          doc(db, "users", email),
           (snap) => {
             if (snap.exists()) {
               setCurrentUser({ id: snap.id, ...snap.data() } as ObyoUser);
@@ -204,28 +308,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
           (err) => {
             if (err.code !== "permission-denied") console.error("Firestore user snapshot error:", err);
-            // If snapshot fails due to Firestore rules, construct basic user from firebaseUser if available
-            if (firebaseUser) {
-              const displayNameParts = (firebaseUser.displayName || "").trim().split(" ");
-              setCurrentUser((prev) => prev || {
-                id: firebaseUser.uid,
-                email: (firebaseUser.email || "").toLowerCase(),
-                name: displayNameParts[0] || "Kullanıcı",
-                surname: displayNameParts.slice(1).join(" ") || "",
-                birthDate: "2000-01-01",
-                currency: "USD",
-                demoBalance: 10000,
-                realBalance: 0,
-                totalDeposited: 0,
-                totalWithdrawn: 0,
-                createdAt: Date.now(),
-                kycStatus: "none",
-                emailVerified: true,
-                photoUrl: firebaseUser.photoURL || undefined,
-              });
-            } else {
-              setCurrentUser(null);
-            }
             setReady(true);
             clearTimeout(fallbackTimer);
           }
@@ -249,7 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!currentUser) { setRequests([]); return; }
     const q = query(
       collection(db, "requests"),
-      where("userId", "==", currentUser.id)
+      where("userEmail", "==", currentUser.email)
     );
     const unsub = onSnapshot(q, (snap) => {
       const sorted = snap.docs
@@ -260,7 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (err.code !== "permission-denied") console.error(err);
     });
     return () => unsub();
-  }, [currentUser?.id]);
+  }, [currentUser?.email]);
 
   /* ── Admin Firestore real-time listeners ─────────────────────────────── */
   useEffect(() => {
@@ -300,12 +382,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, e, password);
+      await signInWithEmailAndPassword(auth, e, password);
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
-      if (cred.user) {
-        localStorage.setItem("obyo_active_uid", cred.user.uid);
-      }
+      localStorage.setItem("obyo_active_email", e);
+      localStorage.setItem("obyo_active_uid", e);
       return { success: true };
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
@@ -322,9 +403,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return { success: false, error: "Şifre hatalı." };
             }
             localStorage.removeItem(LS_IS_ADMIN);
-            localStorage.setItem(LS_CUSTOM_UID, userDoc.id);
-            localStorage.setItem("obyo_active_uid", userDoc.id);
-            setCurrentUser({ id: userDoc.id, ...uData } as ObyoUser);
+            localStorage.setItem(LS_CUSTOM_UID, e);
+            localStorage.setItem("obyo_active_email", e);
+            localStorage.setItem("obyo_active_uid", e);
+            setCurrentUser({ id: e, ...uData } as ObyoUser);
             return { success: true };
           }
         } catch (dbErr) {
@@ -347,7 +429,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      const uid = user.uid;
       const email = (user.email || "").trim().toLowerCase();
 
       if (!email) {
@@ -355,65 +436,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: "Google hesabınızdan e-posta adresi alınamadı." };
       }
 
-      // Check if user exists in Firestore either by UID or by email, or in localStorage
+      // Check if user exists under unified email path
+      const emailDocRef = doc(db, "users", email);
+      const emailSnap = await getDoc(emailDocRef);
+
       let userDocData: any = null;
-      let userDocId: string | null = null;
 
-      // 1. Check local storage cache first
-      try {
-        const localUserRaw = localStorage.getItem("obyo_user_reg_" + email);
-        if (localUserRaw) {
-          userDocData = JSON.parse(localUserRaw);
-          userDocId = userDocData.id || uid;
-        }
-      } catch (e) {}
-
-      // 2. Check Firestore
-      try {
-        if (!userDocData) {
-          const userRef = doc(db, "users", uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            userDocId = uid;
-            userDocData = userSnap.data();
-          } else {
-            const q = query(collection(db, "users"), where("email", "==", email));
-            const qSnap = await getDocs(q);
-            if (!qSnap.empty) {
-              userDocId = qSnap.docs[0].id;
-              userDocData = qSnap.docs[0].data();
-            }
+      if (emailSnap.exists()) {
+        userDocData = emailSnap.data();
+      } else {
+        // Look up by email field query
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          userDocData = qSnap.docs[0].data();
+          const oldId = qSnap.docs[0].id;
+          if (oldId !== email) {
+            await deleteDoc(doc(db, "users", oldId)).catch(() => {});
           }
         }
-      } catch (fsErr) {
-        console.warn("Firestore lookup error during Google sign-in:", fsErr);
       }
 
-      // 3. Check registered email list from local storage as safety net
-      if (!userDocData) {
-        try {
-          const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
-          if (Array.isArray(regList) && regList.includes(email)) {
-            userDocData = {
-              email,
-              name: (user.displayName || "").split(" ")[0] || "Kullanıcı",
-              surname: (user.displayName || "").split(" ").slice(1).join(" ") || "",
-              birthDate: "2000-01-01",
-              currency: "USD",
-              demoBalance: 10000,
-              realBalance: 0,
-              totalDeposited: 0,
-              totalWithdrawn: 0,
-              createdAt: Date.now(),
-              kycStatus: "none",
-              emailVerified: true,
-            };
-            userDocId = uid;
-          }
-        } catch (e) {}
-      }
-
-      // If user doesn't exist yet in Firestore or LocalStorage, construct new user profile from Google
       if (!userDocData) {
         const displayNameParts = (user.displayName || "").trim().split(" ");
         const name = displayNameParts[0] || "Kullanıcı";
@@ -435,23 +478,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           photoUrl: user.photoURL || undefined,
           photoURL: user.photoURL || undefined,
         };
-        userDocId = uid;
       }
 
-      // Matched or newly created Google user account
       const matchedUserObj: ObyoUser = {
-        id: userDocId || uid,
         ...userDocData,
+        id: email,
+        email,
         emailVerified: true,
-        photoUrl: user.photoURL || userDocData.photoUrl || undefined,
-        photoURL: user.photoURL || userDocData.photoURL || userDocData.photoUrl || undefined,
+        photoUrl: userDocData.photoUrl || userDocData.photoURL || user.photoURL || undefined,
+        photoURL: userDocData.photoURL || userDocData.photoUrl || user.photoURL || undefined,
       };
 
-      try {
-        if (userDocId) {
-          await setDoc(doc(db, "users", userDocId), matchedUserObj, { merge: true }).catch(() => {});
-        }
-      } catch (e) {}
+      await setDoc(emailDocRef, cleanForFirestore(matchedUserObj), { merge: true });
 
       try {
         localStorage.setItem("obyo_user_reg_" + email, JSON.stringify(matchedUserObj));
@@ -464,7 +502,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
-      localStorage.setItem("obyo_active_uid", userDocId || uid);
+      localStorage.setItem("obyo_active_email", email);
+      localStorage.setItem("obyo_active_uid", email);
       localStorage.setItem("obyo_tutorial_done", "1");
       setCurrentUser(matchedUserObj);
       return { success: true };
@@ -492,130 +531,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currency    = data.currency ?? "USD";
     const demoBalance = currency === "TL" ? 120000 : 10000;
 
-    // First check if an account with this exact email already exists in Firestore (e.g. created via Google)
-    try {
-      const q = query(collection(db, "users"), where("email", "==", e));
-      const existingSnap = await getDocs(q);
-      if (!existingSnap.empty) {
-        const existingDoc = existingSnap.docs[0];
-        const existingId = existingDoc.id;
-        const existingData = existingDoc.data();
-
-        // Connect password & profile info to the existing user account
-        await updateDoc(doc(db, "users", existingId), {
-          password: data.password,
-          name: data.name.trim() || existingData.name,
-          surname: data.surname.trim() || existingData.surname,
-          birthDate: data.birthDate || existingData.birthDate,
-        });
-
-        localStorage.removeItem(LS_IS_ADMIN);
-        localStorage.setItem(LS_CUSTOM_UID, existingId);
-        setCurrentUser({ id: existingId, ...existingData, password: data.password } as ObyoUser);
-        return { success: true };
-      }
-    } catch (checkErr) {
-      console.error("Error checking existing user in register:", checkErr);
-    }
-
-    let uid = "";
-    let isFirebaseAuth = false;
+    // We will save the document under `users/e`
+    const userDocRef = doc(db, "users", e);
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, e, data.password);
-      uid = cred.user.uid;
-      isFirebaseAuth = true;
     } catch (authErr: any) {
       const code = authErr.code ?? "";
       if (code === "auth/email-already-in-use") {
-        try {
-          const q = query(collection(db, "users"), where("email", "==", e));
-          const existingSnap = await getDocs(q);
-          if (!existingSnap.empty) {
-            const existingDoc = existingSnap.docs[0];
-            await updateDoc(doc(db, "users", existingDoc.id), { password: data.password }).catch(() => {});
-            localStorage.removeItem(LS_IS_ADMIN);
-            localStorage.setItem("obyo_tutorial_done", "1");
-            const loggedInUser = { id: existingDoc.id, ...existingDoc.data(), password: data.password } as ObyoUser;
-            setCurrentUser(loggedInUser);
-            return { success: true };
-          }
-        } catch (e2) {}
-
-        // If email exists in Auth but no doc in Firestore, create user doc and log in
-        const fallbackUid = auth.currentUser?.uid || ("usr_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8));
-        const fallbackUserData: ObyoUser = {
-          id: fallbackUid,
-          email: e,
-          password: data.password,
-          name: data.name.trim(),
-          surname: data.surname.trim(),
-          birthDate: data.birthDate,
-          currency,
-          demoBalance,
-          realBalance: 0,
-          totalDeposited: 0,
-          totalWithdrawn: 0,
-          createdAt: Date.now(),
-          kycStatus: "none" as const,
-          emailVerified: true,
-        };
-        await setDoc(doc(db, "users", fallbackUid), fallbackUserData, { merge: true }).catch(() => {});
-        localStorage.removeItem(LS_IS_ADMIN);
-        localStorage.setItem("obyo_tutorial_done", "1");
-        setCurrentUser(fallbackUserData);
-        return { success: true };
-      }
-      if (code === "auth/weak-password")
+        // Continue and merge if exists
+      } else if (code === "auth/weak-password") {
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
-
-      // Handle operation-not-allowed seamlessly by storing user directly in Firestore
-      if (code === "auth/operation-not-allowed" || code === "auth/admin-restricted-operation" || code === "auth/unauthorized-domain") {
-        uid = "usr_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
-      } else {
-        return { success: false, error: `Kayıt yapılamadı (Auth): ${authErr.message || code}` };
       }
     }
 
-    const userData = {
+    // Check if there is an existing document under another UID first
+    let existingData: any = {};
+    try {
+      const emailSnap = await getDoc(userDocRef);
+      if (emailSnap.exists()) {
+        existingData = emailSnap.data();
+      } else {
+        const q = query(collection(db, "users"), where("email", "==", e));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          existingData = qSnap.docs[0].data();
+          const oldId = qSnap.docs[0].id;
+          if (oldId !== e) {
+            await deleteDoc(doc(db, "users", oldId)).catch(() => {});
+          }
+        }
+      }
+    } catch (err) {}
+
+    const userData: ObyoUser = {
+      id:             e,
       email:          e,
       password:       data.password,
-      name:           data.name.trim(),
-      surname:        data.surname.trim(),
-      birthDate:      data.birthDate,
-      currency,
-      demoBalance,
-      realBalance:    0,
-      totalDeposited: 0,
-      totalWithdrawn: 0,
-      createdAt:      Date.now(),
-      kycStatus:      "none" as const,
+      name:           data.name.trim() || existingData.name || "Kullanıcı",
+      surname:        data.surname.trim() || existingData.surname || "",
+      birthDate:      data.birthDate || existingData.birthDate || "2000-01-01",
+      currency:       existingData.currency || currency,
+      demoBalance:    existingData.demoBalance !== undefined ? existingData.demoBalance : demoBalance,
+      realBalance:    existingData.realBalance !== undefined ? existingData.realBalance : 0,
+      totalDeposited: existingData.totalDeposited !== undefined ? existingData.totalDeposited : 0,
+      totalWithdrawn: existingData.totalWithdrawn !== undefined ? existingData.totalWithdrawn : 0,
+      createdAt:      existingData.createdAt || Date.now(),
+      kycStatus:      existingData.kycStatus || ("none" as const),
+      kycDetails:     existingData.kycDetails || undefined,
+      photoUrl:       existingData.photoUrl || undefined,
+      photoURL:       existingData.photoURL || existingData.photoUrl || undefined,
       emailVerified:  true,
     };
 
     try {
-      await setDoc(doc(db, "users", uid), userData, { merge: true });
+      await setDoc(userDocRef, cleanForFirestore(userData), { merge: true });
     } catch (dbErr: any) {
       console.error("Firebase db setDoc error:", dbErr);
       return { success: false, error: `Kayıt yapılamadı (DB): ${dbErr.message || "Bilinmeyen veritabanı hatası"}` };
     }
 
-    const fullUserObj = { id: uid, ...userData } as ObyoUser;
-
     try {
-      localStorage.setItem("obyo_user_reg_" + e, JSON.stringify(fullUserObj));
+      localStorage.setItem("obyo_user_reg_" + e, JSON.stringify(userData));
       const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
       if (!regList.includes(e)) {
         regList.push(e);
         localStorage.setItem("obyo_registered_emails", JSON.stringify(regList));
       }
-    } catch (e) {}
+    } catch (err) {}
 
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.setItem("obyo_tutorial_done", "1");
-    localStorage.setItem(LS_CUSTOM_UID, uid);
-    localStorage.setItem("obyo_active_uid", uid);
-    setCurrentUser(fullUserObj);
+    localStorage.setItem(LS_CUSTOM_UID, e);
+    localStorage.setItem("obyo_active_email", e);
+    localStorage.setItem("obyo_active_uid", e);
+    setCurrentUser(userData);
 
     return { success: true };
   };
@@ -679,6 +669,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.removeItem(LS_CUSTOM_UID);
     localStorage.removeItem("obyo_active_uid");
+    localStorage.removeItem("obyo_active_email");
     if (auth.currentUser) await signOut(auth);
     setCurrentUser(null);
     setIsAdmin(false);
@@ -717,8 +708,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!accept) return;
 
-      if (req.userId) {
-        const userRef = doc(db, "users", req.userId);
+      const targetUserId = req.userEmail?.trim().toLowerCase() || req.userId;
+      if (targetUserId) {
+        const userRef = doc(db, "users", targetUserId);
         if (req.type === "deposit") {
           await setDoc(userRef, {
             realBalance:    increment(amt),
@@ -740,13 +732,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const addBalanceDirect = async (userId: string, amount: number, userName: string, userEmail: string) => {
     try {
       const amt = Number(amount) || 0;
-      await setDoc(doc(db, "users", userId), {
+      const targetUserId = userEmail?.trim().toLowerCase() || userId;
+      await setDoc(doc(db, "users", targetUserId), {
         realBalance:    increment(amt),
         totalDeposited: increment(amt),
       }, { merge: true });
 
       await addDoc(collection(db, "requests"), {
-        userId,
+        userId: targetUserId,
         userEmail,
         userName,
         type:      "deposit",
@@ -839,10 +832,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const userRef = doc(db, "users", currentUser.id);
-        await setDoc(userRef, {
+        await setDoc(userRef, cleanForFirestore({
           kycStatus: "verified",
           kycDetails,
-        }, { merge: true });
+        }), { merge: true });
 
         setCurrentUser(prev => prev ? {
           ...prev,
@@ -876,10 +869,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const userRef = doc(db, "users", currentUser.id);
-        await setDoc(userRef, {
+        await setDoc(userRef, cleanForFirestore({
           kycStatus: "pending",
           kycDetails,
-        }, { merge: true });
+        }), { merge: true });
 
         setCurrentUser(prev => prev ? {
           ...prev,

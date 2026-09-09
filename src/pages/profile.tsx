@@ -250,7 +250,7 @@ export default function Profile() {
 
       <LeaderboardModal show={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
       <ProfilePhotoModal show={showPhotoModal} onClose={() => setShowPhotoModal(false)} />
-      <KycModal show={showKycModal} onClose={() => setShowKycModal(false)} />
+      {currentUser && <KycModal show={showKycModal} onClose={() => setShowKycModal(false)} />}
       <LanguageModal
         show={showLangModal}
         onClose={() => setShowLangModal(false)}

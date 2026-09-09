@@ -347,7 +347,7 @@ export default function Admin() {
 
             {users.map(u => {
               const isOpen  = expanded === u.id;
-              const pending = requests.filter(r => r.userId === u.id && r.status === "pending").length;
+              const pending = requests.filter(r => (r.userId === u.id || r.userEmail?.toLowerCase() === u.email?.toLowerCase()) && r.status === "pending").length;
               const isAddingThis = adding === u.id;
 
               return (
