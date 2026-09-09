@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -9,6 +10,17 @@ export const auth = getAuth(app);
 export const db = (firebaseConfig as any).firestoreDatabaseId
   ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
+
+export let analytics: ReturnType<typeof getAnalytics> | null = null;
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  }).catch((err) => {
+    console.warn("Analytics initialization check error:", err);
+  });
+}
 
 // Connection test according to Firebase guidelines
 async function testConnection() {
@@ -21,3 +33,4 @@ async function testConnection() {
   }
 }
 testConnection();
+

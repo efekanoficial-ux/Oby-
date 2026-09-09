@@ -183,9 +183,24 @@ export default function AuthPage() {
 
           {err && (
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl px-3 py-2.5 text-xs font-semibold text-[#f6465d]"
+              className="rounded-xl p-3 text-xs font-semibold text-[#f6465d] flex flex-col gap-2"
               style={{ background: "rgba(246,70,93,0.08)", border: "1px solid rgba(246,70,93,0.18)" }}>
-              {err}
+              <span>{err}</span>
+              {typeof window !== "undefined" && err.includes("Authorized Domains") && (
+                <div className="mt-1 pt-2 border-t border-[#f6465d]/20 flex items-center justify-between bg-black/40 p-2 rounded-lg text-white">
+                  <span className="font-mono text-[11px] truncate max-w-[200px] text-white/90">{window.location.hostname}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.hostname);
+                      alert("Domain adı kopyalandı! Firebase Console > Authentication > Settings > Authorized Domains kısmına ekleyebilirsiniz.");
+                    }}
+                    className="px-2.5 py-1 bg-[#FF6B00] text-black font-bold text-[10px] rounded-md hover:bg-[#FFB800] transition-colors cursor-pointer"
+                  >
+                    Kopyala
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -204,29 +219,34 @@ export default function AuthPage() {
             )}
           </motion.button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-1">
-            <div className="h-px flex-1 bg-white/10" />
-            <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">veya</span>
-            <div className="h-px flex-1 bg-white/10" />
-          </div>
+          {/* Google Sign In Option - Only on Login Mode */}
+          {mode === "login" && (
+            <>
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-1">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">veya</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
 
-          {/* Google Sign In Button */}
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.98 }}
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="flex items-center justify-center gap-3 w-full rounded-xl py-3 text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all cursor-pointer disabled:opacity-50"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z" />
-              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12.3s.7 2.6 1.9 5l3.7-2.5z" />
-              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
-            </svg>
-            Google ile Giriş Yap
-          </motion.button>
+              {/* Google Sign In Button */}
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.98 }}
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="flex items-center justify-center gap-3 w-full rounded-xl py-3 text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all cursor-pointer disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z" />
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12.3s.7 2.6 1.9 5l3.7-2.5z" />
+                  <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
+                </svg>
+                Google ile Giriş Yap
+              </motion.button>
+            </>
+          )}
         </form>
 
         {/* Footer */}

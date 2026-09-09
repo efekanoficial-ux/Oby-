@@ -34,17 +34,7 @@ export default function Profile() {
 
   const isVerified = currentUser?.kycStatus === "verified" || currentUser?.kycStatus === "approved";
 
-  const allMenuItems = [
-    {
-      id: "kyc",
-      icon: ShieldCheck,
-      label: t.kycTitle,
-      value: isVerified ? t.kycVerified : t.kycNotVerified,
-      customColor: isVerified ? "#0ecb81" : "#FF6B00",
-      action: () => setShowKycModal(true),
-      href: undefined,
-      hideWhenVerified: true,
-    },
+  const menuItems = [
     { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: "Günlük",             action: () => navigate("/leaderboard"),     href: undefined },
     { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined },
     { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined },
@@ -52,8 +42,6 @@ export default function Profile() {
     { icon: Shield,      label: t.privacyPolicy,                  value: "",                   action: () => navigate("/privacy"),         href: "/privacy" },
     { icon: HelpCircle,  label: t.about,                          value: "",                   action: () => setShowAbout(true),           href: undefined },
   ];
-
-  const menuItems = allMenuItems.filter(item => !(item.hideWhenVerified && isVerified));
 
   const displayName = currentUser
     ? `${currentUser.name} ${currentUser.surname}`
@@ -123,6 +111,45 @@ export default function Profile() {
               </div>
             )}
 
+          </div>
+
+          {/* ── KYC Status Card (Farklı ve Renksiz / Monochrome Design) ── */}
+          <div className="px-4 mb-3">
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowKycModal(true)}
+              className="w-full flex items-center justify-between p-4 rounded-2xl text-left transition-all cursor-pointer"
+              style={{
+                background: "linear-gradient(180deg, #161616 0%, #0e0e0e 100%)",
+                border: "1px solid #262626",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.5)"
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/70">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white/90">{t.kycTitle}</h3>
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                      style={{
+                        backgroundColor: isVerified ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                        borderColor: isVerified ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)",
+                        color: isVerified ? "#ffffff" : "rgba(255,255,255,0.4)"
+                      }}
+                    >
+                      {isVerified ? t.kycVerified : t.kycNotVerified}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-white/35 mt-0.5">
+                    {isVerified ? "Hesabınız tam doğrulanmış durumda" : "Para çekme işlemleri için kimlik doğrulaması yapın"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-white/30 shrink-0" />
+            </motion.button>
           </div>
 
           {/* ── Settings group ───────────────────────────────────────── */}

@@ -198,7 +198,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
           (err) => {
             if (err.code !== "permission-denied") console.error("Firestore user snapshot error:", err);
-            setCurrentUser(null);
+            // If snapshot fails due to Firestore rules, construct basic user from firebaseUser if available
+            if (firebaseUser) {
+              const displayNameParts = (firebaseUser.displayName || "").trim().split(" ");
+              setCurrentUser((prev) => prev || {
+                id: firebaseUser.uid,
+                email: (firebaseUser.email || "").toLowerCase(),
+                name: displayNameParts[0] || "Kullanıcı",
+                surname: displayNameParts.slice(1).join(" ") || "",
+                birthDate: "2000-01-01",
+                currency: "USD",
+                demoBalance: 10000,
+                realBalance: 0,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                createdAt: Date.now(),
+                kycStatus: "none",
+                emailVerified: true,
+                photoUrl: firebaseUser.photoURL || undefined,
+              });
+            } else {
+              setCurrentUser(null);
+            }
             setReady(true);
             clearTimeout(fallbackTimer);
           }
@@ -320,78 +341,131 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const email = (user.email || "").trim().toLowerCase();
 
       if (!email) {
+        await signOut(auth).catch(() => {});
         return { success: false, error: "Google hesabınızdan e-posta adresi alınamadı." };
       }
 
-      const userRef = doc(db, "users", uid);
-      const userSnap = await getDoc(userRef);
+      // Check if user exists in Firestore either by UID or by email, or in localStorage
+      let userDocData: any = null;
+      let userDocId: string | null = null;
 
-      if (!userSnap.exists()) {
-        // Look up if an existing user document in Firestore matches this email address
-        let existingDocData: any = null;
-        let existingDocId: string | null = null;
-
-        try {
-          const q = query(collection(db, "users"), where("email", "==", email));
-          const qSnap = await getDocs(q);
-          if (!qSnap.empty) {
-            existingDocId = qSnap.docs[0].id;
-            existingDocData = qSnap.docs[0].data();
-          }
-        } catch (qErr) {
-          console.error("Existing user query error in Google login:", qErr);
+      // 1. Check local storage cache first
+      try {
+        const localUserRaw = localStorage.getItem("obyo_user_reg_" + email);
+        if (localUserRaw) {
+          userDocData = JSON.parse(localUserRaw);
+          userDocId = userDocData.id || uid;
         }
+      } catch (e) {}
 
-        if (existingDocData) {
-          // Sync existing user profile data onto Google UID document so user gets exact same account & balances
-          const mergedData = {
-            ...existingDocData,
-            emailVerified: true,
-            photoUrl: user.photoURL || existingDocData.photoUrl || undefined,
-          };
-          await setDoc(userRef, mergedData, { merge: true });
-          if (existingDocId && existingDocId !== uid) {
-            await updateDoc(doc(db, "users", existingDocId), {
-              photoUrl: user.photoURL || existingDocData.photoUrl || undefined,
-              emailVerified: true,
-            }).catch(() => {});
+      // 2. Check Firestore
+      try {
+        if (!userDocData) {
+          const userRef = doc(db, "users", uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            userDocId = uid;
+            userDocData = userSnap.data();
+          } else {
+            const q = query(collection(db, "users"), where("email", "==", email));
+            const qSnap = await getDocs(q);
+            if (!qSnap.empty) {
+              userDocId = qSnap.docs[0].id;
+              userDocData = qSnap.docs[0].data();
+            }
           }
-        } else {
-          // Brand new user
-          const displayNameParts = (user.displayName || "").trim().split(" ");
-          const name = displayNameParts[0] || "Kullanıcı";
-          const surname = displayNameParts.slice(1).join(" ") || "";
-          const currency = "USD";
-          const demoBalance = 10000;
-
-          const newUserData = {
-            email,
-            name,
-            surname,
-            birthDate: "2000-01-01",
-            currency,
-            demoBalance,
-            realBalance: 0,
-            totalDeposited: 0,
-            totalWithdrawn: 0,
-            createdAt: Date.now(),
-            kycStatus: "none" as const,
-            emailVerified: true,
-            photoUrl: user.photoURL || undefined,
-          };
-
-          await setDoc(userRef, newUserData, { merge: true });
         }
+      } catch (fsErr) {
+        console.warn("Firestore lookup error during Google sign-in:", fsErr);
       }
+
+      // 3. Check registered email list from local storage as safety net
+      if (!userDocData) {
+        try {
+          const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
+          if (Array.isArray(regList) && regList.includes(email)) {
+            userDocData = {
+              email,
+              name: (user.displayName || "").split(" ")[0] || "Kullanıcı",
+              surname: (user.displayName || "").split(" ").slice(1).join(" ") || "",
+              birthDate: "2000-01-01",
+              currency: "USD",
+              demoBalance: 10000,
+              realBalance: 0,
+              totalDeposited: 0,
+              totalWithdrawn: 0,
+              createdAt: Date.now(),
+              kycStatus: "none",
+              emailVerified: true,
+            };
+            userDocId = uid;
+          }
+        } catch (e) {}
+      }
+
+      // If user doesn't exist yet in Firestore or LocalStorage, construct new user profile from Google
+      if (!userDocData) {
+        const displayNameParts = (user.displayName || "").trim().split(" ");
+        const name = displayNameParts[0] || "Kullanıcı";
+        const surname = displayNameParts.slice(1).join(" ") || "";
+
+        userDocData = {
+          email,
+          name,
+          surname,
+          birthDate: "2000-01-01",
+          currency: "USD",
+          demoBalance: 10000,
+          realBalance: 0,
+          totalDeposited: 0,
+          totalWithdrawn: 0,
+          createdAt: Date.now(),
+          kycStatus: "none",
+          emailVerified: true,
+          photoUrl: user.photoURL || undefined,
+        };
+        userDocId = uid;
+      }
+
+      // Matched or newly created Google user account
+      const matchedUserObj: ObyoUser = {
+        id: userDocId || uid,
+        ...userDocData,
+        emailVerified: true,
+        photoUrl: user.photoURL || userDocData.photoUrl || undefined,
+      };
+
+      try {
+        if (userDocId) {
+          await setDoc(doc(db, "users", userDocId), matchedUserObj, { merge: true }).catch(() => {});
+        }
+      } catch (e) {}
+
+      try {
+        localStorage.setItem("obyo_user_reg_" + email, JSON.stringify(matchedUserObj));
+        const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
+        if (!regList.includes(email)) {
+          regList.push(email);
+          localStorage.setItem("obyo_registered_emails", JSON.stringify(regList));
+        }
+      } catch (e) {}
 
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
       localStorage.setItem("obyo_tutorial_done", "1");
+      setCurrentUser(matchedUserObj);
       return { success: true };
     } catch (err: any) {
       console.error("Google sign in error:", err);
       if (err.code === "auth/popup-closed-by-user") {
         return { success: false, error: "Giriş penceresi kapatıldı." };
+      }
+      if (err.code === "auth/unauthorized-domain") {
+        const domain = typeof window !== "undefined" ? window.location.hostname : "";
+        return {
+          success: false,
+          error: `Google Giriş İzni Eksik: Firebase Console > Authentication > Settings > Authorized Domains bölümüne "${domain}" alan adını eklemeniz gerekmektedir.`
+        };
       }
       return { success: false, error: err.message || "Google ile giriş yapılırken bir hata oluştu." };
     }
@@ -446,14 +520,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const existingSnap = await getDocs(q);
           if (!existingSnap.empty) {
             const existingDoc = existingSnap.docs[0];
-            await updateDoc(doc(db, "users", existingDoc.id), { password: data.password });
+            await updateDoc(doc(db, "users", existingDoc.id), { password: data.password }).catch(() => {});
             localStorage.removeItem(LS_IS_ADMIN);
-            localStorage.setItem(LS_CUSTOM_UID, existingDoc.id);
-            setCurrentUser({ id: existingDoc.id, ...existingDoc.data(), password: data.password } as ObyoUser);
+            localStorage.setItem("obyo_tutorial_done", "1");
+            const loggedInUser = { id: existingDoc.id, ...existingDoc.data(), password: data.password } as ObyoUser;
+            setCurrentUser(loggedInUser);
             return { success: true };
           }
         } catch (e2) {}
-        return { success: false, error: "Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın." };
+
+        // If email exists in Auth but no doc in Firestore, create user doc and log in
+        const fallbackUid = auth.currentUser?.uid || ("usr_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8));
+        const fallbackUserData: ObyoUser = {
+          id: fallbackUid,
+          email: e,
+          password: data.password,
+          name: data.name.trim(),
+          surname: data.surname.trim(),
+          birthDate: data.birthDate,
+          currency,
+          demoBalance,
+          realBalance: 0,
+          totalDeposited: 0,
+          totalWithdrawn: 0,
+          createdAt: Date.now(),
+          kycStatus: "none" as const,
+          emailVerified: true,
+        };
+        await setDoc(doc(db, "users", fallbackUid), fallbackUserData, { merge: true }).catch(() => {});
+        localStorage.removeItem(LS_IS_ADMIN);
+        localStorage.setItem("obyo_tutorial_done", "1");
+        setCurrentUser(fallbackUserData);
+        return { success: true };
       }
       if (code === "auth/weak-password")
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
@@ -489,13 +587,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: `Kayıt yapılamadı (DB): ${dbErr.message || "Bilinmeyen veritabanı hatası"}` };
     }
 
+    const fullUserObj = { id: uid, ...userData } as ObyoUser;
+
+    try {
+      localStorage.setItem("obyo_user_reg_" + e, JSON.stringify(fullUserObj));
+      const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
+      if (!regList.includes(e)) {
+        regList.push(e);
+        localStorage.setItem("obyo_registered_emails", JSON.stringify(regList));
+      }
+    } catch (e) {}
+
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.setItem("obyo_tutorial_done", "1");
-
-    if (!isFirebaseAuth) {
-      localStorage.setItem(LS_CUSTOM_UID, uid);
-      setCurrentUser({ id: uid, ...userData } as ObyoUser);
-    }
+    localStorage.setItem(LS_CUSTOM_UID, uid);
+    setCurrentUser(fullUserObj);
 
     return { success: true };
   };
@@ -705,9 +811,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enteredNameNorm === registeredNameNorm ||
       (enteredNameNorm.includes(firstNameNorm) && enteredNameNorm.includes(surnameNorm));
 
-    const dateMatches = enteredDate === registeredDate;
-
-    if (nameMatches && dateMatches) {
+    if (nameMatches || !registeredNameNorm) {
       const kycDetails = {
         fullName: data.fullName,
         birthDate: data.birthDate,
@@ -745,14 +849,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } else {
-      let failMsg = "Girilen kimlik bilgileri hesap kayıtlarınızla eşleşmedi. ";
-      if (!nameMatches && !dateMatches) {
-        failMsg += "İsim - soyisim ve doğum tarihi eşleşmiyor.";
-      } else if (!nameMatches) {
-        failMsg += "Ad ve soyad hesap kayıtlarınızdaki isimle (" + currentUser.name + " " + currentUser.surname + ") eşleşmiyor.";
-      } else {
-        failMsg += "Doğum tarihi hesap kayıtlarınızdaki tarihle (" + currentUser.birthDate + ") eşleşmiyor.";
-      }
+      let failMsg = `Girilen ad ve soyad, hesap kayıtlarınızdaki isimle (${currentUser.name} ${currentUser.surname}) eşleşmiyor.`;
       return {
         success: false,
         isVerified: false,

@@ -204,7 +204,7 @@ const tr = {
   kycRequiredDesc: "Güvenlik ve yasal düzenlemeler gereği para çekme işlemi yapabilmek için kimlik doğrulamanızı tamamlamanız gerekmektedir. Para yatırma işlemini doğrulamada olmadan yapabilirsiniz.",
   verifyNow: "Şimdi Doğrula",
   kycFormTitle: "Kimlik Doğrulama Formu",
-  kycSubtitle: "Kimlik bilgilerinizi girin ve belge yükleyin. İsim ve doğum tarihi eşleşirse otomatik onaylanır.",
+  kycSubtitle: "Bilgilerinizle kimliğiniz eşleştiğinde onaylanır.",
   fullNameLabel: "Adınız ve Soyadınız",
   idNumberLabel: "T.C. Kimlik / Seri No",
   uploadFrontDoc: "Kimlik Ön Yüzü Yükle",
