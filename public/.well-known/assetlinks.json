@@ -1,8 +1,8 @@
 [{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.obyotrade.twa",
-    "sha256_cert_fingerprints": ["267c83cfbb89897d1ededf114c3caea33f7b7962a5cdc4b8cc3bed5e261f5429"]
-  }
-}]
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.obyotrade.app",
+        "sha256_cert_fingerprints": ["06:0E:2E:94:1F:C1:95:67:47:73:5E:2F:B4:52:DF:02:65:96:94:69:9C:4C:4A:B0:CE:65:C4:FE:9A:67:48:8C"]
+      }
+    }]
