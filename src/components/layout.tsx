@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone } from "lucide-react";
+import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check } from "lucide-react";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
@@ -392,6 +392,85 @@ function DesktopSidebar({
   );
 }
 
+function CallRequestMenu({ buttonClass, iconSize = 15, align = "right" }: { buttonClass: string, iconSize?: number, align?: "left" | "right" }) {
+  const [open, setOpen] = useState(false);
+  const [requested, setRequested] = useState(false);
+  const { currentUser } = useAuth();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleRequest = () => {
+    if (!currentUser || currentUser.totalDeposited <= 0) return;
+    setRequested(true);
+    setTimeout(() => {
+      setOpen(false);
+      setRequested(false);
+    }, 3000);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <div
+        className={buttonClass}
+        title="Müşteri Hizmetleri"
+        onClick={() => setOpen(s => !s)}
+      >
+        <Phone size={iconSize} />
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className={`fixed top-[64px] left-1/2 -translate-x-1/2 sm:absolute sm:top-full sm:left-auto sm:-right-2 sm:translate-x-0 mt-2 w-[calc(100vw-32px)] max-w-[320px] sm:w-64 rounded-2xl border border-white/10 bg-[#111] p-3 shadow-2xl z-50 sm:origin-top-right origin-top`}
+          >
+            {(!currentUser || currentUser.totalDeposited <= 0) ? (
+              <div className="py-2 px-1 text-center">
+                <p className="text-[11px] text-white/50 leading-relaxed mb-2">
+                  Aranma talebi oluşturabilmek için hesabınıza en az bir kez para yatırmış olmanız gerekmektedir.
+                </p>
+                <Link href="/wallet">
+                  <button onClick={() => setOpen(false)} className="w-full py-2 rounded-lg bg-white/10 text-white font-bold text-[10px] hover:bg-white/20 transition-colors">
+                    Yatırım Yap
+                  </button>
+                </Link>
+              </div>
+            ) : requested ? (
+              <div className="flex flex-col items-center justify-center py-3 gap-2">
+                <div className="h-8 w-8 rounded-full bg-[#0ecb81]/20 flex items-center justify-center text-[#0ecb81]">
+                  <Check size={16} />
+                </div>
+                <p className="text-xs font-bold text-white text-center">Talebiniz Alındı</p>
+                <p className="text-[10px] text-white/50 text-center">Temsilcimiz en kısa sürede sizi arayacaktır.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-[11px] text-white/50 text-center mb-1">Müşteri hizmetleri tarafından aranmak ister misiniz?</p>
+                <button
+                  onClick={handleRequest}
+                  className="w-full py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition-colors"
+                >
+                  Aranma Talebi Oluştur
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* ── Desktop Header ──────────────────────────────────────────────────────── */
 function DesktopHeader({
   onWallet,
@@ -417,12 +496,7 @@ function DesktopHeader({
       <div />
       <div className="flex items-center gap-2.5">
         {/* Müşteri Hizmetleri / Telefon Butonu */}
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all cursor-pointer shrink-0"
-          title="Müşteri Hizmetleri"
-        >
-          <Phone size={15} />
-        </div>
+        <CallRequestMenu buttonClass="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all cursor-pointer shrink-0" iconSize={15} align="right" />
 
         {/* Bakiye Kısmı (Hesap Seçici ve Bakiye - diğer butonlarla aynı h-9 boyutta) */}
         <div className="relative">
@@ -565,12 +639,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Right: Telefon + Bakiye + Cüzdan */}
           <div className="relative flex items-center gap-1.5">
             {/* Müşteri Hizmetleri / Telefon Butonu (Bakiyenin hemen yanında) */}
-            <div
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 shrink-0 cursor-pointer"
-              title="Müşteri Hizmetleri"
-            >
-              <Phone size={15} />
-            </div>
+            <CallRequestMenu buttonClass="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 shrink-0 cursor-pointer" iconSize={15} align="right" />
 
             {/* Bakiye Kısmı */}
             <motion.button

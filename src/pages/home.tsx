@@ -439,7 +439,7 @@ function TradeControls({
           onClick={() => setShowDuration(true)}
           className="flex flex-1 flex-col rounded-2xl px-3 py-2.5 border text-left transition-colors active:scale-[0.97]"
           style={{ background: cardBg, borderColor: cardBorder }}
-          data-tour="step-3"
+          data-tour="step-3-old"
         >
           <span className="text-[9px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Süre</span>
           <div className="flex items-center justify-center gap-1.5">
@@ -964,7 +964,7 @@ function MobileTradePanel({
         </button>
 
         {/* Duration / Calendar */}
-        <button onClick={() => setShowDuration(true)} style={tbBtn(false)} data-tour="step-3" title="Vade Süresi">
+        <button onClick={() => setShowDuration(true)} style={tbBtn(false)} title="Vade Süresi">
           <Calendar size={14} color="#ffffff" />
         </button>
 
@@ -995,9 +995,9 @@ function MobileTradePanel({
       />
 
       {/* ── Tutar + Zaman ─────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 8, padding: "2px 12px 6px" }} data-tour="step-2">
+      <div style={{ display: "flex", gap: 8, padding: "2px 12px 6px" }}>
         {/* Tutar */}
-        <div style={{ flex: 1, background: "#1c1c1c", borderRadius: 12, padding: "7px 10px", border: "1px solid #252525" }}>
+        <div data-tour="step-2" style={{ flex: 1, background: "#1c1c1c", borderRadius: 12, padding: "7px 10px", border: "1px solid #252525" }}>
           <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 2, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Tutar</p>
           <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <button
@@ -1029,6 +1029,7 @@ function MobileTradePanel({
         {/* Zaman */}
         <button
           onClick={() => setShowDuration(true)}
+          data-tour="step-3"
           style={{ flex: 1, background: "#1c1c1c", borderRadius: 12, padding: "7px 10px", border: "1px solid #252525", textAlign: "left", cursor: "pointer" }}
         >
           <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 2, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Zaman</p>
@@ -2207,7 +2208,7 @@ export default function Home() {
                   </div>
 
                   {/* Expiry (Aligned & Matching Amount card design) */}
-                  <div className="rounded-xl bg-black border border-white/6 p-3" data-tour="step-3">
+                  <div className="rounded-xl bg-black border border-white/6 p-3" data-tour="step-3-old">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Süre</span>
                       <span className="text-[10px] font-bold text-[#FF6B00]">{tfSubLabel(tf.secs)}</span>

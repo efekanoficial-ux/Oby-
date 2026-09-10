@@ -73,7 +73,9 @@ export interface PaymentSettings {
   ibanNumber:   string;
   ibanSwift:    string;
   trc20Address: string;
+  trc20QrCode?: string;
   erc20Address: string;
+  erc20QrCode?: string;
   updatedAt?:   number;
 }
 
@@ -83,7 +85,9 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   ibanNumber:   "TR88 0006 2000 8765 4321 0099 73",
   ibanSwift:    "TGBATRISXXX",
   trc20Address: "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S",
+  trc20QrCode:  "",
   erc20Address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+  erc20QrCode:  "",
 };
 
 interface RegisterData {

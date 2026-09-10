@@ -16,7 +16,15 @@ import {
 } from "lucide-react";
 
 /* ─── Fake QR code (SVG grid) ────────────────────────────────────────────── */
-function QRVisual({ data }: { data: string }) {
+function QRVisual({ data, imgSrc }: { data: string; imgSrc?: string }) {
+  if (imgSrc) {
+    return (
+      <div className="bg-black/50 border border-white/10 rounded-2xl p-1 shadow-lg inline-block">
+        <img src={imgSrc} alt="QR Code" style={{ width: 175, height: 175, objectFit: "contain", borderRadius: "12px" }} />
+      </div>
+    );
+  }
+
   const S = 25, CS = 7;
   const cells: boolean[] = [];
   const inF = (r: number, c: number) =>
@@ -693,13 +701,14 @@ export default function WalletPage() {
                     const cryptoAddress = method.id === "trc20"
                       ? (paymentSettings.trc20Address || "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S")
                       : (paymentSettings.erc20Address || "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f");
+                    const qrImgSrc = method.id === "trc20" ? paymentSettings.trc20QrCode : paymentSettings.erc20QrCode;
                     const networkLabel = method.id === "trc20" ? "Tron (TRC-20)" : "Ethereum (ERC-20)";
 
                     return (
                       <>
                         <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/8 bg-black/60 p-5">
                           <p className="text-xs font-bold text-white/50">{method.label} — {networkLabel}</p>
-                          <QRVisual data={cryptoAddress} />
+                          <QRVisual data={cryptoAddress} imgSrc={qrImgSrc} />
                           <span className="text-[10px] text-white/30 font-medium">QR kodunu cüzdanınızla taratın</span>
                         </div>
 

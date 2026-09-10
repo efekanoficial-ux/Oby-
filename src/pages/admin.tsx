@@ -110,6 +110,51 @@ export default function Admin() {
     }
   };
 
+  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'trc20QrCode' | 'erc20QrCode') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Dosya boyutu 2MB'dan küçük olmalıdır.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 500;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setFormSettings(prev => ({ ...prev, [field]: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="fixed inset-0 w-full h-full bg-black text-white flex flex-col overflow-hidden">
 
@@ -654,9 +699,31 @@ export default function Admin() {
                       value={formSettings.trc20Address}
                       onChange={(e) => setFormSettings(prev => ({ ...prev, trc20Address: e.target.value }))}
                       placeholder="T..."
-                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#27AE60]/50 transition-colors"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#27AE60]/50 transition-colors mb-2"
                       required
                     />
+                    <div className="flex items-center gap-3">
+                      {formSettings.trc20QrCode && (
+                        <div className="w-12 h-12 rounded bg-white p-1 shrink-0">
+                          <img src={formSettings.trc20QrCode} alt="TRC20 QR" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <label className="flex items-center justify-center gap-2 flex-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white cursor-pointer hover:bg-white/10 transition-colors">
+                        <PlusCircle size={14} />
+                        QR Kod Yükle
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleQrUpload(e, 'trc20QrCode')}
+                        />
+                      </label>
+                      {formSettings.trc20QrCode && (
+                        <button type="button" onClick={() => setFormSettings(prev => ({...prev, trc20QrCode: ''}))} className="p-2 text-white/40 hover:text-red-400 bg-white/5 rounded-xl border border-white/10 transition-colors">
+                           <X size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -671,9 +738,31 @@ export default function Admin() {
                       value={formSettings.erc20Address}
                       onChange={(e) => setFormSettings(prev => ({ ...prev, erc20Address: e.target.value }))}
                       placeholder="0x..."
-                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#627EEA]/50 transition-colors"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#627EEA]/50 transition-colors mb-2"
                       required
                     />
+                    <div className="flex items-center gap-3">
+                      {formSettings.erc20QrCode && (
+                        <div className="w-12 h-12 rounded bg-white p-1 shrink-0">
+                          <img src={formSettings.erc20QrCode} alt="ERC20 QR" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <label className="flex items-center justify-center gap-2 flex-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white cursor-pointer hover:bg-white/10 transition-colors">
+                        <PlusCircle size={14} />
+                        QR Kod Yükle
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleQrUpload(e, 'erc20QrCode')}
+                        />
+                      </label>
+                      {formSettings.erc20QrCode && (
+                        <button type="button" onClick={() => setFormSettings(prev => ({...prev, erc20QrCode: ''}))} className="p-2 text-white/40 hover:text-red-400 bg-white/5 rounded-xl border border-white/10 transition-colors">
+                           <X size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

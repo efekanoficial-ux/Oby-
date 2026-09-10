@@ -112,7 +112,7 @@ export default function LeaderboardPage() {
     // If trade items don't have 'mode', they might have a boolean 'isDemo'.
     // In demo context, they are generated differently. Let's assume there is an `isDemo` flag or we rely on the type.
     const todayTrades = completedTrades.filter((tr) => 
-      tr.closedAt && tr.closedAt >= startOfToday && tr.isDemo !== true
+      tr.closedAt && tr.closedAt >= startOfToday && (tr as any).isDemo !== true
     );
     
     const tradeCount = todayTrades.length;
