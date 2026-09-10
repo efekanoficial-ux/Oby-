@@ -293,6 +293,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
 
+          // Enforce email verification check
+          if (finalUserDoc && finalUserDoc.emailVerified !== true) {
+            console.log("Email not verified. Signing out.");
+            await signOut(auth).catch(() => {});
+            localStorage.removeItem("obyo_active_email");
+            localStorage.removeItem("obyo_active_uid");
+            localStorage.removeItem(LS_CUSTOM_UID);
+            localStorage.removeItem(LS_IS_ADMIN);
+            setCurrentUser(null);
+            setReady(true);
+            clearTimeout(fallbackTimer);
+            return;
+          }
+
           // Enforce profile completeness check
           if (finalUserDoc && !isProfileComplete(finalUserDoc)) {
             console.log("User profile is incomplete. Signing out to complete registration.");
@@ -314,7 +328,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           doc(db, "users", email),
           (snap) => {
             if (snap.exists()) {
-              setCurrentUser({ id: snap.id, ...snap.data() } as ObyoUser);
+              const userData = { id: snap.id, ...snap.data() } as ObyoUser;
+              if (userData.emailVerified !== true) {
+                console.log("Email not verified yet.");
+                // User is in DB but not verified.
+                // Depending on requirements, we might want to sign them out or set a 'pending' state.
+                // For now, let's keep it null in currentUser
+                setCurrentUser(null);
+              } else {
+                setCurrentUser(userData);
+              }
             } else {
               setCurrentUser(null);
             }
@@ -546,13 +569,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userDocRef = doc(db, "users", e);
 
     try {
-      const cred = await createUserWithEmailAndPassword(auth, e, data.password);
+      await createUserWithEmailAndPassword(auth, e, data.password);
     } catch (authErr: any) {
       const code = authErr.code ?? "";
       if (code === "auth/email-already-in-use") {
-        // Continue and merge if exists
+        // User might exist, but we proceed to check/update profile in Firestore
       } else if (code === "auth/weak-password") {
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
+      } else {
+        console.error("Auth error:", authErr);
+        // If it's a different error, we should probably fail
+        return { success: false, error: "Kayıt yapılamadı: " + authErr.message };
       }
     }
 
@@ -592,7 +619,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       kycDetails:     existingData.kycDetails || undefined,
       photoUrl:       existingData.photoUrl || undefined,
       photoURL:       existingData.photoURL || existingData.photoUrl || undefined,
-      emailVerified:  true,
+      emailVerified:  data.emailVerified ?? true,
     };
 
     try {

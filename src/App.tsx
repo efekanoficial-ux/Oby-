@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountModeProvider } from "@/context/AccountModeContext";
 import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 import { Layout } from "@/components/layout";
+import { requestNotificationPermission } from "@/lib/notifications";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DesktopAuthGate } from "@/components/desktop-auth-gate";
@@ -90,6 +91,12 @@ function AppContent() {
   const { ready, currentUser } = useAuth();
   const { t } = useLanguage();
   const [showApp, setShowApp] = useState(false);
+
+  useEffect(() => {
+    if (currentUser && Notification.permission !== 'granted') {
+      requestNotificationPermission();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (ready) {
