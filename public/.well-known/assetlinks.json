@@ -3,6 +3,6 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.obyotrade.twa",
-    "sha256_cert_fingerprints": ["26:7C:83:CF:BB:89:89:7D:1E:DE:DF:11:4C:3C:AE:A3:3F:7B:79:62:A5:CD:C4:B8:CC:3B:ED:5E:26:1F:54:29"]
+    "sha256_cert_fingerprints": ["267c83cfbb89897d1ededf114c3caea33f7b7962a5cdc4b8cc3bed5e261f5429"]
   }
 }]
