@@ -49,6 +49,7 @@
         "ibanBank": { "type": "string" },
         "ibanHolder": { "type": "string" },
         "ibanNumber": { "type": "string" },
+        "ibanDescription": { "type": "string" },
         "ibanSwift": { "type": "string" },
         "trc20Address": { "type": "string" },
         "erc20Address": { "type": "string" },

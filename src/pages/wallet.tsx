@@ -187,6 +187,7 @@ export default function WalletPage() {
   const [destination, setDestination] = useState("");
   const [countdownAt, setCountdownAt] = useState<number | null>(null);
   const [refCode] = useState(() => `OBY-${Math.floor(100000 + Math.random() * 900000)}`);
+  const transferCode = paymentSettings.ibanDescription?.trim() || refCode;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -249,7 +250,7 @@ export default function WalletPage() {
         type: "deposit",
         amount: numAmt,
         currency: method.currency,
-        method: `${method.label} (${refCode})`,
+        method: `${method.label} (${transferCode})`,
         destination: "",
       });
       notifyTelegram({
@@ -640,8 +641,7 @@ export default function WalletPage() {
                         accent: "#0ecb81"
                       },
                       ...(!isTL ? [{ label: "Hesaba Geçecek Tutar", value: `$${amount} USD`, copy: false }] : []),
-                      { label: "SWIFT / BIC", value: paymentSettings.ibanSwift || "TGBATRISXXX", copy: true },
-                      { label: "Açıklama (Zorunlu)", value: refCode, copy: true, accent: "#FFB800" },
+                      { label: "Açıklama (Zorunlu)", value: transferCode, copy: true, accent: "#FFB800" },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                         <span className="text-xs text-white/40 shrink-0">{row.label}</span>
@@ -659,7 +659,7 @@ export default function WalletPage() {
                     style={{ background: "rgba(255,184,0,0.06)" }}>
                     <AlertCircle size={16} className="text-[#FFB800] mt-0.5 shrink-0" />
                     <p className="text-xs text-white/60 leading-relaxed">
-                      Lütfen bankanızın transfer açıklama kısmına kesinlikle <span className="text-[#FFB800] font-bold">"{refCode}"</span> referans kodunu yazınız. Bu kod olmadan yapılan transferler otomatik eşleştirilemez.
+                      Lütfen bankanızın transfer açıklama kısmına kesinlikle <span className="text-[#FFB800] font-bold">"{transferCode}"</span> kodunu yazınız. Bu açıklama olmadan yapılan transferler eşleştirilemez.
                     </p>
                   </div>
 

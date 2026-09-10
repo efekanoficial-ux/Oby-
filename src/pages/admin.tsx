@@ -661,15 +661,18 @@ export default function Admin() {
 
                   <div className="sm:col-span-2">
                     <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
-                      SWIFT / BIC Kodu (Opsiyonel)
+                      Transfer Açıklama Kodu (Açıklama)
                     </label>
                     <input
                       type="text"
-                      value={formSettings.ibanSwift}
-                      onChange={(e) => setFormSettings(prev => ({ ...prev, ibanSwift: e.target.value }))}
-                      placeholder="TGBATRISXXX"
-                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      value={formSettings.ibanDescription ?? ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, ibanDescription: e.target.value }))}
+                      placeholder="Örn: OBYO-TRANSFER veya Referans Kodu"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
                     />
+                    <p className="text-[11px] text-white/35 mt-1.5 leading-relaxed">
+                      Kullanıcılar havale/EFT ile para yatırırken bu açıklama kodunu banka transferine yazar. Dilediğiniz zaman buradan güncelleyebilirsiniz.
+                    </p>
                   </div>
                 </div>
               </div>
