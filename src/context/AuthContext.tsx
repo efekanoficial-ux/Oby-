@@ -104,8 +104,7 @@ interface AuthContextType {
   updatePaymentSettings: (settings: Partial<PaymentSettings>) => Promise<{ success: boolean; error?: string }>;
   login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle:  () => Promise<{ success: boolean; error?: string; googleUser?: { email: string; name: string; surname: string; photoURL: string } }>;
-  register:         (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
-  sendFirebaseVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
+  register:         (data: RegisterData, isGoogleCompletion?: boolean) => Promise<{ success: boolean; error?: string }>;
   checkFirebaseEmailVerified: () => Promise<{ isVerified: boolean; error?: string }>;
   confirmEmailVerified: (userId?: string) => Promise<{ success: boolean; error?: string }>;
   logout:           () => Promise<void>;
@@ -293,28 +292,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // Enforce email verification check
-          if (finalUserDoc && finalUserDoc.emailVerified !== true) {
-            console.log("Email not verified. Signing out.");
-            await signOut(auth).catch(() => {});
-            localStorage.removeItem("obyo_active_email");
-            localStorage.removeItem("obyo_active_uid");
-            localStorage.removeItem(LS_CUSTOM_UID);
-            localStorage.removeItem(LS_IS_ADMIN);
-            setCurrentUser(null);
-            setReady(true);
-            clearTimeout(fallbackTimer);
-            return;
-          }
-
           // Enforce profile completeness check
           if (finalUserDoc && !isProfileComplete(finalUserDoc)) {
-            console.log("User profile is incomplete. Signing out to complete registration.");
-            await signOut(auth).catch(() => {});
-            localStorage.removeItem("obyo_active_email");
-            localStorage.removeItem("obyo_active_uid");
-            localStorage.removeItem(LS_CUSTOM_UID);
-            localStorage.removeItem(LS_IS_ADMIN);
+            console.log("User profile is incomplete. Waiting for completion.");
             setCurrentUser(null);
             setReady(true);
             clearTimeout(fallbackTimer);
@@ -496,11 +476,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!userDocData || !isProfileComplete(userDocData)) {
-        await signOut(auth).catch(() => {});
-        localStorage.removeItem("obyo_active_email");
-        localStorage.removeItem("obyo_active_uid");
-        localStorage.removeItem(LS_CUSTOM_UID);
-        localStorage.removeItem(LS_IS_ADMIN);
         setCurrentUser(null);
         return {
           success: false,
@@ -557,69 +532,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: RegisterData, isGoogleCompletion: boolean = false): Promise<{ success: boolean; error?: string }> => {
     const e = data.email.trim().toLowerCase();
-    if (!e || !data.password || !data.name || !data.surname || !data.birthDate)
+    if (!e || (!data.password && !isGoogleCompletion) || !data.name || !data.surname || !data.birthDate)
       return { success: false, error: "Lütfen tüm alanları doldurun." };
 
     const currency    = data.currency ?? "USD";
     const demoBalance = currency === "TL" ? 120000 : 10000;
 
-    // We will save the document under `users/e`
     const userDocRef = doc(db, "users", e);
 
+    let userCredential;
     try {
-      await createUserWithEmailAndPassword(auth, e, data.password);
+      if (!isGoogleCompletion) {
+        userCredential = await createUserWithEmailAndPassword(auth, e, data.password);
+      } else {
+        userCredential = { user: auth.currentUser };
+      }
     } catch (authErr: any) {
-      const code = authErr.code ?? "";
-      if (code === "auth/email-already-in-use") {
-        // User might exist, but we proceed to check/update profile in Firestore
-      } else if (code === "auth/weak-password") {
+      if (authErr.code === "auth/email-already-in-use") {
+        if (isGoogleCompletion) {
+            // Already exists, just proceed to update Firestore
+        } else {
+            return { success: false, error: "Bu e-posta zaten kullanımda." };
+        }
+      } else if (authErr.code === "auth/weak-password") {
         return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
       } else {
-        console.error("Auth error:", authErr);
-        // If it's a different error, we should probably fail
         return { success: false, error: "Kayıt yapılamadı: " + authErr.message };
       }
     }
 
-    // Check if there is an existing document under another UID first
-    let existingData: any = {};
-    try {
-      const emailSnap = await getDoc(userDocRef);
-      if (emailSnap.exists()) {
-        existingData = emailSnap.data();
-      } else {
-        const q = query(collection(db, "users"), where("email", "==", e));
-        const qSnap = await getDocs(q);
-        if (!qSnap.empty) {
-          existingData = qSnap.docs[0].data();
-          const oldId = qSnap.docs[0].id;
-          if (oldId !== e) {
-            await deleteDoc(doc(db, "users", oldId)).catch(() => {});
-          }
-        }
-      }
-    } catch (err) {}
-
     const userData: ObyoUser = {
       id:             e,
       email:          e,
-      password:       data.password,
-      name:           data.name.trim() || existingData.name || "Kullanıcı",
-      surname:        data.surname.trim() || existingData.surname || "",
-      birthDate:      data.birthDate || existingData.birthDate || "2000-01-01",
-      currency:       data.currency || existingData.currency || currency,
-      demoBalance:    existingData.demoBalance !== undefined ? existingData.demoBalance : demoBalance,
-      realBalance:    existingData.realBalance !== undefined ? existingData.realBalance : 0,
-      totalDeposited: existingData.totalDeposited !== undefined ? existingData.totalDeposited : 0,
-      totalWithdrawn: existingData.totalWithdrawn !== undefined ? existingData.totalWithdrawn : 0,
-      createdAt:      existingData.createdAt || Date.now(),
-      kycStatus:      existingData.kycStatus || ("none" as const),
-      kycDetails:     existingData.kycDetails || undefined,
-      photoUrl:       existingData.photoUrl || undefined,
-      photoURL:       existingData.photoURL || existingData.photoUrl || undefined,
-      emailVerified:  data.emailVerified ?? true,
+      password:       data.password || "",
+      name:           data.name.trim() || "Kullanıcı",
+      surname:        data.surname.trim() || "",
+      birthDate:      data.birthDate || "2000-01-01",
+      currency:       data.currency || currency,
+      demoBalance:    demoBalance,
+      realBalance:    0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      createdAt:      Date.now(),
+      kycStatus:      "none" as const,
+      emailVerified:  true,
     };
 
     try {
@@ -629,36 +587,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: `Kayıt yapılamadı (DB): ${dbErr.message || "Bilinmeyen veritabanı hatası"}` };
     }
 
-    try {
-      localStorage.setItem("obyo_user_reg_" + e, JSON.stringify(userData));
-      const regList = JSON.parse(localStorage.getItem("obyo_registered_emails") || "[]");
-      if (!regList.includes(e)) {
-        regList.push(e);
-        localStorage.setItem("obyo_registered_emails", JSON.stringify(regList));
-      }
-    } catch (err) {}
-
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.setItem("obyo_tutorial_done", "1");
     localStorage.setItem(LS_CUSTOM_UID, e);
     localStorage.setItem("obyo_active_email", e);
     localStorage.setItem("obyo_active_uid", e);
+    
     setCurrentUser(userData);
-
+    
     return { success: true };
-  };
-
-  const sendFirebaseVerificationEmail = async (): Promise<{ success: boolean; error?: string }> => {
-    try {
-      if (auth.currentUser) {
-        await sendEmailVerification(auth.currentUser);
-        return { success: true };
-      }
-      return { success: false, error: "Firebase kullanıcı oturumu bulunamadı." };
-    } catch (err: any) {
-      console.error("sendFirebaseVerificationEmail error:", err);
-      return { success: false, error: err?.message || "Doğrulama e-postası gönderilemedi." };
-    }
   };
 
   const checkFirebaseEmailVerified = async (): Promise<{ isVerified: boolean; error?: string }> => {
@@ -990,7 +927,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready, currentUser, isAdmin,
       paymentSettings, updatePaymentSettings,
       login, loginWithGoogle, register, logout,
-      sendFirebaseVerificationEmail, checkFirebaseEmailVerified, confirmEmailVerified,
+      checkFirebaseEmailVerified, confirmEmailVerified,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,

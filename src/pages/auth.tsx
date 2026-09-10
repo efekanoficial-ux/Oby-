@@ -9,7 +9,7 @@ type Mode = "login" | "register" | "complete-google";
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
-  const { login, loginWithGoogle, register, logout, currentUser, isAdmin, ready, sendFirebaseVerificationEmail } = useAuth();
+  const { login, loginWithGoogle, register, logout, currentUser, isAdmin, ready } = useAuth();
   const [mode, setMode]     = useState<Mode>("login");
 
   const [err, setErr]       = useState("");
@@ -51,17 +51,14 @@ export default function AuthPage() {
       }
       setLoading(false);
     } else {
-      const res = await register({ ...form, currency, emailVerified: false });
+      const res = await register({ ...form, currency }, mode === "complete-google");
       if (!res.success) {
         setErr(res.error ?? t.registerFailed);
         setLoading(false);
         return;
       }
-      await sendFirebaseVerificationEmail();
-      await logout();
       setLoading(false);
-      setErr("Kayıt başarılı! Lütfen e-posta adresinizi doğrulayın.");
-      setMode("login");
+      navigate("/");
     }
   };
 

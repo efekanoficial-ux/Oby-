@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { AnimatedBalance } from "@/components/animated-balance";
 import { Tutorial } from "@/components/tutorial";
+import { SignalModal } from "@/components/signal-modal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -854,6 +855,7 @@ function MobileTradePanel({
   chartIntervalIdx, onChartIntervalChange, isLiveData,
   isLandscape, onToggleOrientation,
   drawings = [], onOpenDrawings,
+  onOpenSignalModal,
 }: {
   asset: typeof ASSETS[0]; tf: typeof TIMEFRAMES[0];
   setTf: (t: typeof TIMEFRAMES[0]) => void;
@@ -871,6 +873,7 @@ function MobileTradePanel({
   onToggleOrientation?: () => void;
   drawings?: DrawingItem[];
   onOpenDrawings?: () => void;
+  onOpenSignalModal?: () => void;
 }) {
   const [showDuration, setShowDuration] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
@@ -965,10 +968,10 @@ function MobileTradePanel({
           <Calendar size={14} color="#ffffff" />
         </button>
 
-        {/* LIVE dot */}
-        <div style={{ ...tbBtn(false), cursor: "default" }} title="Canlı Bağlantı">
+        {/* LIVE dot (Signal Robot) */}
+        <button onClick={onOpenSignalModal} style={tbBtn(false)} title="Sinyal Robotu">
           <Radio size={14} color="#ffffff" />
-        </div>
+        </button>
       </div>
 
       {/* ── Indicators Sheet ──────────────────────────────────────────────── */}
@@ -1220,6 +1223,7 @@ export default function Home() {
   });
   const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [showIndicatorsModal, setShowIndicatorsModal] = useState(false);
+  const [showSignalModal, setShowSignalModal] = useState(false);
   const [showIntervalModal,   setShowIntervalModal]   = useState(false);
   const activeIndicatorCount = [showRSI, showBollinger, showMA].filter(Boolean).length;
 
@@ -2001,6 +2005,7 @@ export default function Home() {
               onToggleOrientation={handleToggleOrientation}
               drawings={drawings}
               onOpenDrawings={() => setShowDrawingTools(true)}
+              onOpenSignalModal={() => setShowSignalModal(true)}
             />
           </div>
         </div>
@@ -2016,6 +2021,11 @@ export default function Home() {
           onRemoveDrawing={handleDeleteDrawing}
           onClearAll={handleClearDrawings}
           currentPrice={price}
+        />
+        <SignalModal
+          visible={showSignalModal}
+          onClose={() => setShowSignalModal(false)}
+          assetLabel={asset.label}
         />
       </>
     );
@@ -2068,6 +2078,15 @@ export default function Home() {
                 {activeIndicatorCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#4DA2FF]" />
                 )}
+              </button>
+
+              {/* Signal Robot (Radio) */}
+              <button
+                onClick={() => setShowSignalModal(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
+                title="Sinyal Robotu (1 Dakikalık Öneriler)"
+              >
+                <Radio size={14} />
               </button>
 
               {/* Chart Type Toggle (Candle / Line) */}
@@ -2370,6 +2389,11 @@ export default function Home() {
         onToggleBollinger={() => setShowBollinger(v => !v)}
         showRSI={showRSI}
         onToggleRSI={() => setShowRSI(v => !v)}
+      />
+      <SignalModal
+        visible={showSignalModal}
+        onClose={() => setShowSignalModal(false)}
+        assetLabel={asset.label}
       />
       <ChartIntervalModal
         visible={showIntervalModal}
