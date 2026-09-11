@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, ObyoRequest, PaymentSettings } from "@/context/AuthContext";
+import { useAuth, ObyoRequest, PaymentSettings, CustomPaymentMethod } from "@/context/AuthContext";
 import {
   Users, ArrowDownCircle, ArrowUpCircle, Check, X, LogOut,
   Shield, Clock, ChevronDown, ChevronUp, Filter, TrendingUp,
   PlusCircle, Settings, Landmark, Zap, Bitcoin, Save, AlertCircle,
-  RefreshCw, CheckCircle2
+  RefreshCw, CheckCircle2, Plus, Trash2, Edit3, Wallet, CreditCard,
+  QrCode, CircleDollarSign, Eye, EyeOff
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -27,6 +28,69 @@ function StatusBadge({ status }: { status: ObyoRequest["status"] }) {
     </span>
   );
 }
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  disabled
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {label && <span className="text-xs text-white/60 select-none">{label}</span>}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+          checked ? "bg-[#0ecb81]" : "bg-white/15"
+        } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function CustomPaymentIcon({ iconType, size = 18 }: { iconType?: string; size?: number }) {
+  if (iconType === "bank") return <Landmark size={size} />;
+  if (iconType === "crypto") return <Bitcoin size={size} />;
+  if (iconType === "card") return <CreditCard size={size} />;
+  if (iconType === "qr") return <QrCode size={size} />;
+  if (iconType === "dollar") return <CircleDollarSign size={size} />;
+  return <Wallet size={size} />;
+}
+
+const COLOR_OPTIONS = [
+  { label: "Mor", value: "#9B51E0" },
+  { label: "Yeşil", value: "#0ecb81" },
+  { label: "Turuncu", value: "#FF6B00" },
+  { label: "Mavi", value: "#2F80ED" },
+  { label: "Sarı", value: "#FFB800" },
+  { label: "Kırmızı", value: "#EB5757" },
+  { label: "Pembe", value: "#E91E63" },
+  { label: "Turkuaz", value: "#00C49F" },
+];
+
+const ICON_OPTIONS = [
+  { id: "wallet", label: "Cüzdan", icon: Wallet },
+  { id: "bank", label: "Banka", icon: Landmark },
+  { id: "crypto", label: "Kripto", icon: Bitcoin },
+  { id: "card", label: "Kredi Kartı", icon: CreditCard },
+  { id: "qr", label: "Karekod", icon: QrCode },
+  { id: "dollar", label: "Nakit/Dolar", icon: CircleDollarSign },
+];
 
 export default function Admin() {
   const [, navigate] = useLocation();
@@ -57,10 +121,123 @@ export default function Admin() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaveMsg, setSettingsSaveMsg] = useState<string | null>(null);
 
+  /* Custom Payment Method modal and editing state */
+  const [editingCustomMethod, setEditingCustomMethod] = useState<CustomPaymentMethod | null>(null);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
   // Keep local form in sync with remote payment settings when loaded
   useEffect(() => {
     setFormSettings(paymentSettings);
   }, [paymentSettings]);
+
+  const handleOpenNewCustomMethod = () => {
+    setEditingCustomMethod({
+      id: "cm_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 6),
+      enabled: true,
+      name: "",
+      subtitle: "",
+      badge: "",
+      color: "#9B51E0",
+      iconType: "wallet",
+      currency: "TL",
+      minAmount: 100,
+      accountHolder: "",
+      accountNumber: "",
+      transferCode: "",
+      qrCode: "",
+      notes: "",
+    });
+    setIsCustomModalOpen(true);
+  };
+
+  const handleEditCustomMethod = (method: CustomPaymentMethod) => {
+    setEditingCustomMethod({ ...method });
+    setIsCustomModalOpen(true);
+  };
+
+  const handleDeleteCustomMethod = (id: string) => {
+    if (confirm("Bu ödeme yöntemini silmek istediğinize emin misiniz?")) {
+      setFormSettings(prev => ({
+        ...prev,
+        customMethods: (prev.customMethods || []).filter(m => m.id !== id)
+      }));
+    }
+  };
+
+  const handleToggleCustomMethod = (id: string) => {
+    setFormSettings(prev => ({
+      ...prev,
+      customMethods: (prev.customMethods || []).map(m =>
+        m.id === id ? { ...m, enabled: !m.enabled } : m
+      )
+    }));
+  };
+
+  const handleSaveCustomMethodInModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomMethod || !editingCustomMethod.name.trim()) return;
+
+    setFormSettings(prev => {
+      const list = prev.customMethods || [];
+      const idx = list.findIndex(m => m.id === editingCustomMethod.id);
+      let updatedList: CustomPaymentMethod[];
+      if (idx >= 0) {
+        updatedList = [...list];
+        updatedList[idx] = editingCustomMethod;
+      } else {
+        updatedList = [...list, editingCustomMethod];
+      }
+      return { ...prev, customMethods: updatedList };
+    });
+
+    setIsCustomModalOpen(false);
+    setEditingCustomMethod(null);
+  };
+
+  const handleCustomQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Dosya boyutu 2MB'dan küçük olmalıdır.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 500;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setEditingCustomMethod(prev => prev ? ({ ...prev, qrCode: dataUrl }) : null);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   /* Direct balance per-user input state */
   const [addAmounts, setAddAmounts] = useState<Record<string, string>>({});
@@ -582,11 +759,11 @@ export default function Admin() {
         {/* ── SETTINGS TAB (Hesap & Cüzdan Ayarları) ────────────────────────── */}
         {tab === "settings" && (
           <div className="p-4 max-w-2xl mx-auto flex flex-col gap-6">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
               <div>
-                <h3 className="text-base font-black text-white">Yatırma Yöntemleri Hesap Bilgileri</h3>
+                <h3 className="text-base font-black text-white">Ödeme Yöntemleri & Hesap Yönetimi</h3>
                 <p className="text-xs text-white/40 mt-0.5">
-                  Kullanıcıların Cüzdan sayfasında gördüğü Havale IBAN ve Kripto cüzdan adreslerini buradan güncelleyin.
+                  Ödeme yöntemlerini açıp kapatabilir, hesap bilgilerini değiştirebilir veya yeni özel yöntemler ekleyebilirsiniz.
                 </p>
               </div>
             </div>
@@ -605,16 +782,42 @@ export default function Admin() {
             <form onSubmit={handleSavePaymentSettings} className="flex flex-col gap-6">
 
               {/* 1. BANKA / HAVALE / EFT BİLGİLERİ */}
-              <div className="rounded-2xl p-5 border border-white/8 bg-[#0d0d10] flex flex-col gap-4">
-                <div className="flex items-center gap-2.5 pb-3 border-b border-white/5">
-                  <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#0ecb81]/10 border border-[#0ecb81]/25">
-                    <Landmark size={16} className="text-[#0ecb81]" />
+              <div className={`rounded-2xl p-5 border transition-all ${
+                formSettings.ibanEnabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
+              } flex flex-col gap-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#0ecb81]/10 border border-[#0ecb81]/25">
+                      <Landmark size={16} className="text-[#0ecb81]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Havale / EFT (Banka) Bilgileri</h4>
+                      <p className="text-[11px] text-white/40">Kullanıcılara gösterilen TR IBAN ve banka detayları</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-black text-white">Havale / EFT (Banka) Bilgileri</h4>
-                    <p className="text-[11px] text-white/40">Kullanıcılara gösterilen TR IBAN ve banka detayları</p>
+                  <div className="flex items-center gap-3">
+                    {formSettings.ibanEnabled !== false ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
+                        <Eye size={11} /> Aktif / Görünür
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                        <EyeOff size={11} /> Kapalı / Gizli
+                      </span>
+                    )}
+                    <ToggleSwitch
+                      checked={formSettings.ibanEnabled !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, ibanEnabled: v }))}
+                    />
                   </div>
                 </div>
+
+                {formSettings.ibanEnabled === false && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>Bu yöntem şu an kapalıdır. Kullanıcıların Para Yatır ekranında listelenmeyecektir.</span>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
@@ -677,26 +880,49 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* 2. KRİPTO CÜZDAN BİLGİLERİ */}
-              <div className="rounded-2xl p-5 border border-white/8 bg-[#0d0d10] flex flex-col gap-4">
-                <div className="flex items-center gap-2.5 pb-3 border-b border-white/5">
-                  <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#FF6B00]/10 border border-[#FF6B00]/25">
-                    <Bitcoin size={16} className="text-[#FF6B00]" />
+              {/* 2. KRİPTO CÜZDAN BİLGİLERİ (TRC-20) */}
+              <div className={`rounded-2xl p-5 border transition-all ${
+                formSettings.trc20Enabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
+              } flex flex-col gap-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#27AE60]/10 border border-[#27AE60]/25">
+                      <Zap size={16} className="text-[#27AE60]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">USDT TRC-20 (Tron Ağı)</h4>
+                      <p className="text-[11px] text-white/40">Tron blokzinciri üzerinden USDT yatırma cüzdanı</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-black text-white">Kripto Cüzdan Adresleri</h4>
-                    <p className="text-[11px] text-white/40">USDT yatırma talepleri için gösterilen cüzdanlar</p>
+                  <div className="flex items-center gap-3">
+                    {formSettings.trc20Enabled !== false ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
+                        <Eye size={11} /> Aktif / Görünür
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                        <EyeOff size={11} /> Kapalı / Gizli
+                      </span>
+                    )}
+                    <ToggleSwitch
+                      checked={formSettings.trc20Enabled !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, trc20Enabled: v }))}
+                    />
                   </div>
                 </div>
 
+                {formSettings.trc20Enabled === false && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>Bu yöntem şu an kapalıdır. Kullanıcıların Para Yatır ekranında listelenmeyecektir.</span>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3.5">
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-[10px] font-bold text-white/40 uppercase">
-                        USDT TRC-20 Cüzdan Adresi (Tron Ağı)
-                      </label>
-                      <span className="text-[10px] text-[#27AE60] font-black">En Çok Tercih Edilen</span>
-                    </div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      USDT TRC-20 Cüzdan Adresi (Tron Ağı)
+                    </label>
                     <input
                       type="text"
                       value={formSettings.trc20Address}
@@ -707,7 +933,7 @@ export default function Admin() {
                     />
                     <div className="flex items-center gap-3">
                       {formSettings.trc20QrCode && (
-                        <div className="w-12 h-12 rounded bg-white p-1 shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-white p-1 shrink-0 overflow-hidden">
                           <img src={formSettings.trc20QrCode} alt="TRC20 QR" className="w-full h-full object-contain" />
                         </div>
                       )}
@@ -728,14 +954,52 @@ export default function Admin() {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-[10px] font-bold text-white/40 uppercase">
-                        USDT ERC-20 Cüzdan Adresi (Ethereum Ağı)
-                      </label>
-                      <span className="text-[10px] text-[#627EEA] font-black">Ethereum / EVM</span>
+              {/* 3. KRİPTO CÜZDAN BİLGİLERİ (ERC-20) */}
+              <div className={`rounded-2xl p-5 border transition-all ${
+                formSettings.erc20Enabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
+              } flex flex-col gap-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#627EEA]/10 border border-[#627EEA]/25">
+                      <Bitcoin size={16} className="text-[#627EEA]" />
                     </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">USDT ERC-20 (Ethereum Ağı)</h4>
+                      <p className="text-[11px] text-white/40">Ethereum blokzinciri üzerinden USDT yatırma cüzdanı</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {formSettings.erc20Enabled !== false ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
+                        <Eye size={11} /> Aktif / Görünür
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                        <EyeOff size={11} /> Kapalı / Gizli
+                      </span>
+                    )}
+                    <ToggleSwitch
+                      checked={formSettings.erc20Enabled !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, erc20Enabled: v }))}
+                    />
+                  </div>
+                </div>
+
+                {formSettings.erc20Enabled === false && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>Bu yöntem şu an kapalıdır. Kullanıcıların Para Yatır ekranında listelenmeyecektir.</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      USDT ERC-20 Cüzdan Adresi (Ethereum Ağı)
+                    </label>
                     <input
                       type="text"
                       value={formSettings.erc20Address}
@@ -746,7 +1010,7 @@ export default function Admin() {
                     />
                     <div className="flex items-center gap-3">
                       {formSettings.erc20QrCode && (
-                        <div className="w-12 h-12 rounded bg-white p-1 shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-white p-1 shrink-0 overflow-hidden">
                           <img src={formSettings.erc20QrCode} alt="ERC20 QR" className="w-full h-full object-contain" />
                         </div>
                       )}
@@ -768,6 +1032,116 @@ export default function Admin() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* 4. ÖZEL / FARKLI ÖDEME YÖNTEMLERİ (CUSTOM PAYMENT METHODS) */}
+              <div className="rounded-2xl p-5 border border-white/10 bg-[#0d0d10] flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#9B51E0]/10 border border-[#9B51E0]/25">
+                      <Wallet size={16} className="text-[#9B51E0]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Farklı / Özel Ödeme Yöntemleri</h4>
+                      <p className="text-[11px] text-white/40">Papara, Payfix, Kredi Kartı veya dilediğiniz yöntemleri ekleyin</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenNewCustomMethod}
+                    className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-colors cursor-pointer shrink-0"
+                  >
+                    <Plus size={14} className="text-[#0ecb81]" />
+                    <span>Yeni Yöntem Ekle</span>
+                  </button>
+                </div>
+
+                {(!formSettings.customMethods || formSettings.customMethods.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed border-white/10 bg-black/20 gap-2">
+                    <Wallet size={24} className="text-white/20" />
+                    <p className="text-xs font-bold text-white/60">Henüz özel bir ödeme yöntemi eklenmedi</p>
+                    <p className="text-[11px] text-white/30 max-w-sm">
+                      Papara, Payfix, Kredi Kartı vb. özel ödeme yöntemi eklemek için yukarıdaki "Yeni Yöntem Ekle" butonuna tıklayabilirsiniz.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {formSettings.customMethods.map((cm) => (
+                      <div
+                        key={cm.id}
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border transition-all ${
+                          cm.enabled !== false
+                            ? "border-white/10 bg-black/40"
+                            : "border-white/5 bg-black/20 opacity-60"
+                        }`}
+                        style={{ borderLeftColor: cm.color || "#9B51E0", borderLeftWidth: "3px" }}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border"
+                            style={{
+                              backgroundColor: `${cm.color || "#9B51E0"}15`,
+                              borderColor: `${cm.color || "#9B51E0"}35`,
+                              color: cm.color || "#9B51E0"
+                            }}
+                          >
+                            <CustomPaymentIcon iconType={cm.iconType} size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-white truncate">{cm.name}</span>
+                              {cm.badge && (
+                                <span
+                                  className="text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase"
+                                  style={{
+                                    backgroundColor: `${cm.color || "#9B51E0"}20`,
+                                    color: cm.color || "#9B51E0",
+                                  }}
+                                >
+                                  {cm.badge}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-white/40 font-mono">
+                                Min: {cm.minAmount || 100} {cm.currency || "TL"}
+                              </span>
+                            </div>
+                            {cm.subtitle && (
+                              <p className="text-[11px] text-white/40 truncate">{cm.subtitle}</p>
+                            )}
+                            {cm.accountNumber && (
+                              <p className="text-[10px] font-mono text-white/60 truncate mt-0.5">
+                                {cm.accountNumber}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <ToggleSwitch
+                            checked={cm.enabled !== false}
+                            onChange={() => handleToggleCustomMethod(cm.id)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleEditCustomMethod(cm)}
+                            className="p-2 rounded-xl text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
+                            title="Düzenle"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomMethod(cm.id)}
+                            className="p-2 rounded-xl text-white/40 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 transition-colors cursor-pointer"
+                            title="Sil"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Kaydet Butonu */}
@@ -797,6 +1171,351 @@ export default function Admin() {
             </form>
           </div>
         )}
+
+        {/* ── CUSTOM PAYMENT METHOD MODAL ────────────────────────── */}
+        <AnimatePresence>
+          {isCustomModalOpen && editingCustomMethod && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#121217] p-5 sm:p-6 text-white shadow-2xl flex flex-col gap-4 my-8"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-8 w-8 rounded-xl flex items-center justify-center"
+                      style={{
+                        backgroundColor: `${editingCustomMethod.color || "#9B51E0"}20`,
+                        color: editingCustomMethod.color || "#9B51E0"
+                      }}
+                    >
+                      <CustomPaymentIcon iconType={editingCustomMethod.iconType} size={16} />
+                    </div>
+                    <h3 className="text-sm font-black text-white">
+                      {editingCustomMethod.name ? `Düzenle: ${editingCustomMethod.name}` : "Yeni Ödeme Yöntemi"}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomModalOpen(false);
+                      setEditingCustomMethod(null);
+                    }}
+                    className="p-2 rounded-xl text-white/40 hover:text-white bg-white/5 border border-white/10 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Real-time Preview in user's UI */}
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/5 flex flex-col gap-1.5">
+                  <div className="text-[10px] font-bold text-white/40 uppercase">Kullanıcı Ekranı Önizlemesi</div>
+                  <div
+                    className="flex items-center justify-between p-3 rounded-xl border"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
+                      borderColor: `${editingCustomMethod.color || "#9B51E0"}40`,
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-9 w-9 rounded-xl flex items-center justify-center"
+                        style={{
+                          backgroundColor: `${editingCustomMethod.color || "#9B51E0"}20`,
+                          color: editingCustomMethod.color || "#9B51E0"
+                        }}
+                      >
+                        <CustomPaymentIcon iconType={editingCustomMethod.iconType} size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">
+                            {editingCustomMethod.name || "Yöntem Adı"}
+                          </span>
+                          {editingCustomMethod.badge && (
+                            <span
+                              className="text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase"
+                              style={{
+                                backgroundColor: `${editingCustomMethod.color || "#9B51E0"}25`,
+                                color: editingCustomMethod.color || "#9B51E0",
+                              }}
+                            >
+                              {editingCustomMethod.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-white/50">
+                          {editingCustomMethod.subtitle || "Açıklama / alt bilgi"}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-white/40 font-mono">
+                      Min {editingCustomMethod.minAmount || 100} {editingCustomMethod.currency || "TL"}
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveCustomMethodInModal} className="flex flex-col gap-3.5 max-h-[60vh] overflow-y-auto pr-1">
+                  
+                  {/* Status Toggle */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div>
+                      <span className="text-xs font-bold text-white block">Bu Yöntem Aktif mi?</span>
+                      <span className="text-[10px] text-white/40">Kapatırsanız kullanıcıların Para Yatır ekranında gözükmez</span>
+                    </div>
+                    <ToggleSwitch
+                      checked={editingCustomMethod.enabled !== false}
+                      onChange={(v) => setEditingCustomMethod(prev => prev ? ({ ...prev, enabled: v }) : null)}
+                    />
+                  </div>
+
+                  {/* Name & Subtitle */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Yöntem Adı *
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCustomMethod.name}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+                        placeholder="Örn: Papara, Payfix"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Rozet / Etiket (Opsiyonel)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCustomMethod.badge || ""}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, badge: e.target.value }) : null)}
+                        placeholder="Örn: Hızlı, 7/24, %0 Komisyon"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      Alt Başlık / Bilgi Notu
+                    </label>
+                    <input
+                      type="text"
+                      value={editingCustomMethod.subtitle || ""}
+                      onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, subtitle: e.target.value }) : null)}
+                      placeholder="Örn: Papara hesabı ile anında transfer"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                    />
+                  </div>
+
+                  {/* Icon & Color Selection */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        İkon Seçimi
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {ICON_OPTIONS.map((ico) => {
+                          const IconComp = ico.icon;
+                          const isSel = (editingCustomMethod.iconType || "wallet") === ico.id;
+                          return (
+                            <button
+                              key={ico.id}
+                              type="button"
+                              onClick={() => setEditingCustomMethod(prev => prev ? ({ ...prev, iconType: ico.id as any }) : null)}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[10px] font-bold gap-1 transition-colors cursor-pointer ${
+                                isSel ? "border-white/40 bg-white/15 text-white" : "border-white/5 bg-white/5 text-white/40 hover:text-white"
+                              }`}
+                            >
+                              <IconComp size={16} />
+                              <span className="text-[9px] truncate max-w-full">{ico.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Tema Rengi
+                      </label>
+                      <div className="grid grid-cols-4 gap-2 pt-1">
+                        {COLOR_OPTIONS.map((c) => {
+                          const isSel = (editingCustomMethod.color || "#9B51E0") === c.value;
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => setEditingCustomMethod(prev => prev ? ({ ...prev, color: c.value }) : null)}
+                              className={`h-8 rounded-xl flex items-center justify-center transition-transform cursor-pointer ${
+                                isSel ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-black" : "hover:scale-105"
+                              }`}
+                              style={{ backgroundColor: c.value }}
+                              title={c.label}
+                            >
+                              {isSel && <Check size={14} className="text-black stroke-[3]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Currency & Min Amount */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Para Birimi
+                      </label>
+                      <select
+                        value={editingCustomMethod.currency || "TL"}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, currency: e.target.value as any }) : null)}
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      >
+                        <option value="TL">TL (₺)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="USDT">USDT ($)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Minimum Tutar
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editingCustomMethod.minAmount || 100}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, minAmount: parseFloat(e.target.value) || 0 }) : null)}
+                        placeholder="100"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Account details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Alıcı / Hesap Sahibi (Opsiyonel)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCustomMethod.accountHolder || ""}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, accountHolder: e.target.value }) : null)}
+                        placeholder="Örn: Şirket Adı veya İsim"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Transfer / Açıklama Kodu (Opsiyonel)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCustomMethod.transferCode || ""}
+                        onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, transferCode: e.target.value }) : null)}
+                        placeholder="Örn: OBYO-KOD veya Kullanıcı ID"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      Hesap No / Cüzdan Adresi / IBAN *
+                    </label>
+                    <input
+                      type="text"
+                      value={editingCustomMethod.accountNumber}
+                      onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, accountNumber: e.target.value }) : null)}
+                      placeholder="Kullanıcının para göndereceği ve kopyalayacağı adres ya da numara"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  {/* QR Code Upload */}
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      QR Kod Görseli (Opsiyonel)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {editingCustomMethod.qrCode && (
+                        <div className="w-12 h-12 rounded-xl bg-white p-1 shrink-0 overflow-hidden">
+                          <img src={editingCustomMethod.qrCode} alt="Custom QR" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <label className="flex items-center justify-center gap-2 flex-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2 text-xs font-bold text-white cursor-pointer hover:bg-white/10 transition-colors">
+                        <PlusCircle size={14} />
+                        QR Kod Seç
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleCustomQrUpload}
+                        />
+                      </label>
+                      {editingCustomMethod.qrCode && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingCustomMethod(prev => prev ? ({ ...prev, qrCode: "" }) : null)}
+                          className="p-2 text-white/40 hover:text-red-400 bg-white/5 rounded-xl border border-white/10 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes / instructions */}
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      Kullanıcıya Gösterilecek Talimat / Not (Opsiyonel)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editingCustomMethod.notes || ""}
+                      onChange={(e) => setEditingCustomMethod(prev => prev ? ({ ...prev, notes: e.target.value }) : null)}
+                      placeholder="Örn: Lütfen transfer açıklamasına adınızı ve kullanıcı numaranızı yazınız."
+                      className="w-full rounded-xl bg-black border border-white/10 p-2.5 text-xs text-white outline-none focus:border-[#0ecb81]/50 transition-colors resize-none"
+                    />
+                  </div>
+
+                  {/* Modal Action Buttons */}
+                  <div className="flex items-center gap-2.5 pt-3 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomModalOpen(false);
+                        setEditingCustomMethod(null);
+                      }}
+                      className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 rounded-xl text-xs font-black text-black cursor-pointer shadow-lg transition-transform active:scale-98"
+                      style={{ background: "linear-gradient(135deg, #0ecb81, #05a660)" }}
+                    >
+                      {editingCustomMethod.name ? "Yöntemi Kaydet" : "Listeye Ekle"}
+                    </button>
+                  </div>
+
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>

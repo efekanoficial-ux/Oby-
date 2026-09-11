@@ -46,13 +46,17 @@
       "description": "Admin-configured deposit payment accounts and wallet addresses",
       "type": "object",
       "properties": {
+        "ibanEnabled": { "type": "boolean" },
         "ibanBank": { "type": "string" },
         "ibanHolder": { "type": "string" },
         "ibanNumber": { "type": "string" },
         "ibanDescription": { "type": "string" },
         "ibanSwift": { "type": "string" },
+        "trc20Enabled": { "type": "boolean" },
         "trc20Address": { "type": "string" },
+        "erc20Enabled": { "type": "boolean" },
         "erc20Address": { "type": "string" },
+        "customMethods": { "type": "array" },
         "updatedAt": { "type": "number" }
       }
     }
