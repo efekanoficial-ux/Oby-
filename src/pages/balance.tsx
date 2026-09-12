@@ -12,7 +12,7 @@ import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowDownLeft, ArrowUpRight,
   Clock, ArrowDownLeft as DepIcon, ArrowUpRight as WithIcon,
-  Hourglass, TrendingUp,
+  Hourglass, TrendingUp, AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -75,8 +75,12 @@ export default function Balance() {
     { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",     sub: t.ethChain,         color: "#627EEA", badge: null    },
   ];
 
-  const allReqs     = currentUser ? requests.filter(r => r.userId === currentUser.id) : [];
+  const allReqs     = currentUser ? requests.filter(r => (
+    r.userId === currentUser.id ||
+    (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase())
+  )) : [];
   const pendingReqs = allReqs.filter(r => r.status === "pending");
+  const rejectedReqsWithReason = allReqs.filter(r => r.status === "rejected" && r.rejectionReason);
   const approvedDep = allReqs.filter(r => r.type === "deposit"  && r.status === "accepted");
   const approvedWit = allReqs.filter(r => r.type === "withdraw" && r.status === "accepted");
   const pendingDep  = allReqs.filter(r => r.type === "deposit"  && r.status === "pending");
@@ -303,6 +307,49 @@ export default function Balance() {
                     </p>
                   </div>
                   <span className="text-sm font-black text-[#FFB800]">{sym}{r.amount}</span>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Rejected Transactions Banner with Reasons ───────────────── */}
+        <AnimatePresence>
+          {rejectedReqsWithReason.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mx-4 mb-5 overflow-hidden rounded-2xl cursor-pointer"
+              style={{ background: "rgba(246,70,93,0.08)", border: "1px solid rgba(246,70,93,0.25)" }}
+              onClick={() => openWallet("deposit")}
+            >
+              <div className="flex items-center justify-between px-4 py-3"
+                style={{ borderBottom: "1px solid rgba(246,70,93,0.12)" }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(246,70,93,0.18)" }}>
+                    <AlertCircle size={13} className="text-[#f6465d]" />
+                  </div>
+                  <span className="text-xs font-black text-[#f6465d]">
+                    {rejectedReqsWithReason.length} Talebiniz Reddedildi
+                  </span>
+                </div>
+                <span className="text-[10px] text-white/40 font-bold flex items-center gap-1">
+                  Cüzdanda İncele →
+                </span>
+              </div>
+              {rejectedReqsWithReason.slice(0, 3).map(r => (
+                <div key={r.id} className="px-4 py-2.5 border-b border-white/5 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">
+                      {r.type === "deposit" ? t.depositTx : t.withdrawTx} ({sym}{r.amount})
+                    </span>
+                    <span className="text-[10px] font-black text-[#f6465d]">Reddedildi</span>
+                  </div>
+                  <p className="text-xs text-white/80 mt-1 pl-2 border-l-2 border-[#f6465d]/50 leading-relaxed font-medium">
+                    {r.rejectionReason}
+                  </p>
                 </div>
               ))}
             </motion.div>

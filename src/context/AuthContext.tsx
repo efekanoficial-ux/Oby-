@@ -68,6 +68,8 @@ export interface ObyoRequest {
   destination?: string;
   status:      "pending" | "accepted" | "rejected";
   createdAt:   number;
+  processedAt?: number;
+  rejectionReason?: string;
 }
 
 export interface CustomPaymentMethod {
@@ -156,7 +158,7 @@ interface AuthContextType {
   users:            ObyoUser[];
   requests:         ObyoRequest[];
   addRequest:       (data: Omit<ObyoRequest, "id" | "status" | "createdAt">) => Promise<string>;
-  processRequest:   (id: string, accept: boolean) => Promise<void>;
+  processRequest:   (id: string, accept: boolean, reason?: string) => Promise<void>;
   addBalanceDirect: (userId: string, amount: number, userName: string, userEmail: string) => Promise<void>;
   placeRealTrade:   (amount: number) => Promise<boolean>;
   settleRealTrade:  (amount: number, won: boolean, payout: number) => Promise<void>;
@@ -480,20 +482,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /* ── User own requests real-time listener ────────────────────────────── */
   useEffect(() => {
     if (!currentUser) { setRequests([]); return; }
-    const q = query(
-      collection(db, "requests"),
-      where("userEmail", "==", currentUser.email)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const sorted = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }) as ObyoRequest)
+    const userKeys = Array.from(new Set([
+      currentUser.email?.trim().toLowerCase(),
+      currentUser.email?.trim(),
+      currentUser.id?.trim(),
+      currentUser.id?.trim().toLowerCase()
+    ].filter(Boolean) as string[]));
+
+    const unsub = onSnapshot(collection(db, "requests"), (snap) => {
+      const allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as ObyoRequest);
+      const userReqs = allDocs
+        .filter(r => {
+          const rEmail = (r.userEmail || "").trim().toLowerCase();
+          const rId = (r.userId || "").trim().toLowerCase();
+          return userKeys.some(k => k && (k.toLowerCase() === rEmail || k.toLowerCase() === rId));
+        })
         .sort((a, b) => b.createdAt - a.createdAt);
-      setRequests(sorted);
+      setRequests(userReqs);
     }, (err) => {
       if (err.code !== "permission-denied") console.error(err);
     });
     return () => unsub();
-  }, [currentUser?.email]);
+  }, [currentUser?.email, currentUser?.id]);
 
   /* ── Admin Firestore real-time listeners ─────────────────────────────── */
   useEffect(() => {
@@ -832,7 +842,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return ref.id;
   };
 
-  const processRequest = async (id: string, accept: boolean) => {
+  const processRequest = async (id: string, accept: boolean, reason?: string) => {
     try {
       const req = requests.find(r => r.id === id);
       if (!req) {
@@ -847,10 +857,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const amt = Number(req.amount) || 0;
 
       // Update request status safely with merge
-      await setDoc(doc(db, "requests", id), {
+      const updateData: any = {
         status: accept ? "accepted" : "rejected",
         processedAt: Date.now(),
-      }, { merge: true });
+      };
+      if (!accept && reason?.trim()) {
+        updateData.rejectionReason = reason.trim();
+      }
+
+      await setDoc(doc(db, "requests", id), updateData, { merge: true });
 
       if (!accept) return;
 

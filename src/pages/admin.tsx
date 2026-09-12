@@ -117,6 +117,10 @@ export default function Admin() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [processingReq, setProcessingReq] = useState<string | null>(null);
 
+  /* Request Rejection Modal state */
+  const [rejectModalReq, setRejectModalReq] = useState<ObyoRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>("");
+
   /* Payment Settings Form state */
   const [formSettings, setFormSettings] = useState<PaymentSettings>(paymentSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -522,6 +526,12 @@ export default function Admin() {
                         </span>
                         <span className="text-[10px] text-white/25">· {req.method}</span>
                       </div>
+                      {req.status === "rejected" && req.rejectionReason && (
+                        <div className="mt-1 text-[11px] text-[#f6465d] flex items-center gap-1 font-medium truncate max-w-sm">
+                          <AlertCircle size={11} className="shrink-0" />
+                          <span className="truncate">Red: {req.rejectionReason}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-[10px] text-white/25">
@@ -552,6 +562,19 @@ export default function Admin() {
                             </div>
                           ))}
 
+                          {/* Reddedilme Sebebi (Eğer reddedildiyse) */}
+                          {req.status === "rejected" && (
+                            <div className="p-3 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/20 text-xs">
+                              <div className="flex items-center gap-1.5 text-[#f6465d] font-bold mb-1">
+                                <AlertCircle size={13} className="shrink-0" />
+                                <span>Kullanıcıya İletilen Red Sebebi:</span>
+                              </div>
+                              <p className="text-white/80 font-medium leading-relaxed pl-5">
+                                {req.rejectionReason || "Sebep belirtilmedi."}
+                              </p>
+                            </div>
+                          )}
+
                           {/* İsteğe bağlı Onay / Red Butonları — Kaldırılabilir / Esnek Yönetim */}
                           {req.status === "pending" && (
                             <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/5">
@@ -570,14 +593,13 @@ export default function Admin() {
                                 </motion.button>
                                 <motion.button whileTap={{ scale: 0.97 }}
                                   disabled={processingReq === req.id}
-                                  onClick={async () => {
-                                    setProcessingReq(req.id);
-                                    await processRequest(req.id, false);
-                                    setProcessingReq(null);
+                                  onClick={() => {
+                                    setRejectModalReq(req);
+                                    setRejectReason(req.type === "withdraw" ? "Lütfen para yatırımı oluşturup çekim talebi verin." : "");
                                   }}
-                                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-white disabled:opacity-50 cursor-pointer"
+                                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-white disabled:opacity-50 cursor-pointer hover:bg-[#f6465d]/25 transition-all"
                                   style={{ background: "rgba(246,70,93,0.15)", border: "1px solid rgba(246,70,93,0.25)" }}>
-                                  <X size={13} className="text-[#f6465d]" /> {processingReq === req.id ? "İşleniyor..." : "Reddet"}
+                                  <X size={13} className="text-[#f6465d]" /> Reddet...
                                 </motion.button>
                               </div>
                             </div>
@@ -1734,6 +1756,162 @@ export default function Admin() {
                         <>
                           <Trash2 size={15} />
                           <span>Kalıcı Olarak Sil</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Request Rejection Modal ── */}
+        <AnimatePresence>
+          {rejectModalReq && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setRejectModalReq(null)}
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="relative w-full max-w-lg rounded-3xl bg-[#111111] border border-white/10 shadow-2xl overflow-hidden z-10"
+              >
+                {/* Modal Header */}
+                <div className="p-5 border-b border-white/10 flex items-start gap-3.5 bg-gradient-to-b from-[#f6465d]/12 to-transparent">
+                  <div className="h-10 w-10 rounded-xl bg-[#f6465d]/20 border border-[#f6465d]/30 flex items-center justify-center shrink-0">
+                    <AlertCircle className="text-[#f6465d]" size={22} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-black text-white">İşlem Talebini Reddet</h3>
+                    <p className="text-xs text-white/50 mt-0.5">
+                      Kullanıcıya iletilecek red gerekçesini belirleyin veya yazın.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRejectModalReq(null)}
+                    className="text-white/40 hover:text-white transition-colors cursor-pointer p-1"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 flex flex-col gap-4">
+                  {/* Request summary info */}
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/8 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-white/35 uppercase tracking-wider block">
+                        {rejectModalReq.type === "withdraw" ? "Para Çekme Talebi" : "Para Yatırma Talebi"}
+                      </span>
+                      <p className="text-sm font-black text-white truncate mt-0.5">
+                        {rejectModalReq.userName}
+                      </p>
+                      <p className="text-[11px] text-white/40 truncate">
+                        {rejectModalReq.userEmail} · {rejectModalReq.method}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-base font-black text-[#FF6B00]">
+                        {rejectModalReq.currency === "TL" || rejectModalReq.currency === "TRY" ? "₺" : "$"}
+                        {rejectModalReq.amount} {rejectModalReq.currency}
+                      </span>
+                      {rejectModalReq.destination && (
+                        <span className="text-[10px] font-mono text-white/30 block max-w-[140px] truncate">
+                          {rejectModalReq.destination}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick template presets */}
+                  <div>
+                    <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider block mb-2">
+                      Hızlı Sebep Şablonları (Tıklayarak Seçin)
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        "Lütfen para yatırımı oluşturup çekim talebi verin.",
+                        "Hesap ve IBAN bilgileri uyuşmuyor, lütfen kontrol ediniz.",
+                        "Kimlik doğrulaması (KYC) ve güvenlik teyidi gerekmektedir.",
+                        "Minimum işlem hacmi ve çevrim şartı tamamlanmalıdır.",
+                        "Güvenlik ve risk birimi incelemesi sonucu reddedildi.",
+                        "Yetersiz serbest bakiye veya hatalı hesap numarası.",
+                      ].map((tpl) => (
+                        <button
+                          key={tpl}
+                          type="button"
+                          onClick={() => setRejectReason(tpl)}
+                          className={`text-[11px] px-2.5 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
+                            rejectReason === tpl
+                              ? "bg-[#f6465d]/20 border-[#f6465d]/50 text-white font-bold"
+                              : "bg-white/[0.03] border-white/8 text-white/60 hover:text-white hover:bg-white/[0.07]"
+                          }`}
+                        >
+                          {tpl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Reason Textarea */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center justify-between">
+                      <span>Reddetme Sebebi (Kullanıcının 'İşlemler' ekranında görünür) *</span>
+                      <span className="text-[10px] text-white/30 font-normal">
+                        {rejectReason.length} karakter
+                      </span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Örn: Lütfen para yatırımı oluşturup çekim talebi verin..."
+                      className="w-full rounded-xl bg-[#161616] border border-white/10 p-3 text-xs text-white placeholder:text-white/20 outline-none focus:border-[#f6465d]/50 transition-colors resize-none leading-relaxed"
+                    />
+                    <p className="text-[10px] text-white/30">
+                      Bu mesaj, kullanıcının cüzdanındaki "İşlemler" listesinde ilgili talebin altında doğrudan kırmızı uyarı kutusu olarak görünecektir.
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2.5 pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      disabled={processingReq === rejectModalReq.id}
+                      onClick={() => setRejectModalReq(null)}
+                      className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Vazgeç
+                    </button>
+                    <button
+                      type="button"
+                      disabled={processingReq === rejectModalReq.id}
+                      onClick={async () => {
+                        const finalReason = rejectReason.trim() || "İşlem talebiniz onaylanamadı.";
+                        setProcessingReq(rejectModalReq.id);
+                        await processRequest(rejectModalReq.id, false, finalReason);
+                        setProcessingReq(null);
+                        setRejectModalReq(null);
+                        setRejectReason("");
+                      }}
+                      className="flex-1 py-3 rounded-xl text-xs font-black text-white bg-[#f6465d] hover:bg-[#d63048] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-[#f6465d]/20 disabled:opacity-50"
+                    >
+                      {processingReq === rejectModalReq.id ? (
+                        <>
+                          <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                          <span>İşleniyor...</span>
+                        </>
+                      ) : (
+                        <>
+                          <X size={15} />
+                          <span>Talebi Reddet ve Sebebi İlet</span>
                         </>
                       )}
                     </button>

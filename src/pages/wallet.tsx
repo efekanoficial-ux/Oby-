@@ -265,8 +265,12 @@ export default function WalletPage() {
   }, [dStep, wStep]);
 
   // Active user requests
-  const userRequests = requests.filter(r => currentUser && r.userId === currentUser.id);
+  const userRequests = requests.filter(r => currentUser && (
+    r.userId === currentUser.id ||
+    (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase())
+  ));
   const pendingRequests = userRequests.filter(r => r.status === "pending");
+  const rejectedWithReason = userRequests.filter(r => r.status === "rejected" && r.rejectionReason);
 
   const selectDepositMethod = (m: MethodConfig) => {
     setMethod(m);
@@ -494,9 +498,11 @@ export default function WalletPage() {
             >
               <Clock size={13} strokeWidth={2.4} />
               <span>{t.transactionsTab}</span>
-              {pendingRequests.length > 0 && (
-                <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1.5 right-1.5" />
-              )}
+              {pendingRequests.length > 0 ? (
+                <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1.5 right-1.5 animate-pulse" />
+              ) : rejectedWithReason.length > 0 ? (
+                <span className="h-2 w-2 rounded-full bg-[#f6465d] absolute top-1.5 right-1.5" />
+              ) : null}
             </button>
           </div>
         </div>
@@ -505,6 +511,33 @@ export default function WalletPage() {
       {/* ── Scrollable Tab Content ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 pb-8">
         <div className="max-w-xl mx-auto flex flex-col gap-4">
+
+          {/* Rejection Notification Banner */}
+          {tab !== "pending" && rejectedWithReason.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => setTab("pending")}
+              className="p-3 rounded-2xl bg-[#f6465d]/10 border border-[#f6465d]/25 flex items-center justify-between cursor-pointer hover:bg-[#f6465d]/15 transition-colors"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-7 w-7 rounded-xl bg-[#f6465d]/20 flex items-center justify-center shrink-0">
+                  <AlertCircle size={14} className="text-[#f6465d]" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-white block truncate">
+                    İşlem Talebiniz Reddedildi
+                  </span>
+                  <span className="text-[11px] text-white/60 block truncate">
+                    {rejectedWithReason[0].rejectionReason}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-[#f6465d] shrink-0 ml-2">
+                İncele →
+              </span>
+            </motion.div>
+          )}
 
           {/* ═════════════════ TAB: DEPOSIT ═════════════════ */}
           {tab === "deposit" && (
@@ -1324,6 +1357,37 @@ export default function WalletPage() {
                         <div className="mb-2 p-2 rounded-xl bg-white/[0.02] border border-white/5">
                           <span className="text-[9px] font-bold text-white/30 uppercase block">Hedef Adres</span>
                           <span className="text-[11px] font-mono text-white/70 break-all">{req.destination}</span>
+                        </div>
+                      )}
+
+                      {/* Reddedilme Sebebi ve Açıklama Kutusu */}
+                      {req.status === "rejected" && req.rejectionReason && (
+                        <div className="mb-2.5 p-3 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
+                          <div className="flex items-center gap-1.5 text-[#f6465d] font-black text-xs mb-1">
+                            <AlertCircle size={14} className="shrink-0" />
+                            <span>İşlem Reddedildi - Açıklama:</span>
+                          </div>
+                          <p className="text-xs text-white/90 leading-relaxed pl-5 font-medium">
+                            {req.rejectionReason}
+                          </p>
+
+                          {/* Eğer çekim talebiyse ve yatırım yapması istenmişse hızlı yönlendirme */}
+                          {req.type === "withdraw" && (
+                            <div className="mt-2.5 pt-2 border-t border-[#f6465d]/15 flex justify-end">
+                              <button
+                                onClick={() => {
+                                  setTab("deposit");
+                                  setDStep("method");
+                                  setMethod(null);
+                                  setAmount("");
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white transition-all cursor-pointer"
+                              >
+                                <ArrowDownLeft size={12} className="text-[#0ecb81]" />
+                                <span>Para Yatırma Ekranına Git</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
 
