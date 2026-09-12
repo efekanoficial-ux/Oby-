@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 import {
   doc, setDoc, getDoc, updateDoc, addDoc, collection, getDocs,
-  onSnapshot, query, orderBy, where, increment, deleteDoc,
+  onSnapshot, query, orderBy, where, increment, deleteDoc, deleteField,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -39,6 +39,8 @@ export interface ObyoUser {
   name:           string;
   surname:        string;
   birthDate:      string;
+  tcKimlik?:      string;
+  idNumber?:      string;
   photoURL?:      string;
   photoUrl?:      string;
   password?:      string;
@@ -51,6 +53,7 @@ export interface ObyoUser {
   kycStatus?:     "none" | "pending" | "verified" | "rejected";
   kycDetails?:    KYCDetails;
   emailVerified?: boolean;
+  referralCode?:  string;
 }
 
 export interface ObyoRequest {
@@ -130,7 +133,11 @@ interface RegisterData {
   name:           string;
   surname:        string;
   birthDate:      string;
+  tcKimlik?:      string;
+  idNumber?:      string;
   currency:       "TL" | "USD";
+  referralCode?:  string;
+  photoUrl?:      string;
   emailVerified?: boolean;
 }
 
@@ -156,6 +163,7 @@ interface AuthContextType {
   updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
   adminUpdateKYC:   (userId: string, status: "verified" | "rejected", reason?: string) => Promise<{ success: boolean; error?: string }>;
+  deleteUserPermanently: (userId: string, userEmail?: string) => Promise<{ success: boolean; error?: string }>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -174,18 +182,97 @@ function cleanForFirestore<T>(obj: T): T {
     if (obj instanceof Date) {
       return obj as any;
     }
+    // Safeguard against raw File / Blob objects
+    if (typeof Blob !== "undefined" && obj instanceof Blob) {
+      return "" as any;
+    }
+    if (typeof File !== "undefined" && obj instanceof File) {
+      return "" as any;
+    }
+
     const cleaned: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const val = obj[key];
-        if (val !== undefined) {
-          cleaned[key] = cleanForFirestore(val);
+        const val = (obj as any)[key];
+        if (val !== undefined && typeof val !== "function") {
+          // If a key contains dots, break it into nested object structure so setDoc never receives dot keys
+          if (key.includes(".")) {
+            const parts = key.split(".");
+            let cur = cleaned;
+            for (let i = 0; i < parts.length - 1; i++) {
+              const p = parts[i];
+              if (!cur[p] || typeof cur[p] !== "object") {
+                cur[p] = {};
+              }
+              cur = cur[p];
+            }
+            cur[parts[parts.length - 1]] = cleanForFirestore(val);
+          } else {
+            cleaned[key] = cleanForFirestore(val);
+          }
         }
       }
     }
     return cleaned;
   }
   return obj;
+}
+
+/**
+ * Ensures that base64 image strings do not exceed Firestore's nested entity size limits (1MB).
+ * Downscales images to max dimension of 1000px and 72% JPEG quality (~50KB-80KB).
+ */
+async function compressDataUrlIfNeeded(dataUrl: string | undefined, maxDim = 1000, quality = 0.72): Promise<string> {
+  if (!dataUrl || typeof dataUrl !== "string") return "";
+  // If not a data:image or already compact (< 120,000 characters ~ 90KB), return as is
+  if (!dataUrl.startsWith("data:image/") || dataUrl.length < 120000) {
+    return dataUrl;
+  }
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return dataUrl;
+  }
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        } catch (e) {
+          console.warn("Canvas compression failed, returning original:", e);
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => {
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      resolve(dataUrl);
+    }
+  });
 }
 
 function isProfileComplete(data: any): boolean {
@@ -586,6 +673,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currency    = data.currency ?? "USD";
     const demoBalance = currency === "TL" ? 120000 : 10000;
 
+    const rawRefCode = (data.referralCode || "").trim();
+    const isTrade2026Bonus = rawRefCode.toUpperCase() === "TRADE2026";
+    let initialRealBalance = 0;
+    if (isTrade2026Bonus) {
+      initialRealBalance = currency === "TL" ? 1200 : 25;
+    }
+
     const userDocRef = doc(db, "users", e);
 
     let userCredential;
@@ -609,6 +703,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const cleanTc = (data.tcKimlik || data.idNumber || "").replace(/\D/g, "").slice(0, 11);
+
     const userData: ObyoUser = {
       id:             e,
       email:          e,
@@ -616,18 +712,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name:           data.name.trim() || "Kullanıcı",
       surname:        data.surname.trim() || "",
       birthDate:      data.birthDate || "2000-01-01",
+      tcKimlik:       cleanTc || undefined,
+      idNumber:       cleanTc || undefined,
       currency:       data.currency || currency,
       demoBalance:    demoBalance,
-      realBalance:    0,
-      totalDeposited: 0,
+      realBalance:    initialRealBalance,
+      totalDeposited: initialRealBalance,
       totalWithdrawn: 0,
       createdAt:      Date.now(),
       kycStatus:      "none" as const,
       emailVerified:  true,
+      referralCode:   rawRefCode || undefined,
+      photoUrl:       data.photoUrl || undefined,
+      photoURL:       data.photoUrl || undefined,
     };
 
     try {
       await setDoc(userDocRef, cleanForFirestore(userData), { merge: true });
+
+      if (isTrade2026Bonus && initialRealBalance > 0) {
+        try {
+          await addDoc(collection(db, "requests"), {
+            userId: e,
+            userEmail: e,
+            userName: `${userData.name} ${userData.surname}`.trim(),
+            type: "deposit",
+            amount: initialRealBalance,
+            currency: currency,
+            method: "Referans Kodu (TRADE2026)",
+            status: "accepted",
+            createdAt: Date.now(),
+            processedAt: Date.now(),
+          });
+        } catch (reqErr) {
+          console.warn("Could not log referral bonus request:", reqErr);
+        }
+      }
     } catch (dbErr: any) {
       console.error("Firebase db setDoc error:", dbErr);
       return { success: false, error: `Kayıt yapılamadı (DB): ${dbErr.message || "Bilinmeyen veritabanı hatası"}` };
@@ -638,6 +758,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LS_CUSTOM_UID, e);
     localStorage.setItem("obyo_active_email", e);
     localStorage.setItem("obyo_active_uid", e);
+    if (isTrade2026Bonus) {
+      try {
+        localStorage.setItem(`obyo_mode_${e}`, "real");
+      } catch {}
+    }
     
     setCurrentUser(userData);
     
@@ -827,93 +952,132 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .replace(/ç/g, "c")
         .replace(/\s+/g, " ");
 
-    const enteredNameNorm = normalize(data.fullName);
-    const firstNameNorm   = normalize(currentUser.name);
-    const surnameNorm     = normalize(currentUser.surname);
-    const registeredNameNorm = `${firstNameNorm} ${surnameNorm}`;
+    const enteredNameNorm = normalize(data.fullName || "");
+    const firstNameNorm   = normalize(currentUser.name || "");
+    const surnameNorm     = normalize(currentUser.surname || "");
+    const registeredNameNorm = `${firstNameNorm} ${surnameNorm}`.trim();
 
-    const enteredDate = data.birthDate.trim();
-    const registeredDate = (currentUser.birthDate || "").trim();
-
-    // Check if name contains both registered first name and surname or matches registered full name
+    // 1. İsim ve Soyisim uyuşsun
     const nameMatches =
-      enteredNameNorm === registeredNameNorm ||
-      (enteredNameNorm.includes(firstNameNorm) && enteredNameNorm.includes(surnameNorm));
+      Boolean(registeredNameNorm && enteredNameNorm === registeredNameNorm) ||
+      Boolean(firstNameNorm && surnameNorm && enteredNameNorm.includes(firstNameNorm) && enteredNameNorm.includes(surnameNorm)) ||
+      !registeredNameNorm;
 
-    if (nameMatches || !registeredNameNorm) {
-      const kycDetails = {
-        fullName: data.fullName,
-        birthDate: data.birthDate,
-        idNumber: data.idNumber,
-        documentFrontUrl: data.documentFrontUrl || "",
-        documentBackUrl: data.documentBackUrl || "",
+    // 2. Kimlikteki T.C. uyuşsun (11 haneli T.C. Kimlik No)
+    const cleanEnteredTc = String(data.idNumber || "").replace(/\D/g, "");
+    const cleanRegisteredTc = String(currentUser.tcKimlik || currentUser.idNumber || "").replace(/\D/g, "");
+
+    const isTcValidFormat = cleanEnteredTc.length === 11 && cleanEnteredTc[0] !== "0";
+
+    // Kullanıcının hesabında kayıtlı bir TC varsa onunla birebir eşleşmeli.
+    // Yoksa girilen geçerli 11 haneli TC hesaba kaydedilerek doğrulanır.
+    const tcMatches = cleanRegisteredTc
+      ? cleanEnteredTc === cleanRegisteredTc
+      : isTcValidFormat;
+
+    // 3. Fotoğrafla yeter (Kimlik ön yüz fotoğrafı mevcut olmalı)
+    const hasPhoto = Boolean(data.documentFrontUrl && data.documentFrontUrl.trim().length > 0);
+
+    // Üç kriter bir arada sağlandığında otomatik tam onay
+    const isAutoVerified = Boolean(nameMatches && tcMatches && hasPhoto);
+    const newStatus = isAutoVerified ? "verified" : "pending";
+
+    try {
+      // 1. Ensure images are safely compressed so Firestore nested entity limit (1MB) is never exceeded
+      const compressedFront = await compressDataUrlIfNeeded(data.documentFrontUrl);
+      const compressedBack  = await compressDataUrlIfNeeded(data.documentBackUrl);
+
+      const kycDetails: KYCDetails = {
+        fullName: String(data.fullName || "").trim(),
+        birthDate: String(data.birthDate || currentUser.birthDate || "").trim(),
+        idNumber: cleanEnteredTc,
+        documentFrontUrl: typeof compressedFront === "string" ? compressedFront : "",
+        documentBackUrl: typeof compressedBack === "string" ? compressedBack : "",
         submittedAt: Date.now(),
-        verifiedAt: Date.now(),
+        ...(isAutoVerified ? { verifiedAt: Date.now() } : {}),
       };
 
+      const userRef = doc(db, "users", currentUser.id);
+
+      // 2. Clean up any legacy corrupted dot-keys (e.g. "kycDetails.rejectionReason") that break nested entity serialization
       try {
-        const userRef = doc(db, "users", currentUser.id);
-        await setDoc(userRef, cleanForFirestore({
-          kycStatus: "verified",
-          kycDetails,
-        }), { merge: true });
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const docData = snap.data();
+          const dotKeys = Object.keys(docData).filter(k => k.startsWith("kycDetails."));
+          if (dotKeys.length > 0) {
+            const cleanup: any = {};
+            for (const dk of dotKeys) cleanup[dk] = deleteField();
+            await updateDoc(userRef, cleanup).catch(() => {});
+          }
+        }
+      } catch (cleanErr) {
+        console.warn("Legacy dot-key cleanup error:", cleanErr);
+      }
 
-        setCurrentUser(prev => prev ? {
-          ...prev,
-          kycStatus: "verified",
-          kycDetails,
-        } : null);
+      // 3. Write verified/pending status, clean kycDetails and update user's tcKimlik/idNumber
+      const updatePayload: any = {
+        kycStatus: newStatus,
+        kycDetails,
+      };
+      if (cleanEnteredTc) {
+        updatePayload.tcKimlik = cleanEnteredTc;
+        updatePayload.idNumber = cleanEnteredTc;
+      }
 
+      await setDoc(userRef, cleanForFirestore(updatePayload), { merge: true });
+
+      // 4. Also synchronize to email document if it is distinct from user id
+      if (currentUser.email && currentUser.email.toLowerCase() !== currentUser.id.toLowerCase()) {
+        try {
+          const emailDocRef = doc(db, "users", currentUser.email.toLowerCase());
+          await setDoc(emailDocRef, cleanForFirestore(updatePayload), { merge: true });
+        } catch (e) {
+          console.warn("Sync to email doc failed:", e);
+        }
+      }
+
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        tcKimlik: cleanEnteredTc || prev.tcKimlik,
+        idNumber: cleanEnteredTc || prev.idNumber,
+        kycStatus: newStatus,
+        kycDetails,
+      } : null);
+
+      if (isAutoVerified) {
         return {
           success: true,
           isVerified: true,
-          message: "Kimlik bilgileriniz başarıyla doğrulandı ve hesabınız onaylandı!",
+          message: "T.C. Kimlik No, Ad Soyad ve kimlik fotoğrafınız başarıyla doğrulandı! Hesabınız onaylandı.",
         };
-      } catch (err: any) {
-        console.error("KYC update error:", err);
-        return {
-          success: false,
-          isVerified: false,
-          message: "Veritabanı güncellenirken hata oluştu: " + (err?.message || "Bilinmeyen hata"),
-        };
-      }
-    } else {
-      // If name does not match, don't fail outright; submit as 'pending' for manual admin review
-      const kycDetails = {
-        fullName: data.fullName,
-        birthDate: data.birthDate,
-        idNumber: data.idNumber,
-        documentFrontUrl: data.documentFrontUrl || "",
-        documentBackUrl: data.documentBackUrl || "",
-        submittedAt: Date.now(),
-      };
-
-      try {
-        const userRef = doc(db, "users", currentUser.id);
-        await setDoc(userRef, cleanForFirestore({
-          kycStatus: "pending",
-          kycDetails,
-        }), { merge: true });
-
-        setCurrentUser(prev => prev ? {
-          ...prev,
-          kycStatus: "pending",
-          kycDetails,
-        } : null);
+      } else {
+        let diffReason = "";
+        if (!hasPhoto) {
+          diffReason = "Kimlik fotoğrafı yüklenmediği için";
+        } else if (!tcMatches) {
+          diffReason = cleanRegisteredTc
+            ? "Kimlikteki T.C. numarası hesabınızdaki kayıtlı T.C. ile uyuşmadığı için"
+            : "T.C. Kimlik numarası 11 haneli geçerli bir numara olmadığı için";
+        } else if (!nameMatches) {
+          diffReason = `Kimlikteki Ad Soyad hesabınızdaki kayıtlı isimle (${currentUser.name} ${currentUser.surname}) uyuşmadığı için`;
+        } else {
+          diffReason = "Bilgileriniz sistemdeki kayıtlarla tam uyuşmadığı için";
+        }
 
         return {
           success: true,
           isVerified: false,
-          message: "Kimlik bilgileriniz sistemdeki kayıtlarınızla tam uyuşmadı. Ancak belgeleriniz yöneticilerimiz tarafından incelenmek üzere 'Beklemede' (Pending) olarak başarıyla kaydedildi!",
-        };
-      } catch (err: any) {
-        console.error("KYC pending submit error:", err);
-        return {
-          success: false,
-          isVerified: false,
-          message: "Veritabanı güncellenirken hata oluştu: " + (err?.message || "Bilinmeyen hata"),
+          message: `${diffReason} başvurunuz yöneticilerimiz tarafından incelenmek üzere 'Beklemede' (Pending) olarak kaydedildi.`,
         };
       }
+    } catch (err: any) {
+      console.error("KYC update error:", err);
+      return {
+        success: false,
+        isVerified: false,
+        message: "Veritabanı güncellenirken hata oluştu: " + (err?.message || "Bilinmeyen hata"),
+      };
     }
   };
 
@@ -933,15 +1097,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const adminUpdateKYC = async (userId: string, status: "verified" | "rejected", reason?: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const userRef = doc(db, "users", userId);
+
+      // Clean up any legacy corrupted dot-keys if present on this document
+      try {
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const docData = snap.data();
+          const dotKeys = Object.keys(docData).filter(k => k.startsWith("kycDetails."));
+          if (dotKeys.length > 0) {
+            const cleanup: any = {};
+            for (const dk of dotKeys) cleanup[dk] = deleteField();
+            await updateDoc(userRef, cleanup).catch(() => {});
+          }
+        }
+      } catch (cleanErr) {
+        console.warn("Legacy dot-key cleanup error:", cleanErr);
+      }
+
+      const kycUpdates: Record<string, any> = {};
+      if (status === "rejected") {
+        kycUpdates.rejectionReason = String(reason || "").trim();
+      } else if (status === "verified") {
+        kycUpdates.verifiedAt = Date.now();
+      }
+
       const updates: any = {
         kycStatus: status,
+        kycDetails: kycUpdates,
       };
-      if (status === "rejected") {
-        updates["kycDetails.rejectionReason"] = reason || "";
-      } else if (status === "verified") {
-        updates["kycDetails.verifiedAt"] = Date.now();
-      }
-      await setDoc(userRef, updates, { merge: true });
+
+      await setDoc(userRef, cleanForFirestore(updates), { merge: true });
       return { success: true };
     } catch (err: any) {
       console.error("adminUpdateKYC error:", err);
@@ -965,6 +1150,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteUserPermanently = async (userId: string, userEmail?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const email = userEmail?.trim().toLowerCase() || "";
+      const id = userId?.trim() || "";
+
+      // Helper to batch-delete documents matching a query
+      const deleteDocsForQuery = async (collName: string, field: string, value: string) => {
+        if (!value) return;
+        try {
+          const q = query(collection(db, collName), where(field, "==", value));
+          const snap = await getDocs(q);
+          const deletes = snap.docs.map(d => deleteDoc(d.ref).catch(() => {}));
+          await Promise.all(deletes);
+        } catch (e) {
+          console.warn(`Error deleting from ${collName} (${field} == ${value}):`, e);
+        }
+      };
+
+      // 1. Delete users collection documents (both by id and email keys)
+      const userDocIds = new Set<string>();
+      if (id) userDocIds.add(id);
+      if (email) userDocIds.add(email);
+      for (const docId of userDocIds) {
+        await deleteDoc(doc(db, "users", docId)).catch(() => {});
+      }
+      if (email) {
+        await deleteDocsForQuery("users", "email", email);
+      }
+      if (id) {
+        await deleteDocsForQuery("users", "id", id);
+      }
+
+      // 2. Delete all requests (deposits / withdrawals / adjustments)
+      if (id) await deleteDocsForQuery("requests", "userId", id);
+      if (email) {
+        await deleteDocsForQuery("requests", "userEmail", email);
+        await deleteDocsForQuery("requests", "userId", email);
+      }
+
+      // 3. Delete all trade history (trades collection)
+      if (id) await deleteDocsForQuery("trades", "userId", id);
+      if (email) await deleteDocsForQuery("trades", "userId", email);
+
+      // 4. Delete realActiveTrades
+      if (id) await deleteDocsForQuery("realActiveTrades", "userId", id);
+      if (email) await deleteDocsForQuery("realActiveTrades", "userId", email);
+
+      // 5. Delete activeTrades (demo)
+      if (id) await deleteDocsForQuery("activeTrades", "userId", id);
+      if (email) await deleteDocsForQuery("activeTrades", "userId", email);
+
+      // 6. Delete leaderboard documents
+      if (id) {
+        await deleteDoc(doc(db, "leaderboard", id)).catch(() => {});
+        await deleteDocsForQuery("leaderboard", "userId", id);
+      }
+      if (email) {
+        await deleteDoc(doc(db, "leaderboard", email)).catch(() => {});
+        await deleteDocsForQuery("leaderboard", "userId", email);
+      }
+
+      // 7. Clean up any local storage traces in current client
+      if (email) {
+        try {
+          localStorage.removeItem("obyo_user_reg_" + email);
+          const rawRegs = localStorage.getItem("obyo_registered_emails");
+          if (rawRegs) {
+            const list: string[] = JSON.parse(rawRegs);
+            const updated = list.filter(e => e.toLowerCase() !== email);
+            localStorage.setItem("obyo_registered_emails", JSON.stringify(updated));
+          }
+        } catch {}
+      }
+      if (id) {
+        try {
+          localStorage.removeItem(`obyo_mode_${id}`);
+        } catch {}
+      }
+
+      // 8. Optimistically clean React state
+      setUsers(prev => prev.filter(u => u.id !== id && (!email || u.email?.toLowerCase() !== email)));
+      setRequests(prev => prev.filter(r => r.userId !== id && (!email || r.userEmail?.toLowerCase() !== email)));
+      if (currentUser && (currentUser.id === id || (email && currentUser.email?.toLowerCase() === email))) {
+        setCurrentUser(null);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("deleteUserPermanently error:", err);
+      return { success: false, error: err?.message || "Kullanıcı ve verileri silinirken bir hata oluştu." };
+    }
+  };
+
   const refreshUser  = () => {};
   const refreshAdmin = () => {};
 
@@ -977,6 +1255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       users, requests,
       addRequest, processRequest, addBalanceDirect,
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
+      deleteUserPermanently,
       refreshUser, refreshAdmin,
     }}>
       {children}

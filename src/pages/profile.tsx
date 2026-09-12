@@ -115,8 +115,8 @@ export default function Profile() {
 
           </div>
 
-          {/* ── KYC Status Card (Farklı ve Renksiz / Monochrome Design) ── */}
-          {currentUser && !isVerified && (
+          {/* ── KYC Status Card ── */}
+          {currentUser && (
             <div className="px-4 mb-3">
               <motion.button
                 whileTap={{ scale: 0.98 }}
@@ -124,12 +124,19 @@ export default function Profile() {
                 className="w-full flex items-center justify-between p-4 rounded-2xl text-left transition-all cursor-pointer"
                 style={{
                   background: "linear-gradient(180deg, #161616 0%, #0e0e0e 100%)",
-                  border: "1px solid #262626",
+                  border: isVerified ? "1px solid rgba(14,203,129,0.25)" : "1px solid #262626",
                   boxShadow: "0 4px 16px rgba(0,0,0,0.5)"
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/70">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border transition-colors"
+                    style={{
+                      backgroundColor: isVerified ? "rgba(14,203,129,0.1)" : "rgba(255,255,255,0.05)",
+                      borderColor: isVerified ? "rgba(14,203,129,0.25)" : "rgba(255,255,255,0.1)",
+                      color: isVerified ? "#0ecb81" : "rgba(255,255,255,0.7)"
+                    }}
+                  >
                     <ShieldCheck size={20} />
                   </div>
                   <div>
@@ -138,16 +145,20 @@ export default function Profile() {
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
                         style={{
-                          backgroundColor: "rgba(255,255,255,0.03)",
-                          borderColor: "rgba(255,255,255,0.08)",
-                          color: "rgba(255,255,255,0.4)"
+                          backgroundColor: isVerified ? "rgba(14,203,129,0.12)" : currentUser.kycStatus === "pending" ? "rgba(255,184,0,0.12)" : "rgba(255,255,255,0.03)",
+                          borderColor: isVerified ? "rgba(14,203,129,0.25)" : currentUser.kycStatus === "pending" ? "rgba(255,184,0,0.25)" : "rgba(255,255,255,0.08)",
+                          color: isVerified ? "#0ecb81" : currentUser.kycStatus === "pending" ? "#FFB800" : "rgba(255,255,255,0.4)"
                         }}
                       >
-                        {t.kycNotVerified}
+                        {isVerified ? t.kycVerified : currentUser.kycStatus === "pending" ? "Onay Bekliyor" : t.kycNotVerified}
                       </span>
                     </div>
                     <p className="text-[11px] text-white/35 mt-0.5">
-                      Para çekme işlemleri için kimlik doğrulaması yapın
+                      {isVerified
+                        ? "Kimliğiniz onaylandı. Detayları görüntülemek için dokunun."
+                        : currentUser.kycStatus === "pending"
+                        ? "Kimlik belgeleriniz inceleniyor."
+                        : "Para çekme işlemleri için kimlik doğrulaması yapın"}
                     </p>
                   </div>
                 </div>

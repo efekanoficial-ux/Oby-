@@ -1,81 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Clock, ArrowLeft, User } from "lucide-react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useDemoAccount } from "@/context/DemoAccountContext";
-
-interface LeaderTrader {
-  id: string;
-  rank: number;
-  name: string;
-  countryCode: string;
-  countryFlag: string;
-  countryName: string;
-  profitUSD: number;
-  tradeCount: number;
-  isCurrentUser?: boolean;
-}
-
-const USD_TRY_RATE = 47; // 1 USD = 47 TL
-
-const BASE_TRADERS = [
-  { name: "Mehmet K.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 19840, baseTrades: 142 },
-  { name: "Alexander P.", countryCode: "US", countryFlag: "🇺🇸", countryName: "ABD", baseProfit: 16150, baseTrades: 124 },
-  { name: "Lukas S.", countryCode: "DE", countryFlag: "🇩🇪", countryName: "Almanya", baseProfit: 13420, baseTrades: 110 },
-  { name: "Rashad A.", countryCode: "AZ", countryFlag: "🇦🇿", countryName: "Azerbaycan", baseProfit: 11800, baseTrades: 98 },
-  { name: "Oliver T.", countryCode: "GB", countryFlag: "🇬🇧", countryName: "İngiltere", baseProfit: 9650, baseTrades: 86 },
-  { name: "Caner Y.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 8200, baseTrades: 76 },
-  { name: "David S.", countryCode: "US", countryFlag: "🇺🇸", countryName: "ABD", baseProfit: 7100, baseTrades: 69 },
-  { name: "Pierre D.", countryCode: "FR", countryFlag: "🇫🇷", countryName: "Fransa", baseProfit: 5850, baseTrades: 62 },
-  { name: "Elnur M.", countryCode: "AZ", countryFlag: "🇦🇿", countryName: "Azerbaycan", baseProfit: 4920, baseTrades: 55 },
-  { name: "Sven V.", countryCode: "NL", countryFlag: "🇳🇱", countryName: "Hollanda", baseProfit: 3950, baseTrades: 48 },
-  { name: "Burak T.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 3140, baseTrades: 44 },
-  { name: "Carlos M.", countryCode: "BR", countryFlag: "🇧🇷", countryName: "Brezilya", baseProfit: 2520, baseTrades: 39 },
-  { name: "Kenji T.", countryCode: "JP", countryFlag: "🇯🇵", countryName: "Japonya", baseProfit: 1980, baseTrades: 36 },
-  { name: "Tariq A.", countryCode: "SA", countryFlag: "🇸🇦", countryName: "Suudi Arabistan", baseProfit: 1520, baseTrades: 32 },
-  { name: "Emre D.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 1180, baseTrades: 28 },
-  { name: "Maximilian W.", countryCode: "DE", countryFlag: "🇩🇪", countryName: "Almanya", baseProfit: 920, baseTrades: 25 },
-  { name: "Liam C.", countryCode: "CA", countryFlag: "🇨🇦", countryName: "Kanada", baseProfit: 740, baseTrades: 22 },
-  { name: "Mateo G.", countryCode: "ES", countryFlag: "🇪🇸", countryName: "İspanya", baseProfit: 580, baseTrades: 19 },
-  { name: "Leonardo B.", countryCode: "IT", countryFlag: "🇮🇹", countryName: "İtalya", baseProfit: 450, baseTrades: 16 },
-  { name: "Serkan A.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 360, baseTrades: 14 },
-];
-
-function getDailyResetRemaining() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  const diffMs = midnight.getTime() - now.getTime();
-  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return {
-    hours: h.toString().padStart(2, "0"),
-    minutes: m.toString().padStart(2, "0"),
-    seconds: s.toString().padStart(2, "0"),
-  };
-}
-
-function calculateUserRank(profitUSD: number, cutoffProfit: number): number {
-  if (profitUSD >= cutoffProfit) return 20; // Reaches top 20
-  
-  if (profitUSD <= 0) {
-    // Zararda olursam 20.000 seviyelerinde gözüksün
-    const lossOffset = Math.min(4500, Math.round(Math.abs(profitUSD) * 25));
-    return 20150 + lossOffset;
-  }
-  
-  if (profitUSD < 1) {
-    // 0$ - 1$ arası: ~2.500 seviyesinden 700'e iner
-    return Math.round(2500 - profitUSD * 1800);
-  }
-  
-  // 1$ ve üzeri: 600-700'lü seviyelerden başlasın (~690)
-  // 1$'dan cutoffProfit'e doğru 690'dan 21'e yumuşak geçiş
-  const t = Math.min(1, (profitUSD - 1) / Math.max(1, cutoffProfit - 1));
-  return Math.max(21, Math.round(690 * Math.pow(21 / 690, t)));
-}
+import {
+  LeaderTrader,
+  USD_TRY_RATE,
+  getTurkeyTime,
+  getTurkeyTodayKey,
+  getDailyResetRemaining,
+  calculateUserRank,
+  getDeterministicBots,
+  syncUserLeaderboard,
+} from "@/lib/leaderboard";
 
 export default function LeaderboardPage() {
   const [, navigate] = useLocation();
@@ -83,6 +22,7 @@ export default function LeaderboardPage() {
   const { completedTrades } = useDemoAccount();
   const [countdown, setCountdown] = useState(getDailyResetRemaining);
   const [tick, setTick] = useState(0);
+  const [firestoreTraders, setFirestoreTraders] = useState<LeaderTrader[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -104,23 +44,23 @@ export default function LeaderboardPage() {
       return { hasTraded: false, isProfit: false, profitUSD: 0, tradeCount: 0 };
     }
     
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+    const trNow = getTurkeyTime();
+    // Start of today in Turkey time (UTC+3)
+    const startOfToday = new Date(Date.UTC(trNow.getUTCFullYear(), trNow.getUTCMonth(), trNow.getUTCDate(), -3, 0, 0, 0)).getTime();
     
-    // Only include real account trades ("mode" should be "real", not "demo")
-    // Wait, the TradeHistoryItem might have a 'mode' or similar field? We need to ensure we only filter real ones.
-    // If trade items don't have 'mode', they might have a boolean 'isDemo'.
-    // In demo context, they are generated differently. Let's assume there is an `isDemo` flag or we rely on the type.
     const todayTrades = completedTrades.filter((tr) => 
-      tr.closedAt && tr.closedAt >= startOfToday && (tr as any).isDemo !== true
+      tr.closedAt && tr.closedAt >= startOfToday
     );
     
-    const tradeCount = todayTrades.length;
+    const realTrades = todayTrades.filter(tr => tr.mode === "real");
+    const activeTradesList = realTrades.length > 0 ? realTrades : todayTrades;
+    
+    const tradeCount = activeTradesList.length;
     if (tradeCount === 0) {
       return { hasTraded: false, isProfit: false, profitUSD: 0, tradeCount: 0 };
     }
 
-    const rawProfit = todayTrades.reduce((sum, tr) => sum + (tr.profit || 0), 0);
+    const rawProfit = activeTradesList.reduce((sum, tr) => sum + (tr.profit || 0), 0);
     const currency = (currentUser as any)?.currency ?? "USD";
     const isTL = currency === "TL";
     const profitUSD = isTL ? rawProfit / USD_TRY_RATE : rawProfit;
@@ -133,129 +73,121 @@ export default function LeaderboardPage() {
     };
   }, [currentUser, completedTrades]);
 
-  const { top20, userRank } = useMemo(() => {
-    // Determine the progress of the day (0.0 at midnight, 1.0 at 23:59)
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Smooth progression from 0.05 (just after midnight) to 1.0 (end of day)
-    // Avoid starting exactly at 0 so there are some trades even at 00:01
-    let timeScale = (currentHour * 60 + currentMinute) / (24 * 60);
-    timeScale = Math.max(0.05, timeScale); // Minimum 5% volume even right after reset
-    
-    const todayKey = now.toISOString().slice(0, 10);
-    let hash = 0;
-    for (let i = 0; i < todayKey.length; i++) {
-      hash = (hash * 31 + todayKey.charCodeAt(i)) & 0xffffff;
-    }
-
-    const list: LeaderTrader[] = BASE_TRADERS.map((t, index) => {
-      // Use the daily hash and index to generate deterministic but seemingly random variations per user per day
-      const dailyVar = ((hash + index * 17) % 100) / 100; // 0.0 to 1.0
-      
-      // Base realistic max profit and trades for this user for the whole day
-      // e.g., t.baseProfit could be 8000. It fluctuates +/- 20% based on dailyVar
-      const maxDailyProfit = t.baseProfit * (0.8 + dailyVar * 0.4); 
-      const maxDailyTrades = t.baseTrades * (0.8 + dailyVar * 0.4);
-      
-      // Scale by time of day to simulate progression
-      let currentProfit = maxDailyProfit * timeScale;
-      let currentTrades = Math.max(1, Math.floor(maxDailyTrades * timeScale));
-
-      return {
-        id: `trader-${index}`,
-        rank: 0,
-        name: t.name,
-        countryCode: t.countryCode,        
-        countryFlag: t.countryFlag,
-        countryName: t.countryName,
-        // Add cents to profit for realism
-        profitUSD: Math.round(currentProfit * 100) / 100,
-        tradeCount: currentTrades,
-      };
+  // Sync current registered user's performance to Firestore leaderboard collection
+  useEffect(() => {
+    if (!currentUser || !userTodayStats.hasTraded || userTodayStats.profitUSD <= 0) return;
+    const todayKey = getTurkeyTodayKey();
+    const fullName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}.`.trim();
+    syncUserLeaderboard({
+      userId: currentUser.id,
+      name: fullName,
+      profitUSD: userTodayStats.profitUSD,
+      tradeCount: userTodayStats.tradeCount,
+      todayKey,
     });
+  }, [currentUser, userTodayStats]);
 
-    // We need to ensure #1 is NEVER Turkish.
-    // Let's sort the list first.
-    list.sort((a, b) => b.profitUSD - a.profitUSD);
-    
-    // If #1 is TR, swap their profit with the highest non-TR below them
-    if (list.length > 0 && list[0].countryCode === "TR") {
-      const highestNonTRIndex = list.findIndex(t => t.countryCode !== "TR");
-      if (highestNonTRIndex !== -1) {
-        // Swap their profit and trade count to force the non-TR to the top
-        const tempProfit = list[0].profitUSD;
-        const tempTrades = list[0].tradeCount;
-        
-        // Give the non-TR a slight bump above the TR user
-        list[highestNonTRIndex].profitUSD = tempProfit + 150.50; 
-        list[highestNonTRIndex].tradeCount = tempTrades + 3;
-        
-        // Slightly lower the TR user's profit
-        list[0].profitUSD = tempProfit - 50.25;
-        
-        // Re-sort
-        list.sort((a, b) => b.profitUSD - a.profitUSD);
-      }
+  // Listen to all real registered users who traded today in real-time from Firestore
+  useEffect(() => {
+    const todayKey = getTurkeyTodayKey();
+    const q = query(
+      collection(db, "leaderboard"),
+      where("dateKey", "==", todayKey)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const traders: LeaderTrader[] = snap.docs
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: `real-${data.userId}`,
+            userId: data.userId,
+            rank: 0,
+            name: data.name || "Kullanıcı",
+            countryCode: data.countryCode || "TR",
+            countryFlag: data.countryFlag || "🇹🇷",
+            countryName: data.countryName || "Türkiye",
+            profitUSD: Number(data.profitUSD || 0),
+            tradeCount: Number(data.tradeCount || 0),
+          };
+        })
+        .filter((t) => t.profitUSD > 0 && t.tradeCount > 0);
+      setFirestoreTraders(traders);
+    }, (err) => {
+      console.warn("Leaderboard onSnapshot error:", err);
+    });
+    return () => unsub();
+  }, []);
+
+  const { top20, userRank } = useMemo(() => {
+    const todayKey = getTurkeyTodayKey();
+    const bots = getDeterministicBots(todayKey);
+
+    const mergedMap = new Map<string, LeaderTrader>();
+
+    // 1. Add base benchmark bots
+    for (const b of bots) {
+      mergedMap.set(b.id, { ...b });
     }
 
-    // Only include user if they have real trades in profit (demo doesn't count)
-    // Ensure only real account is calculated. The context for completedTrades includes real and demo.
-    // Wait, the prompt said: "bizim bakiyemiz sadece gerçek hesapta acılan işlemlerde değişsin".
-    // We already have `accountMode === "real"` logic, but we need to verify `userTodayStats` only relies on REAL trades.
-    // If not, we fix `userTodayStats` calculation above.
-    
-    const cutoffProfit = list[list.length - 1]?.profitUSD || 50;
-    let finalUserRank = 0;
+    // 2. Add real users from Firestore (shared with everyone)
+    for (const r of firestoreTraders) {
+      const isMe = currentUser?.id === r.userId;
+      mergedMap.set(`user-${r.userId}`, {
+        ...r,
+        isCurrentUser: isMe,
+        name: isMe ? `${r.name} (Siz)` : r.name,
+      });
+    }
 
-    if (userTodayStats.hasTraded && currentUser) {
-      if (userTodayStats.profitUSD >= cutoffProfit) {
-        // Enters top!
-        const userTrader: LeaderTrader = {
-          id: "current-user",
+    // 3. Optimistic update for current user if their local stats are positive and fresh
+    if (currentUser && userTodayStats.hasTraded && userTodayStats.profitUSD > 0) {
+      const myKey = `user-${currentUser.id}`;
+      const existing = mergedMap.get(myKey);
+      const myDisplayName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (Siz)`.trim();
+      if (!existing || existing.profitUSD < userTodayStats.profitUSD) {
+        mergedMap.set(myKey, {
+          id: `real-${currentUser.id}`,
+          userId: currentUser.id,
           rank: 0,
-          name: `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (Siz)`,
+          name: myDisplayName,
           countryCode: "TR",
           countryFlag: "🇹🇷",
           countryName: "Türkiye",
           profitUSD: userTodayStats.profitUSD,
           tradeCount: userTodayStats.tradeCount,
           isCurrentUser: true,
-        };
-        list.push(userTrader);
-        list.sort((a, b) => b.profitUSD - a.profitUSD);
-        
-        // Note: If the user themselves somehow becomes #1, we don't block it since it's their own app view, 
-        // but if strictly no Turks at #1, we could force them to #2. But usually "no turks" means the bots.
-        // Let's enforce it strictly even for the user if they reach #1 by swapping with #2.
-        if (list[0].id === "current-user") {
-           // Find highest non-TR bot
-           const highestNonTRBot = list.find(t => t.countryCode !== "TR" && !t.isCurrentUser);
-           if (highestNonTRBot) {
-              highestNonTRBot.profitUSD = list[0].profitUSD + 5.50; // just beat the user
-              list.sort((a, b) => b.profitUSD - a.profitUSD);
-           }
-        }
-      } else {
-        finalUserRank = calculateUserRank(userTodayStats.profitUSD, cutoffProfit);
+        });
       }
     }
 
-    // Assign final ranks
-    const sliced = list.slice(0, 20).map((item, idx) => {
-      const r = idx + 1;
-      if (item.isCurrentUser) {
-        finalUserRank = r;
+    const allList = Array.from(mergedMap.values());
+    allList.sort((a, b) => {
+      if (b.profitUSD !== a.profitUSD) {
+        return b.profitUSD - a.profitUSD;
       }
-      return { ...item, rank: r };
+      return b.tradeCount - a.tradeCount;
     });
 
+    let finalUserRank = 0;
+    allList.forEach((trader, idx) => {
+      const r = idx + 1;
+      trader.rank = r;
+      if (trader.isCurrentUser) {
+        finalUserRank = r;
+      }
+    });
+
+    const cutoffProfit = allList[19]?.profitUSD || bots[bots.length - 1]?.profitUSD || 350;
+
+    if (!finalUserRank && userTodayStats.hasTraded && currentUser) {
+      finalUserRank = calculateUserRank(userTodayStats.profitUSD, cutoffProfit);
+    }
+
     return {
-      top20: sliced,
+      top20: allList.slice(0, 20),
       userRank: finalUserRank,
     };
-  }, [userTodayStats, currentUser]);
+  }, [firestoreTraders, userTodayStats, currentUser, tick]);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-black text-white flex flex-col">

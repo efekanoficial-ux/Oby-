@@ -1,83 +1,27 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, User } from "lucide-react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useDemoAccount } from "@/context/DemoAccountContext";
-
-interface LeaderTrader {
-  id: string;
-  rank: number;
-  name: string;
-  countryCode: string;
-  countryFlag: string;
-  countryName: string;
-  profitUSD: number;
-  tradeCount: number;
-  isCurrentUser?: boolean;
-}
-
-const USD_TRY_RATE = 47; // 1 USD = 47 TL
-
-const BASE_TRADERS = [
-  { name: "Mehmet K.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 19840, baseTrades: 142 },
-  { name: "Alexander P.", countryCode: "US", countryFlag: "🇺🇸", countryName: "ABD", baseProfit: 16150, baseTrades: 124 },
-  { name: "Lukas S.", countryCode: "DE", countryFlag: "🇩🇪", countryName: "Almanya", baseProfit: 13420, baseTrades: 110 },
-  { name: "Rashad A.", countryCode: "AZ", countryFlag: "🇦🇿", countryName: "Azerbaycan", baseProfit: 11800, baseTrades: 98 },
-  { name: "Oliver T.", countryCode: "GB", countryFlag: "🇬🇧", countryName: "İngiltere", baseProfit: 9650, baseTrades: 86 },
-  { name: "Caner Y.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 8200, baseTrades: 76 },
-  { name: "David S.", countryCode: "US", countryFlag: "🇺🇸", countryName: "ABD", baseProfit: 7100, baseTrades: 69 },
-  { name: "Pierre D.", countryCode: "FR", countryFlag: "🇫🇷", countryName: "Fransa", baseProfit: 5850, baseTrades: 62 },
-  { name: "Elnur M.", countryCode: "AZ", countryFlag: "🇦🇿", countryName: "Azerbaycan", baseProfit: 4920, baseTrades: 55 },
-  { name: "Sven V.", countryCode: "NL", countryFlag: "🇳🇱", countryName: "Hollanda", baseProfit: 3950, baseTrades: 48 },
-  { name: "Burak T.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 3140, baseTrades: 44 },
-  { name: "Carlos M.", countryCode: "BR", countryFlag: "🇧🇷", countryName: "Brezilya", baseProfit: 2520, baseTrades: 39 },
-  { name: "Kenji T.", countryCode: "JP", countryFlag: "🇯🇵", countryName: "Japonya", baseProfit: 1980, baseTrades: 36 },
-  { name: "Tariq A.", countryCode: "SA", countryFlag: "🇸🇦", countryName: "Suudi Arabistan", baseProfit: 1520, baseTrades: 32 },
-  { name: "Emre D.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 1180, baseTrades: 28 },
-  { name: "Maximilian W.", countryCode: "DE", countryFlag: "🇩🇪", countryName: "Almanya", baseProfit: 920, baseTrades: 25 },
-  { name: "Liam C.", countryCode: "CA", countryFlag: "🇨🇦", countryName: "Kanada", baseProfit: 740, baseTrades: 22 },
-  { name: "Mateo G.", countryCode: "ES", countryFlag: "🇪🇸", countryName: "İspanya", baseProfit: 580, baseTrades: 19 },
-  { name: "Leonardo B.", countryCode: "IT", countryFlag: "🇮🇹", countryName: "İtalya", baseProfit: 450, baseTrades: 16 },
-  { name: "Serkan A.", countryCode: "TR", countryFlag: "🇹🇷", countryName: "Türkiye", baseProfit: 360, baseTrades: 14 },
-];
-
-function getDailyResetRemaining() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  const diffMs = midnight.getTime() - now.getTime();
-  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return {
-    hours: h.toString().padStart(2, "0"),
-    minutes: m.toString().padStart(2, "0"),
-    seconds: s.toString().padStart(2, "0"),
-  };
-}
-
-function calculateUserRank(profitUSD: number, cutoffProfit: number): number {
-  if (profitUSD >= cutoffProfit) return 20;
-  
-  if (profitUSD <= 0) {
-    const lossOffset = Math.min(4500, Math.round(Math.abs(profitUSD) * 25));
-    return 20150 + lossOffset;
-  }
-  
-  if (profitUSD < 1) {
-    return Math.round(2500 - profitUSD * 1800);
-  }
-  
-  const t = Math.min(1, (profitUSD - 1) / Math.max(1, cutoffProfit - 1));
-  return Math.max(21, Math.round(690 * Math.pow(21 / 690, t)));
-}
+import {
+  LeaderTrader,
+  USD_TRY_RATE,
+  getTurkeyTime,
+  getTurkeyTodayKey,
+  getDailyResetRemaining,
+  calculateUserRank,
+  getDeterministicBots,
+  syncUserLeaderboard,
+} from "@/lib/leaderboard";
 
 export function LeaderboardModal({ show, onClose }: { show: boolean; onClose: () => void }) {
   const { currentUser } = useAuth();
   const { completedTrades } = useDemoAccount();
   const [countdown, setCountdown] = useState(getDailyResetRemaining);
   const [tick, setTick] = useState(0);
+  const [firestoreTraders, setFirestoreTraders] = useState<LeaderTrader[]>([]);
 
   useEffect(() => {
     if (!show) return;
@@ -100,16 +44,19 @@ export function LeaderboardModal({ show, onClose }: { show: boolean; onClose: ()
       return { hasTraded: false, isProfit: false, profitUSD: 0, tradeCount: 0 };
     }
     
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+    const trNow = getTurkeyTime();
+    const startOfToday = new Date(Date.UTC(trNow.getUTCFullYear(), trNow.getUTCMonth(), trNow.getUTCDate(), -3, 0, 0, 0)).getTime();
     
     const todayTrades = completedTrades.filter((tr) => tr.closedAt && tr.closedAt >= startOfToday);
-    const tradeCount = todayTrades.length;
+    const realTrades = todayTrades.filter(tr => tr.mode === "real");
+    const activeTradesList = realTrades.length > 0 ? realTrades : todayTrades;
+
+    const tradeCount = activeTradesList.length;
     if (tradeCount === 0) {
       return { hasTraded: false, isProfit: false, profitUSD: 0, tradeCount: 0 };
     }
 
-    const rawProfit = todayTrades.reduce((sum, tr) => sum + (tr.profit || 0), 0);
+    const rawProfit = activeTradesList.reduce((sum, tr) => sum + (tr.profit || 0), 0);
     const currency = (currentUser as any)?.currency ?? "USD";
     const isTL = currency === "TL";
     const profitUSD = isTL ? rawProfit / USD_TRY_RATE : rawProfit;
@@ -122,64 +69,122 @@ export function LeaderboardModal({ show, onClose }: { show: boolean; onClose: ()
     };
   }, [currentUser, completedTrades]);
 
+  // Sync current user's performance to Firestore
+  useEffect(() => {
+    if (!show || !currentUser || !userTodayStats.hasTraded || userTodayStats.profitUSD <= 0) return;
+    const todayKey = getTurkeyTodayKey();
+    const fullName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}.`.trim();
+    syncUserLeaderboard({
+      userId: currentUser.id,
+      name: fullName,
+      profitUSD: userTodayStats.profitUSD,
+      tradeCount: userTodayStats.tradeCount,
+      todayKey,
+    });
+  }, [show, currentUser, userTodayStats]);
+
+  // Listen to Firestore real users
+  useEffect(() => {
+    if (!show) return;
+    const todayKey = getTurkeyTodayKey();
+    const q = query(
+      collection(db, "leaderboard"),
+      where("dateKey", "==", todayKey)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const traders: LeaderTrader[] = snap.docs
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: `real-${data.userId}`,
+            userId: data.userId,
+            rank: 0,
+            name: data.name || "Kullanıcı",
+            countryCode: data.countryCode || "TR",
+            countryFlag: data.countryFlag || "🇹🇷",
+            countryName: data.countryName || "Türkiye",
+            profitUSD: Number(data.profitUSD || 0),
+            tradeCount: Number(data.tradeCount || 0),
+          };
+        })
+        .filter((t) => t.profitUSD > 0 && t.tradeCount > 0);
+      setFirestoreTraders(traders);
+    }, (err) => {
+      console.warn("Leaderboard onSnapshot error:", err);
+    });
+    return () => unsub();
+  }, [show]);
+
   const { top20, userRank } = useMemo(() => {
-    const todayKey = new Date().toISOString().slice(0, 10);
-    let hash = 0;
-    for (let i = 0; i < todayKey.length; i++) {
-      hash = (hash * 31 + todayKey.charCodeAt(i)) & 0xffffff;
+    const todayKey = getTurkeyTodayKey();
+    const bots = getDeterministicBots(todayKey);
+
+    const mergedMap = new Map<string, LeaderTrader>();
+
+    // 1. Benchmark bots
+    for (const b of bots) {
+      mergedMap.set(b.id, { ...b });
     }
 
-    const list: LeaderTrader[] = BASE_TRADERS.map((t, index) => {
-      const deltaSeed = (hash + index * 17) % 300;
-      const profit = t.baseProfit + deltaSeed + ((tick % (index + 1)) === 0 ? 10 : 0);
-      return {
-        id: `trader-${index}`,
-        rank: index + 1,
-        name: t.name,
-        countryCode: t.countryCode,
-        countryFlag: t.countryFlag,
-        countryName: t.countryName,
-        profitUSD: profit,
-        tradeCount: t.baseTrades,
-      };
-    });
+    // 2. Real users from Firestore
+    for (const r of firestoreTraders) {
+      const isMe = currentUser?.id === r.userId;
+      mergedMap.set(`user-${r.userId}`, {
+        ...r,
+        isCurrentUser: isMe,
+        name: isMe ? `${r.name} (Siz)` : r.name,
+      });
+    }
 
-    const cutoffProfit = list[list.length - 1]?.profitUSD || 350;
-    let finalUserRank = 0;
-
-    if (userTodayStats.hasTraded && currentUser) {
-      if (userTodayStats.profitUSD >= cutoffProfit) {
-        const userTrader: LeaderTrader = {
-          id: "current-user",
+    // 3. Current user optimistic update
+    if (currentUser && userTodayStats.hasTraded && userTodayStats.profitUSD > 0) {
+      const myKey = `user-${currentUser.id}`;
+      const existing = mergedMap.get(myKey);
+      const myDisplayName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (Siz)`.trim();
+      if (!existing || existing.profitUSD < userTodayStats.profitUSD) {
+        mergedMap.set(myKey, {
+          id: `real-${currentUser.id}`,
+          userId: currentUser.id,
           rank: 0,
-          name: `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (Siz)`,
+          name: myDisplayName,
           countryCode: "TR",
           countryFlag: "🇹🇷",
           countryName: "Türkiye",
           profitUSD: userTodayStats.profitUSD,
           tradeCount: userTodayStats.tradeCount,
           isCurrentUser: true,
-        };
-        list.push(userTrader);
-        list.sort((a, b) => b.profitUSD - a.profitUSD);
-      } else {
-        finalUserRank = calculateUserRank(userTodayStats.profitUSD, cutoffProfit);
+        });
       }
     }
 
-    const sliced = list.slice(0, 20).map((item, idx) => {
-      const r = idx + 1;
-      if (item.isCurrentUser) {
-        finalUserRank = r;
+    const allList = Array.from(mergedMap.values());
+    allList.sort((a, b) => {
+      if (b.profitUSD !== a.profitUSD) {
+        return b.profitUSD - a.profitUSD;
       }
-      return { ...item, rank: r };
+      return b.tradeCount - a.tradeCount;
     });
 
+    let finalUserRank = 0;
+    allList.forEach((trader, idx) => {
+      const r = idx + 1;
+      trader.rank = r;
+      if (trader.isCurrentUser) {
+        finalUserRank = r;
+      }
+    });
+
+    const cutoffProfit = allList[19]?.profitUSD || bots[bots.length - 1]?.profitUSD || 350;
+
+    if (!finalUserRank && userTodayStats.hasTraded && currentUser) {
+      finalUserRank = calculateUserRank(userTodayStats.profitUSD, cutoffProfit);
+    }
+
     return {
-      top20: sliced,
+      top20: allList.slice(0, 20),
       userRank: finalUserRank,
     };
-  }, [userTodayStats, currentUser, tick]);
+  }, [firestoreTraders, userTodayStats, currentUser, tick]);
 
   if (!show) return null;
 

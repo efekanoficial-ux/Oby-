@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { Eye, EyeOff, Mail, Lock, User, Calendar, ChevronRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Calendar, ChevronRight, Tag, IdCard } from "lucide-react";
 import { t } from "@/i18n";
 
 type Mode = "login" | "register" | "complete-google";
@@ -18,7 +18,7 @@ export default function AuthPage() {
 
   const [currency, setCurrency] = useState<"USD" | "TL">("USD");
   const [form, setForm] = useState({
-    email: "", password: "", name: "", surname: "", birthDate: "", photoUrl: "",
+    email: "", password: "", name: "", surname: "", tcKimlik: "", birthDate: "", photoUrl: "", referralCode: "",
   });
 
   useEffect(() => {
@@ -51,6 +51,12 @@ export default function AuthPage() {
       }
       setLoading(false);
     } else {
+      if (form.tcKimlik && form.tcKimlik.length !== 11) {
+        setErr("T.C. Kimlik Numarası 11 haneli olmalıdır.");
+        setLoading(false);
+        return;
+      }
+
       const res = await register({ ...form, currency }, mode === "complete-google");
       if (!res.success) {
         setErr(res.error ?? t.registerFailed);
@@ -74,8 +80,10 @@ export default function AuthPage() {
           password: "",
           name: res.googleUser.name,
           surname: res.googleUser.surname,
+          tcKimlik: "",
           birthDate: "",
           photoUrl: res.googleUser.photoURL || "",
+          referralCode: "",
         });
         setMode("complete-google");
         setErr("");
@@ -95,54 +103,55 @@ export default function AuthPage() {
     setErr("");
   };
 
-  const inputClass = "w-full rounded-xl bg-[#111] border border-[#1e1e1e] px-4 py-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#FF6B00]/50 transition-colors";
+  const inputClass = "w-full rounded-xl bg-[#111] border border-[#1e1e1e] px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#FF6B00]/50 transition-colors";
 
   return (
-    <div className="min-h-[100dvh] w-full bg-black text-white flex flex-col items-center justify-center px-4 py-8">
-      {/* Logo */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col items-center mb-8"
-      >
-        <img
-          src="/logo.png"
-          alt="Obyo Option"
-          className="h-14 w-14 object-contain mb-2 drop-shadow-[0_4px_16px_rgba(255,107,0,0.3)]"
-        />
-        <p className="text-xl font-black text-white">Obyo <span className="text-[#FF6B00]">Option</span></p>
-        <p className="text-xs text-white/50 font-medium mt-0.5">Profesyonel Opsiyon Trading</p>
-      </motion.div>
+    <div className="min-h-[100dvh] w-full bg-black text-white flex flex-col items-center justify-start sm:justify-center overflow-y-auto overscroll-y-contain px-4 py-5 sm:py-10">
+      <div className="w-full max-w-sm flex flex-col items-center my-auto pb-12 sm:pb-6">
+        {/* Logo */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center mb-4 sm:mb-7 shrink-0"
+        >
+          <img
+            src="/logo.png"
+            alt="Obyo Option"
+            className="h-12 w-12 sm:h-14 sm:w-14 object-contain mb-1.5 sm:mb-2 drop-shadow-[0_4px_16px_rgba(255,107,0,0.3)]"
+          />
+          <p className="text-xl font-black text-white">Obyo <span className="text-[#FF6B00]">Option</span></p>
+          <p className="text-xs text-white/50 font-medium mt-0.5">Profesyonel Opsiyon Trading</p>
+        </motion.div>
 
-      {/* Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="w-full max-w-sm rounded-3xl overflow-hidden"
-        style={{ background: "#0a0a0a", border: "1px solid #1a1a1a" }}
-      >
-        {/* Tabs */}
-        {mode === "complete-google" ? (
-          <div className="px-6 pt-5 pb-3 border-b border-[#111] text-center bg-white/[0.01]">
-            <h2 className="text-sm font-black text-[#FF6B00]">Google Kaydını Tamamla</h2>
-            <p className="text-[11px] text-white/40 mt-1 font-medium">Devam etmek için lütfen aşağıdaki eksik alanları doldurun.</p>
-          </div>
-        ) : (
-          <div className="flex border-b border-[#111]">
-            {(["login", "register"] as Mode[]).map(m => (
-              <button key={m} onClick={() => switchMode(m)}
-                className="flex-1 py-3.5 text-sm font-black transition-colors relative cursor-pointer"
-                style={{ color: mode === m ? "#FF6B00" : "#444" }}>
-                {m === "login" ? t.signIn : t.signUp}
-                {mode === m && (
-                  <motion.div layoutId="auth-tab" className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                    style={{ background: "#FF6B00" }} />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="w-full rounded-3xl overflow-hidden shadow-2xl"
+          style={{ background: "#0a0a0a", border: "1px solid #1a1a1a" }}
+        >
+          {/* Tabs */}
+          {mode === "complete-google" ? (
+            <div className="px-5 sm:px-6 pt-5 pb-3 border-b border-[#111] text-center bg-white/[0.01]">
+              <h2 className="text-sm font-black text-[#FF6B00]">Google Kaydını Tamamla</h2>
+              <p className="text-[11px] text-white/40 mt-1 font-medium">Devam etmek için lütfen aşağıdaki eksik alanları doldurun.</p>
+            </div>
+          ) : (
+            <div className="flex border-b border-[#111]">
+              {(["login", "register"] as Mode[]).map(m => (
+                <button key={m} onClick={() => switchMode(m)}
+                  className="flex-1 py-3 sm:py-3.5 text-sm font-black transition-colors relative cursor-pointer"
+                  style={{ color: mode === m ? "#FF6B00" : "#444" }}>
+                  {m === "login" ? t.signIn : t.signUp}
+                  {mode === m && (
+                    <motion.div layoutId="auth-tab" className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
+                      style={{ background: "#FF6B00" }} />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-3">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-6 flex flex-col gap-3">
           <AnimatePresence mode="wait">
             {(mode === "register" || mode === "complete-google") && (
               <motion.div key="reg-fields"
@@ -159,6 +168,21 @@ export default function AuthPage() {
                       placeholder={t.lastName} value={form.surname} onChange={set("surname")} />
                   </div>
                 </div>
+
+                {/* T.C. Kimlik No */}
+                <div className="relative">
+                  <IdCard size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                  <input
+                    type="text"
+                    maxLength={11}
+                    className={inputClass}
+                    style={{ paddingLeft: 36 }}
+                    placeholder="T.C. Kimlik Numarası (11 Haneli)"
+                    value={form.tcKimlik}
+                    onChange={(e) => setForm(f => ({ ...f, tcKimlik: e.target.value.replace(/\D/g, "").slice(0, 11) }))}
+                  />
+                </div>
+
                 <div className="relative">
                   <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
                   <input required type="date" className={inputClass} style={{ paddingLeft: 36 }}
@@ -181,6 +205,19 @@ export default function AuthPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Referans Kodu (opsiyonel) */}
+                <div className="relative">
+                  <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                  <input
+                    type="text"
+                    className={inputClass}
+                    style={{ paddingLeft: 36 }}
+                    placeholder="Referans Kodu (opsiyonel)"
+                    value={form.referralCode}
+                    onChange={set("referralCode")}
+                  />
                 </div>
               </motion.div>
             )}
@@ -274,7 +311,7 @@ export default function AuthPage() {
         {/* Footer */}
         {mode === "complete-google" ? (
           <div className="px-6 pb-6 text-center">
-            <button type="button" onClick={() => { setMode("login"); setForm({ email: "", password: "", name: "", surname: "", birthDate: "", photoUrl: "" }); }}
+            <button type="button" onClick={() => { setMode("login"); setForm({ email: "", password: "", name: "", surname: "", tcKimlik: "", birthDate: "", photoUrl: "", referralCode: "" }); }}
               className="text-xs font-bold text-white/30 hover:text-[#FF6B00] transition-colors cursor-pointer">
               ← Geri Dön / İptal Et
             </button>
@@ -291,6 +328,7 @@ export default function AuthPage() {
           </div>
         )}
       </motion.div>
+      </div>
     </div>
   );
 }

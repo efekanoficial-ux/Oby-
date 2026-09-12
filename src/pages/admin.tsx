@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, ObyoRequest, PaymentSettings, CustomPaymentMethod } from "@/context/AuthContext";
+import { useAuth, ObyoUser, ObyoRequest, PaymentSettings, CustomPaymentMethod } from "@/context/AuthContext";
 import {
   Users, ArrowDownCircle, ArrowUpCircle, Check, X, LogOut,
   Shield, Clock, ChevronDown, ChevronUp, Filter, TrendingUp,
   PlusCircle, Settings, Landmark, Zap, Bitcoin, Save, AlertCircle,
   RefreshCw, CheckCircle2, Plus, Trash2, Edit3, Wallet, CreditCard,
-  QrCode, CircleDollarSign, Eye, EyeOff
+  QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -105,6 +105,7 @@ export default function Admin() {
     paymentSettings,
     updatePaymentSettings,
     adminUpdateKYC,
+    deleteUserPermanently,
   } = useAuth();
 
   useEffect(() => {
@@ -243,6 +244,31 @@ export default function Admin() {
   const [addAmounts, setAddAmounts] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState<string | null>(null);
 
+  /* User search and delete state */
+  const [userSearch, setUserSearch] = useState("");
+  const [userToDelete, setUserToDelete] = useState<ObyoUser | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [userDeleteSuccess, setUserDeleteSuccess] = useState<string | null>(null);
+
+  const handleDeleteUserPermanently = async () => {
+    if (!userToDelete) return;
+    setIsDeletingUser(true);
+    try {
+      const res = await deleteUserPermanently(userToDelete.id, userToDelete.email);
+      if (res.success) {
+        setUserDeleteSuccess(`${userToDelete.name} ${userToDelete.surname} (${userToDelete.email}) ve tüm kullanıcı verileri kalıcı olarak silindi.`);
+        setUserToDelete(null);
+        setTimeout(() => setUserDeleteSuccess(null), 5000);
+      } else {
+        alert("Silme işlemi başarısız: " + (res.error || "Bilinmeyen hata"));
+      }
+    } catch (err: any) {
+      alert("Hata oluştu: " + (err?.message || err));
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
   const handleLogout = async () => { await logout(); navigate("/auth"); };
 
   const filteredReqs = requests.filter(r => {
@@ -257,6 +283,15 @@ export default function Admin() {
   const totalDeposited  = requests
     .filter(r => r.type === "deposit" && r.status === "accepted")
     .reduce((s, r) => s + r.amount, 0);
+
+  const displayedUsers = users.filter(u => {
+    if (!userSearch.trim()) return true;
+    const q = userSearch.toLowerCase().trim();
+    const fullName = `${u.name || ""} ${u.surname || ""}`.toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    const id = (u.id || "").toLowerCase();
+    return fullName.includes(q) || email.includes(q) || id.includes(q);
+  });
 
   const handleAddBalance = async (userId: string, userName: string, userEmail: string) => {
     const raw = parseFloat(addAmounts[userId] ?? "");
@@ -560,6 +595,40 @@ export default function Admin() {
         {/* ── USERS tab ─────────────────────────────────────────────────── */}
         {tab === "users" && (
           <div className="p-4 flex flex-col gap-3">
+            {/* Delete Success Notification */}
+            {userDeleteSuccess && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2.5 p-3.5 rounded-2xl border border-[#0ecb81]/30 bg-[#0ecb81]/10 text-xs font-bold text-[#0ecb81]"
+              >
+                <CheckCircle2 size={16} className="shrink-0" />
+                <span>{userDeleteSuccess}</span>
+              </motion.div>
+            )}
+
+            {/* Search Bar */}
+            {users.length > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-[#0d0d0d] border border-[#1e1e1e] px-3.5 py-2.5 text-sm text-white focus-within:border-[#FF6B00]/40 transition-colors">
+                <Search size={16} className="text-white/30 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Kullanıcı ara (İsim, e-posta, ID)..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-white/25 outline-none"
+                />
+                {userSearch && (
+                  <button
+                    onClick={() => setUserSearch("")}
+                    className="text-white/40 hover:text-white text-xs px-1 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+
             {users.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Users size={28} className="text-white/10 mb-3" />
@@ -567,7 +636,20 @@ export default function Admin() {
               </div>
             )}
 
-            {users.map(u => {
+            {users.length > 0 && displayedUsers.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center bg-[#0d0d0d] rounded-2xl border border-[#1a1a1a] p-6">
+                <Users size={24} className="text-white/20 mb-2" />
+                <p className="text-sm text-white/40 font-bold">"{userSearch}" ile eşleşen kullanıcı bulunamadı</p>
+                <button
+                  onClick={() => setUserSearch("")}
+                  className="mt-3 text-xs text-[#FF6B00] hover:underline font-bold cursor-pointer"
+                >
+                  Aramayı Temizle
+                </button>
+              </div>
+            )}
+
+            {displayedUsers.map(u => {
               const isOpen  = expanded === u.id;
               const pending = requests.filter(r => (r.userId === u.id || r.userEmail?.toLowerCase() === u.email?.toLowerCase()) && r.status === "pending").length;
               const isAddingThis = adding === u.id;
@@ -576,8 +658,9 @@ export default function Admin() {
                 <motion.div key={u.id} layout
                   className="rounded-2xl overflow-hidden"
                   style={{ background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
-                  <button onClick={() => setExpanded(isOpen ? null : u.id)}
-                    className="flex items-center gap-3 w-full p-4 text-left cursor-pointer">
+                  <div
+                    onClick={() => setExpanded(isOpen ? null : u.id)}
+                    className="flex items-center gap-3 w-full p-4 text-left cursor-pointer hover:bg-white/[0.01] transition-colors">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-black overflow-hidden"
                       style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}>
                       {u.photoURL ? (
@@ -586,22 +669,35 @@ export default function Admin() {
                         `${u.name.charAt(0)}${u.surname.charAt(0)}`
                       )}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-white">{u.name} {u.surname}</span>
+                        <span className="text-sm font-black text-white truncate">{u.name} {u.surname}</span>
                         {pending > 0 && (
-                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black text-black"
+                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black text-black shrink-0"
                             style={{ background: "#FFB800" }}>{pending}</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-white/30">{u.email}</span>
+                      <span className="text-[10px] text-white/30 truncate block">{u.email}</span>
                     </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-xs font-black text-[#0ecb81]">${(u.realBalance ?? 0).toFixed(2)}</span>
-                      <span className="text-[10px] text-white/25">Gerçek</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-xs font-black text-[#0ecb81]">${(u.realBalance ?? 0).toFixed(2)}</span>
+                        <span className="text-[10px] text-white/25">Gerçek</span>
+                      </div>
+                      <button
+                        type="button"
+                        title="Kullanıcıyı Sil"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUserToDelete(u);
+                        }}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-white/30 hover:text-[#f6465d] hover:bg-[#f6465d]/10 transition-colors shrink-0 cursor-pointer"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                      {isOpen ? <ChevronUp size={13} className="text-white/25 shrink-0" /> : <ChevronDown size={13} className="text-white/25 shrink-0" />}
                     </div>
-                    {isOpen ? <ChevronUp size={13} className="text-white/25 shrink-0" /> : <ChevronDown size={13} className="text-white/25 shrink-0" />}
-                  </button>
+                  </div>
 
                   <AnimatePresence>
                     {isOpen && (
@@ -614,6 +710,8 @@ export default function Admin() {
                             {[
                               { label: "Kullanıcı ID",   value: u.id,                                       full: true },
                               { label: "E-posta",        value: u.email,                                    full: true },
+                              ...(u.tcKimlik || u.idNumber ? [{ label: "T.C. Kimlik No", value: u.tcKimlik || u.idNumber, full: false }] : []),
+                              ...(u.referralCode ? [{ label: "Referans Kodu", value: u.referralCode, full: false }] : []),
                               { label: "Doğum Tarihi",   value: u.birthDate                                            },
                               { label: "Kayıt Tarihi",   value: format(u.createdAt, "dd.MM.yyyy")                      },
                               { label: "Demo Bakiye",    value: `$${(u.demoBalance ?? 0).toFixed(2)}`                  },
@@ -684,7 +782,7 @@ export default function Admin() {
                                 )}
 
                                 {/* Rejection Reason if any */}
-                                {u.kycStatus === "rejected" && u.kycDetails.rejectionReason && (
+                                {u.kycStatus === "rejected" && u.kycDetails?.rejectionReason && (
                                   <div className="rounded-lg p-2 mt-1 text-[11px] text-[#f6465d] bg-[#f6465d]/10 border border-[#f6465d]/20">
                                     <span className="font-black">Red Nedeni:</span> {u.kycDetails.rejectionReason}
                                   </div>
@@ -745,6 +843,29 @@ export default function Admin() {
                                 }
                               </motion.button>
                             </div>
+                          </div>
+
+                          {/* Tehlikeli Bölge - Kullanıcıyı Sil */}
+                          <div className="rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[#f6465d]/20 bg-[#f6465d]/5">
+                            <div className="flex items-start gap-2.5">
+                              <div className="h-8 w-8 rounded-lg bg-[#f6465d]/15 border border-[#f6465d]/25 flex items-center justify-center shrink-0 mt-0.5">
+                                <Trash2 size={15} className="text-[#f6465d]" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-[#f6465d]">Kullanıcıyı ve Tüm Bilgilerini Sil</p>
+                                <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">
+                                  Kullanıcı profili, demo ve gerçek bakiyeler, işlem geçmişi, açık pozisyonlar, para yatırma/çekme talepleri ve liderlik tablosu kayıtları kalıcı olarak tamamen silinir.
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setUserToDelete(u)}
+                              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-[#f6465d] hover:bg-[#d63048] transition-all shrink-0 cursor-pointer shadow-lg shadow-[#f6465d]/20 active:scale-97"
+                            >
+                              <Trash2 size={13} />
+                              <span>Kullanıcıyı Sil</span>
+                            </button>
                           </div>
                         </div>
                       </motion.div>
@@ -1512,6 +1633,112 @@ export default function Admin() {
                   </div>
 
                 </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── User Delete Confirmation Modal ──────────────────────────────── */}
+        <AnimatePresence>
+          {userToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="w-full max-w-md rounded-2xl bg-[#0d0d0d] border border-[#222] shadow-2xl overflow-hidden"
+              >
+                {/* Modal Header */}
+                <div className="p-4 sm:p-5 border-b border-white/10 flex items-start gap-3.5 bg-gradient-to-b from-[#f6465d]/10 to-transparent">
+                  <div className="h-10 w-10 rounded-xl bg-[#f6465d]/20 border border-[#f6465d]/30 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="text-[#f6465d]" size={22} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-black text-white">Kullanıcıyı Sil</h3>
+                    <p className="text-xs text-white/50 mt-0.5">
+                      Bu kullanıcının hesabı ve tüm verileri sistemden kalıcı olarak silinecektir.
+                    </p>
+                  </div>
+                  <button
+                    disabled={isDeletingUser}
+                    onClick={() => setUserToDelete(null)}
+                    className="text-white/40 hover:text-white transition-colors cursor-pointer p-1"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-4 sm:p-5 flex flex-col gap-4">
+                  {/* User Profile Overview */}
+                  <div className="rounded-xl p-3.5 bg-[#141414] border border-[#222] flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black text-black overflow-hidden"
+                      style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}>
+                      {userToDelete.photoURL ? (
+                        <img src={userToDelete.photoURL} alt={userToDelete.name} className="h-full w-full object-cover" />
+                      ) : (
+                        `${userToDelete.name.charAt(0)}${userToDelete.surname.charAt(0)}`
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-black text-white truncate">
+                        {userToDelete.name} {userToDelete.surname}
+                      </div>
+                      <div className="text-xs text-white/40 truncate">{userToDelete.email}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-black text-[#0ecb81]">${(userToDelete.realBalance ?? 0).toFixed(2)}</div>
+                      <div className="text-[10px] text-white/30">Gerçek Bakiye</div>
+                    </div>
+                  </div>
+
+                  {/* Warning Box */}
+                  <div className="rounded-xl p-3.5 bg-[#f6465d]/10 border border-[#f6465d]/25 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#f6465d]">
+                      <AlertCircle size={15} className="shrink-0" />
+                      <span>BU İŞLEM GERİ ALINAMAZ</span>
+                    </div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      Onayladığınız takdirde bu kullanıcıya ait aşağıdaki tüm bilgiler Firestore veritabanından kalıcı olarak silinecektir:
+                    </p>
+                    <ul className="text-xs text-white/60 space-y-1 pl-4 list-disc marker:text-[#f6465d]">
+                      <li>Kullanıcı profili ve giriş yetkisi</li>
+                      <li>Gerçek (${(userToDelete.realBalance ?? 0).toFixed(2)}) ve Demo (${(userToDelete.demoBalance ?? 0).toFixed(2)}) bakiyeleri</li>
+                      <li>Tüm para yatırma ve para çekme talepleri</li>
+                      <li>Açık ve geçmiş tüm ikili opsiyon işlemleri</li>
+                      <li>Kimlik doğrulama (KYC) ve liderlik tablosu kayıtları</li>
+                    </ul>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      disabled={isDeletingUser}
+                      onClick={() => setUserToDelete(null)}
+                      className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Vazgeç
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeletingUser}
+                      onClick={handleDeleteUserPermanently}
+                      className="flex-1 py-3 rounded-xl text-xs font-black text-white bg-[#f6465d] hover:bg-[#d63048] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-[#f6465d]/20 disabled:opacity-50"
+                    >
+                      {isDeletingUser ? (
+                        <>
+                          <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                          <span>Siliniyor...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={15} />
+                          <span>Kalıcı Olarak Sil</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             </div>
           )}

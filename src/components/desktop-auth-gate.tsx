@@ -33,6 +33,7 @@ export function DesktopAuthGate({ onEnterDemo }: DesktopAuthGateProps) {
     name: "",
     surname: "",
     birthDate: "",
+    referralCode: "",
   });
 
   const setField = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,6 +258,22 @@ export function DesktopAuthGate({ onEnterDemo }: DesktopAuthGateProps) {
                         <span className="font-bold text-emerald-400">₺</span>
                         <span>TL (Türk Lirası)</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Referral Code (optional) */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-white/50 mb-1">
+                      Referans Kodu (opsiyonel)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Referans Kodu (opsiyonel)"
+                        value={form.referralCode}
+                        onChange={setField("referralCode")}
+                        className="w-full rounded-xl bg-[#05060A] border border-white/[0.08] focus:border-white/30 px-3 py-2.5 text-xs text-white placeholder:text-white/20 outline-none transition-colors"
+                      />
                     </div>
                   </div>
                 </motion.div>
