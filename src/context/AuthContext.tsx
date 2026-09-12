@@ -66,10 +66,13 @@ export interface ObyoRequest {
   currency:    string;
   method:      string;
   destination?: string;
+  receiptUrl?: string;
+  receiptName?: string;
   status:      "pending" | "accepted" | "rejected";
   createdAt:   number;
   processedAt?: number;
   rejectionReason?: string;
+  rejectedViewed?: boolean;
 }
 
 export interface CustomPaymentMethod {
@@ -166,6 +169,8 @@ interface AuthContextType {
   submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
   adminUpdateKYC:   (userId: string, status: "verified" | "rejected", reason?: string) => Promise<{ success: boolean; error?: string }>;
   deleteUserPermanently: (userId: string, userEmail?: string) => Promise<{ success: boolean; error?: string }>;
+  isRejectionViewed: (req: ObyoRequest) => boolean;
+  markRejectionsAsViewed: (requestIds: string[]) => Promise<void>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -224,7 +229,7 @@ function cleanForFirestore<T>(obj: T): T {
  * Ensures that base64 image strings do not exceed Firestore's nested entity size limits (1MB).
  * Downscales images to max dimension of 1000px and 72% JPEG quality (~50KB-80KB).
  */
-async function compressDataUrlIfNeeded(dataUrl: string | undefined, maxDim = 1000, quality = 0.72): Promise<string> {
+export async function compressDataUrlIfNeeded(dataUrl: string | undefined, maxDim = 1000, quality = 0.72): Promise<string> {
   if (!dataUrl || typeof dataUrl !== "string") return "";
   // If not a data:image or already compact (< 120,000 characters ~ 90KB), return as is
   if (!dataUrl.startsWith("data:image/") || dataUrl.length < 120000) {
@@ -833,12 +838,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ── Request actions ─────────────────────────────────────────────────── */
   const addRequest = async (data: Omit<ObyoRequest, "id" | "status" | "createdAt">): Promise<string> => {
-    const ref = await addDoc(collection(db, "requests"), {
+    let finalReceipt = data.receiptUrl;
+    if (finalReceipt && finalReceipt.startsWith("data:image/")) {
+      try {
+        finalReceipt = await compressDataUrlIfNeeded(finalReceipt, 1200, 0.75);
+      } catch (err) {
+        console.warn("Receipt compression failed, proceeding with original:", err);
+      }
+    }
+
+    const docPayload: any = {
       ...data,
       amount: Number(data.amount) || 0,
       status:    "pending",
       createdAt: Date.now(),
-    });
+    };
+    if (finalReceipt) {
+      docPayload.receiptUrl = finalReceipt;
+    }
+
+    const ref = await addDoc(collection(db, "requests"), docPayload);
     return ref.id;
   };
 
@@ -861,8 +880,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status: accept ? "accepted" : "rejected",
         processedAt: Date.now(),
       };
-      if (!accept && reason?.trim()) {
-        updateData.rejectionReason = reason.trim();
+      if (!accept) {
+        updateData.rejectedViewed = false;
+        if (reason?.trim()) {
+          updateData.rejectionReason = reason.trim();
+        }
       }
 
       await setDoc(doc(db, "requests", id), updateData, { merge: true });
@@ -1258,6 +1280,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isRejectionViewed = (req: ObyoRequest): boolean => {
+    if (req.status !== "rejected") return true;
+    if (req.rejectedViewed === true) return true;
+    try {
+      const raw = localStorage.getItem("obyo_viewed_rejected_ids");
+      if (raw) {
+        const ids: string[] = JSON.parse(raw);
+        if (ids.includes(req.id)) return true;
+      }
+    } catch {}
+    return false;
+  };
+
+  const markRejectionsAsViewed = async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    try {
+      const raw = localStorage.getItem("obyo_viewed_rejected_ids");
+      const existing: string[] = raw ? JSON.parse(raw) : [];
+      const updated = Array.from(new Set([...existing, ...ids]));
+      localStorage.setItem("obyo_viewed_rejected_ids", JSON.stringify(updated));
+    } catch {}
+
+    // Instantly update local requests state so UI components re-render immediately
+    setRequests(prev =>
+      prev.map(r => (ids.includes(r.id) ? { ...r, rejectedViewed: true } : r))
+    );
+
+    // Persist to Firestore
+    for (const id of ids) {
+      try {
+        await setDoc(doc(db, "requests", id), { rejectedViewed: true }, { merge: true });
+      } catch (e) {
+        console.warn("[markRejectionsAsViewed Firestore warning]:", e);
+      }
+    }
+  };
+
   const refreshUser  = () => {};
   const refreshAdmin = () => {};
 
@@ -1271,6 +1330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       addRequest, processRequest, addBalanceDirect,
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
       deleteUserPermanently,
+      isRejectionViewed, markRejectionsAsViewed,
       refreshUser, refreshAdmin,
     }}>
       {children}

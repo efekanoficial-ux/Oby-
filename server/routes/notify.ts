@@ -99,12 +99,13 @@ router.post("/notify/telegram", async (req, res) => {
     return;
   }
 
-  const { type, userName, amount, currency, method } = req.body as {
-    type:     "deposit" | "withdraw";
-    userName: string;
-    amount:   number;
-    currency: string;
-    method:   string;
+  const { type, userName, amount, currency, method, hasReceipt } = req.body as {
+    type:        "deposit" | "withdraw";
+    userName:    string;
+    amount:      number;
+    currency:    string;
+    method:      string;
+    hasReceipt?: boolean;
   };
 
   if (!type || !userName || !amount || !currency || !method) {
@@ -121,7 +122,8 @@ router.post("/notify/telegram", async (req, res) => {
     `👤 *Kullanıcı:* ${escMd(userName)}\n` +
     `💰 *Miktar:* ${currSymbol}${amount} ${currency}\n` +
     `📊 *İşlem Tipi:* ${typeLabel}\n` +
-    `🏦 *Yöntem:* ${escMd(method)}\n\n` +
+    `🏦 *Yöntem:* ${escMd(method)}\n` +
+    (hasReceipt ? `📎 *Dekont:* Yüklendi ✅ \\(Admin panelinde inceleyin\\)\n\n` : `\n`) +
     `🌐 _Lütfen Admin panelinden kontrol edin\\._`;
 
   try {

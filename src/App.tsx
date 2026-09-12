@@ -23,6 +23,7 @@ import Privacy from "@/pages/privacy";
 import AuthPage from "@/pages/auth";
 import Admin   from "@/pages/admin";
 import NotFound from "@/pages/not-found";
+import { RejectionAlert } from "@/components/RejectionAlert";
 
 const queryClient = new QueryClient();
 
@@ -153,6 +154,7 @@ function AppContent() {
       <AccountModeProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <RejectionAlert />
             <Router />
           </WouterRouter>
           <Toaster />

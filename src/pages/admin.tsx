@@ -7,7 +7,8 @@ import {
   Shield, Clock, ChevronDown, ChevronUp, Filter, TrendingUp,
   PlusCircle, Settings, Landmark, Zap, Bitcoin, Save, AlertCircle,
   RefreshCw, CheckCircle2, Plus, Trash2, Edit3, Wallet, CreditCard,
-  QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle
+  QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle,
+  FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -120,6 +121,19 @@ export default function Admin() {
   /* Request Rejection Modal state */
   const [rejectModalReq, setRejectModalReq] = useState<ObyoRequest | null>(null);
   const [rejectReason, setRejectReason] = useState<string>("");
+
+  /* Receipt Lightbox Viewer state */
+  const [viewingReceipt, setViewingReceipt] = useState<{
+    url: string;
+    name: string;
+    reqId?: string;
+    userName?: string;
+    amount?: number;
+    currency?: string;
+    status?: ObyoRequest["status"];
+  } | null>(null);
+  const [receiptZoom, setReceiptZoom] = useState(1);
+  const [receiptRotation, setReceiptRotation] = useState(0);
 
   /* Payment Settings Form state */
   const [formSettings, setFormSettings] = useState<PaymentSettings>(paymentSettings);
@@ -519,6 +533,11 @@ export default function Admin() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-black text-white">{req.userName}</span>
                         <StatusBadge status={req.status} />
+                        {req.receiptUrl && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#0ecb81]/15 text-[#0ecb81] border border-[#0ecb81]/30 flex items-center gap-1">
+                            <FileText size={10} /> Dekont Var
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-black" style={{ color }}>
@@ -561,6 +580,103 @@ export default function Admin() {
                               <span className="text-xs font-mono text-white/60 truncate ml-4 max-w-[200px]">{row.value}</span>
                             </div>
                           ))}
+
+                          {/* ── Dekont İnceleme Bölümü ── */}
+                          {req.receiptUrl ? (
+                            <div className="p-3.5 rounded-2xl border border-[#0ecb81]/30 bg-[#0ecb81]/[0.05] flex flex-col gap-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <FileText size={15} className="text-[#0ecb81]" />
+                                  <span className="text-xs font-black text-white">Transfer / Havale Dekontu</span>
+                                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#0ecb81]/20 text-[#0ecb81] border border-[#0ecb81]/30">
+                                    Kullanıcı Yükledi ✓
+                                  </span>
+                                </div>
+                                {req.receiptName && (
+                                  <span className="text-[10px] text-white/40 font-mono truncate max-w-[180px]">
+                                    {req.receiptName}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                {/* Tıklanabilir Küçük Önizleme */}
+                                <div
+                                  onClick={() => {
+                                    setViewingReceipt({
+                                      url: req.receiptUrl!,
+                                      name: req.receiptName || `${req.userName} - Dekont`,
+                                      reqId: req.id,
+                                      userName: req.userName,
+                                      amount: req.amount,
+                                      currency: req.currency,
+                                      status: req.status,
+                                    });
+                                    setReceiptZoom(1);
+                                    setReceiptRotation(0);
+                                  }}
+                                  className="relative group cursor-pointer overflow-hidden rounded-xl border border-white/15 bg-black/60 w-24 h-20 shrink-0 flex items-center justify-center shadow-md"
+                                  title="Büyük boyutta incelemek için tıklayın"
+                                >
+                                  <img
+                                    src={req.receiptUrl}
+                                    alt="Dekont Önizleme"
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                  />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5">
+                                    <Eye size={16} className="text-white" />
+                                    <span className="text-[9px] font-bold text-white">Büyüt</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                                  <p className="text-xs text-white/70 font-medium leading-relaxed">
+                                    Kullanıcı havale transfer dekontunu sisteme yükledi. Tutar ve açıklamayı kontrol edebilirsiniz.
+                                  </p>
+
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setViewingReceipt({
+                                          url: req.receiptUrl!,
+                                          name: req.receiptName || `${req.userName} - Dekont`,
+                                          reqId: req.id,
+                                          userName: req.userName,
+                                          amount: req.amount,
+                                          currency: req.currency,
+                                          status: req.status,
+                                        });
+                                        setReceiptZoom(1);
+                                        setReceiptRotation(0);
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0ecb81]/20 hover:bg-[#0ecb81]/30 text-[#0ecb81] text-xs font-black transition-all cursor-pointer"
+                                    >
+                                      <Eye size={13} />
+                                      <span>Dekontu İncele (Tam Ekran)</span>
+                                    </button>
+                                    <a
+                                      href={req.receiptUrl}
+                                      download={req.receiptName || `dekont_${req.userName.replace(/\s+/g, "_")}.jpg`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                      <Download size={13} />
+                                      <span>İndir</span>
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            (req.type === "deposit" && (req.method?.toLowerCase().includes("iban") || req.method?.toLowerCase().includes("havale"))) && (
+                              <div className="p-3 rounded-xl border border-[#FFB800]/30 bg-[#FFB800]/[0.05] flex items-center gap-2.5 text-xs text-[#FFB800]">
+                                <AlertCircle size={15} className="shrink-0" />
+                                <span>Bu havale talebinde kullanıcı dekont yüklememiş.</span>
+                              </div>
+                            )
+                          )}
 
                           {/* Reddedilme Sebebi (Eğer reddedildiyse) */}
                           {req.status === "rejected" && (
@@ -1830,6 +1946,65 @@ export default function Admin() {
                     </div>
                   </div>
 
+                  {/* Dekont Varsa Hızlı Önizleme */}
+                  {rejectModalReq.receiptUrl && (
+                    <div className="p-3 rounded-2xl bg-[#0ecb81]/[0.06] border border-[#0ecb81]/25 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          onClick={() => {
+                            setViewingReceipt({
+                              url: rejectModalReq.receiptUrl!,
+                              name: rejectModalReq.receiptName || `${rejectModalReq.userName} - Dekont`,
+                              reqId: rejectModalReq.id,
+                              userName: rejectModalReq.userName,
+                              amount: rejectModalReq.amount,
+                              currency: rejectModalReq.currency,
+                              status: rejectModalReq.status,
+                            });
+                            setReceiptZoom(1);
+                            setReceiptRotation(0);
+                          }}
+                          className="h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-black/60 shrink-0 cursor-pointer group relative"
+                        >
+                          <img
+                            src={rejectModalReq.receiptUrl}
+                            alt="Dekont"
+                            className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                            <Eye size={13} className="text-white" />
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-[#0ecb81] uppercase block">Yüklenen Havale Dekontu</span>
+                          <span className="text-xs text-white/80 font-medium truncate block max-w-[200px]">
+                            {rejectModalReq.receiptName || "Dekont Belgesi"}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewingReceipt({
+                            url: rejectModalReq.receiptUrl!,
+                            name: rejectModalReq.receiptName || `${rejectModalReq.userName} - Dekont`,
+                            reqId: rejectModalReq.id,
+                            userName: rejectModalReq.userName,
+                            amount: rejectModalReq.amount,
+                            currency: rejectModalReq.currency,
+                            status: rejectModalReq.status,
+                          });
+                          setReceiptZoom(1);
+                          setReceiptRotation(0);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-all cursor-pointer shrink-0"
+                      >
+                        <Eye size={13} className="text-[#0ecb81]" />
+                        <span>Dekontu Aç</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Quick template presets */}
                   <div>
                     <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider block mb-2">
@@ -1837,12 +2012,22 @@ export default function Admin() {
                     </label>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        "Lütfen para yatırımı oluşturup çekim talebi verin.",
-                        "Hesap ve IBAN bilgileri uyuşmuyor, lütfen kontrol ediniz.",
-                        "Kimlik doğrulaması (KYC) ve güvenlik teyidi gerekmektedir.",
-                        "Minimum işlem hacmi ve çevrim şartı tamamlanmalıdır.",
-                        "Güvenlik ve risk birimi incelemesi sonucu reddedildi.",
-                        "Yetersiz serbest bakiye veya hatalı hesap numarası.",
+                        ...(rejectModalReq.type === "withdraw"
+                          ? [
+                              "Lütfen para yatırımı oluşturup çekim talebi verin.",
+                              "Hesap ve IBAN bilgileri uyuşmuyor, lütfen kontrol ediniz.",
+                              "Kimlik doğrulaması (KYC) ve güvenlik teyidi gerekmektedir.",
+                              "Minimum işlem hacmi ve çevrim şartı tamamlanmalıdır.",
+                              "Güvenlik ve risk birimi incelemesi sonucu reddedildi.",
+                              "Yetersiz serbest bakiye veya hatalı hesap numarası.",
+                            ]
+                          : [
+                              "Yüklenen dekont geçersiz, okunamıyor veya sahte transfer bildirimi tespit edildi.",
+                              "Dekonttaki tutar veya transfer açıklaması talep bilgisi ile eşleşmiyor.",
+                              "Banka hesabımıza gelen transfer görünmüyor, lütfen dekontu kontrol ediniz.",
+                              "Açıklama alanına referans kodu yazılmadığından transfer eşleştirilemedi.",
+                              "Hatalı veya eksik bilgi nedeniyle yatırım onaylanamadı.",
+                            ]),
                       ].map((tpl) => (
                         <button
                           key={tpl}
@@ -1916,6 +2101,176 @@ export default function Admin() {
                       )}
                     </button>
                   </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Dekont İnceleme Lightbox Modalı (Admin) ── */}
+        <AnimatePresence>
+          {viewingReceipt && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setViewingReceipt(null)}
+                className="fixed inset-0 bg-black/90 backdrop-blur-md cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="relative w-full max-w-3xl rounded-3xl bg-[#0f0f12] border border-white/15 overflow-hidden shadow-2xl z-10 flex flex-col max-h-[92vh]"
+              >
+                {/* Header */}
+                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-[#0ecb81]/15 border border-[#0ecb81]/30 flex items-center justify-center shrink-0">
+                      <FileText size={18} className="text-[#0ecb81]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-black text-white truncate">
+                          {viewingReceipt.name}
+                        </h4>
+                        {viewingReceipt.amount !== undefined && (
+                          <span className="text-xs font-black text-[#0ecb81]">
+                            ({viewingReceipt.currency === "TL" || viewingReceipt.currency === "TRY" ? "₺" : "$"}{viewingReceipt.amount} {viewingReceipt.currency})
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-white/40 truncate">
+                        {viewingReceipt.userName ? `Kullanıcı: ${viewingReceipt.userName}` : "Transfer dekontu önizleme"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={viewingReceipt.url}
+                      download={viewingReceipt.name || "dekont.jpg"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+                      title="İndir / Yeni Sekmede Aç"
+                    >
+                      <Download size={16} />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setViewingReceipt(null)}
+                      className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Kapat"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Canvas / Image Display */}
+                <div className="relative p-4 overflow-auto flex items-center justify-center bg-black/70 min-h-[340px] max-h-[62vh]">
+                  <img
+                    src={viewingReceipt.url}
+                    alt="Dekont Detayı"
+                    style={{
+                      transform: `scale(${receiptZoom}) rotate(${receiptRotation}deg)`,
+                      transformOrigin: "center center",
+                      transition: "transform 0.15s ease-out",
+                    }}
+                    className="max-h-[58vh] max-w-full object-contain rounded-xl border border-white/10 shadow-2xl select-none pointer-events-auto"
+                  />
+                </div>
+
+                {/* Toolbar & Actions */}
+                <div className="p-3.5 border-t border-white/10 flex items-center justify-between gap-3 bg-white/[0.02] flex-wrap">
+                  {/* Zoom and Rotate Controls */}
+                  <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setReceiptZoom(prev => Math.max(0.5, prev - 0.25))}
+                      className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Uzaklaştır"
+                    >
+                      <ZoomOut size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiptZoom(1);
+                        setReceiptRotation(0);
+                      }}
+                      className="px-2 py-1 text-[11px] font-mono font-bold text-white/80 hover:text-white cursor-pointer"
+                      title="Sıfırla"
+                    >
+                      {Math.round(receiptZoom * 100)}%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptZoom(prev => Math.min(3, prev + 0.25))}
+                      className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Yakınlaştır"
+                    >
+                      <ZoomIn size={15} />
+                    </button>
+                    <div className="h-4 w-px bg-white/15 mx-1" />
+                    <button
+                      type="button"
+                      onClick={() => setReceiptRotation(prev => (prev + 90) % 360)}
+                      className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title="90° Döndür"
+                    >
+                      <RotateCw size={15} />
+                    </button>
+                  </div>
+
+                  {/* Direct Approve / Reject shortcuts if pending request */}
+                  {viewingReceipt.reqId && viewingReceipt.status === "pending" ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={processingReq === viewingReceipt.reqId}
+                        onClick={async () => {
+                          const reqId = viewingReceipt.reqId!;
+                          setProcessingReq(reqId);
+                          await processRequest(reqId, true);
+                          setProcessingReq(null);
+                          setViewingReceipt(null);
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-black text-black flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                        style={{ background: "linear-gradient(135deg,#0ecb81,#05a660)" }}
+                      >
+                        <Check size={14} />
+                        <span>{processingReq === viewingReceipt.reqId ? "İşleniyor..." : "Dekontu Onayla"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={processingReq === viewingReceipt.reqId}
+                        onClick={() => {
+                          const targetReq = requests.find(r => r.id === viewingReceipt.reqId);
+                          setViewingReceipt(null);
+                          if (targetReq) {
+                            setRejectModalReq(targetReq);
+                            setRejectReason(targetReq.type === "withdraw" ? "Lütfen para yatırımı oluşturup çekim talebi verin." : "");
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl text-xs font-black text-white hover:bg-[#f6465d]/25 transition-all cursor-pointer border border-[#f6465d]/30 bg-[#f6465d]/15"
+                      >
+                        <X size={14} className="text-[#f6465d]" />
+                        <span>Reddet...</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setViewingReceipt(null)}
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors cursor-pointer"
+                    >
+                      Kapat
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </div>

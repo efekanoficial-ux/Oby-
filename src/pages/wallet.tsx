@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { useAuth, type PaymentSettings, type CustomPaymentMethod } from "@/context/AuthContext";
+import { useAuth, type PaymentSettings, type CustomPaymentMethod, compressDataUrlIfNeeded } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
@@ -13,7 +13,8 @@ import {
   Landmark, Zap, Bitcoin, ArrowDownCircle, ArrowUpCircle,
   ChevronRight, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
   ShieldCheck, RefreshCw, Wallet as WalletIcon, ExternalLink,
-  CreditCard, QrCode, CircleDollarSign, Coins,
+  CreditCard, QrCode, CircleDollarSign, Coins, FileText,
+  UploadCloud, Eye, Trash2, X, Paperclip,
 } from "lucide-react";
 
 /* ─── Fake QR code (SVG grid) ────────────────────────────────────────────── */
@@ -122,7 +123,7 @@ interface MethodConfig {
 
 export default function WalletPage() {
   const [, navigate] = useLocation();
-  const { currentUser, requests, addRequest, paymentSettings } = useAuth();
+  const { currentUser, requests, addRequest, paymentSettings, isRejectionViewed, markRejectionsAsViewed } = useAuth();
   const { isReal, currency, currencySymbol } = useAccountMode();
   const { t } = useLanguage();
 
@@ -257,6 +258,77 @@ export default function WalletPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Receipt upload states for IBAN / Havale deposit
+  const [receiptFile, setReceiptFile] = useState<{
+    dataUrl: string;
+    name: string;
+    size: number;
+  } | null>(null);
+  const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
+  const [previewReceiptModal, setPreviewReceiptModal] = useState<{ url: string; name?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const handleReceiptChange = async (file: File | null) => {
+    if (!file) return;
+    setReceiptError(null);
+
+    // Check size limit: max 15MB
+    if (file.size > 15 * 1024 * 1024) {
+      setReceiptError("Dosya boyutu 15 MB'dan küçük olmalıdır.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setReceiptError("Lütfen geçerli bir resim formatı yükleyiniz (JPG, PNG, WEBP).");
+      return;
+    }
+
+    setIsProcessingReceipt(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const rawData = ev.target?.result as string;
+        if (!rawData) {
+          setIsProcessingReceipt(false);
+          setReceiptError("Dosya okunamadı, lütfen tekrar deneyiniz.");
+          return;
+        }
+
+        try {
+          const compressed = await compressDataUrlIfNeeded(rawData, 1200, 0.75);
+          setReceiptFile({
+            dataUrl: compressed,
+            name: file.name,
+            size: Math.round(compressed.length * 0.75),
+          });
+        } catch {
+          setReceiptFile({
+            dataUrl: rawData,
+            name: file.name,
+            size: file.size,
+          });
+        }
+        setIsProcessingReceipt(false);
+      };
+      reader.onerror = () => {
+        setIsProcessingReceipt(false);
+        setReceiptError("Dosya yüklenirken bir hata oluştu.");
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsProcessingReceipt(false);
+      setReceiptError(err?.message || "Dekont işlenirken hata oluştu.");
+    }
+  };
+
   // Focus input when moving to amount step
   useEffect(() => {
     if (dStep === "amount" || wStep === "amount") {
@@ -270,11 +342,46 @@ export default function WalletPage() {
     (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase())
   ));
   const pendingRequests = userRequests.filter(r => r.status === "pending");
-  const rejectedWithReason = userRequests.filter(r => r.status === "rejected" && r.rejectionReason);
+  const unviewedRejections = userRequests.filter(r => r.status === "rejected" && !isRejectionViewed(r));
+
+  // Sync tab with URL search if changed externally
+  useEffect(() => {
+    try {
+      const search = window.location.search;
+      const params = new URLSearchParams(search);
+      const tParam = params.get("tab");
+      if (tParam === "withdraw" || tParam === "pending" || tParam === "deposit") {
+        setTab(tParam as WalletTab);
+      }
+    } catch {}
+  }, []);
+
+  // When user enters transactions tab, clear rejected notifications immediately
+  useEffect(() => {
+    if (tab === "pending") {
+      const unviewed = userRequests.filter(r => r.status === "rejected" && !isRejectionViewed(r));
+      if (unviewed.length > 0) {
+        markRejectionsAsViewed(unviewed.map(r => r.id));
+      }
+    }
+  }, [tab, userRequests, isRejectionViewed, markRejectionsAsViewed]);
+
+  const switchTab = (newTab: WalletTab) => {
+    setTab(newTab);
+    if (newTab === "deposit") resetDeposit();
+    if (newTab === "withdraw") resetWithdraw();
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", newTab);
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  };
 
   const selectDepositMethod = (m: MethodConfig) => {
     setMethod(m);
     setAmount("");
+    setReceiptFile(null);
+    setReceiptError(null);
     setDStep("amount");
   };
 
@@ -287,6 +394,7 @@ export default function WalletPage() {
 
   const handleDepositDetails = () => {
     if (!method || !amount || parseFloat(amount) < method.min) return;
+    setReceiptError(null);
     setDStep("details");
     if (method.id !== "iban") {
       setCountdownAt(Date.now());
@@ -299,6 +407,7 @@ export default function WalletPage() {
     amount: number;
     currency: string;
     method: string;
+    hasReceipt?: boolean;
   }) => {
     fetch("/api/notify/telegram", {
       method: "POST",
@@ -309,6 +418,13 @@ export default function WalletPage() {
 
   const handleSentDeposit = async () => {
     if (!currentUser || !method) return;
+
+    // Check if IBAN transfer requires receipt
+    if (method.id === "iban" && !receiptFile?.dataUrl) {
+      setReceiptError("Banka havale/EFT transferi için lütfen transfer dekontunu yükleyiniz.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const userName = `${currentUser.name} ${currentUser.surname}`;
@@ -333,15 +449,25 @@ export default function WalletPage() {
         currency: method.currency,
         method: methodLabelWithCode,
         destination: dest,
+        receiptUrl: receiptFile?.dataUrl,
+        receiptName: receiptFile?.name,
       });
+
       notifyTelegram({
         type: "deposit",
         userName,
         amount: numAmt,
         currency: method.currency,
         method: methodLabelWithCode,
+        hasReceipt: Boolean(receiptFile?.dataUrl),
       });
+
+      setReceiptFile(null);
+      setReceiptError(null);
       setDStep("success");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "İşlem sırasında bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
     }
@@ -465,7 +591,7 @@ export default function WalletPage() {
           {/* Quick Segment Switcher Tabs */}
           <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-black/60 border border-white/5">
             <button
-              onClick={() => { setTab("deposit"); resetDeposit(); }}
+              onClick={() => switchTab("deposit")}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 tab === "deposit"
                   ? "bg-white/15 text-white shadow-md"
@@ -477,7 +603,7 @@ export default function WalletPage() {
             </button>
 
             <button
-              onClick={() => { setTab("withdraw"); resetWithdraw(); }}
+              onClick={() => switchTab("withdraw")}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 tab === "withdraw"
                   ? "bg-white/15 text-white shadow-md"
@@ -489,7 +615,7 @@ export default function WalletPage() {
             </button>
 
             <button
-              onClick={() => setTab("pending")}
+              onClick={() => switchTab("pending")}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all relative cursor-pointer ${
                 tab === "pending"
                   ? "bg-white/15 text-white shadow-md"
@@ -500,7 +626,7 @@ export default function WalletPage() {
               <span>{t.transactionsTab}</span>
               {pendingRequests.length > 0 ? (
                 <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1.5 right-1.5 animate-pulse" />
-              ) : rejectedWithReason.length > 0 ? (
+              ) : unviewedRejections.length > 0 ? (
                 <span className="h-2 w-2 rounded-full bg-[#f6465d] absolute top-1.5 right-1.5" />
               ) : null}
             </button>
@@ -513,11 +639,11 @@ export default function WalletPage() {
         <div className="max-w-xl mx-auto flex flex-col gap-4">
 
           {/* Rejection Notification Banner */}
-          {tab !== "pending" && rejectedWithReason.length > 0 && (
+          {tab !== "pending" && unviewedRejections.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              onClick={() => setTab("pending")}
+              onClick={() => switchTab("pending")}
               className="p-3 rounded-2xl bg-[#f6465d]/10 border border-[#f6465d]/25 flex items-center justify-between cursor-pointer hover:bg-[#f6465d]/15 transition-colors"
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -529,7 +655,7 @@ export default function WalletPage() {
                     İşlem Talebiniz Reddedildi
                   </span>
                   <span className="text-[11px] text-white/60 block truncate">
-                    {rejectedWithReason[0].rejectionReason}
+                    {unviewedRejections[0].rejectionReason || "Detayları görmek için işlemleri inceleyin."}
                   </span>
                 </div>
               </div>
@@ -802,17 +928,168 @@ export default function WalletPage() {
                     </p>
                   </div>
 
+                  {/* ── Havale / EFT Dekont Yükleme (Zorunlu) ── */}
+                  <div className="rounded-2xl p-4 border border-white/10 bg-black/60 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-[#0ecb81]" />
+                        <span className="text-xs font-black text-white">Transfer Dekontu</span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#f6465d]/20 text-[#f6465d] border border-[#f6465d]/40">
+                          Zorunlu
+                        </span>
+                      </div>
+                      {receiptFile && (
+                        <span className="text-[10px] font-bold text-[#0ecb81] flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Yüklendi
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[11px] text-white/50 leading-relaxed">
+                      Transferinizi bankanızdan gerçekleştirdikten sonra oluşan dekontun ekran görüntüsünü veya fotoğrafını yükleyiniz. Transferiniz admin tarafından dekont kontrol edilerek onaylanacaktır.
+                    </p>
+
+                    {/* Gizli Dosya Seçici */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        handleReceiptChange(file);
+                        e.target.value = "";
+                      }}
+                    />
+
+                    {receiptFile ? (
+                      /* Yüklenen Dekont Kartı */
+                      <div className="rounded-xl p-3 border border-[#0ecb81]/30 bg-[#0ecb81]/[0.06] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            onClick={() => setPreviewReceiptModal({ url: receiptFile.dataUrl, name: receiptFile.name })}
+                            className="relative h-12 w-12 rounded-lg overflow-hidden border border-white/15 bg-black/50 shrink-0 cursor-pointer group"
+                            title="Büyütmek için tıklayın"
+                          >
+                            <img
+                              src={receiptFile.dataUrl}
+                              alt="Dekont Önizleme"
+                              className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Eye size={14} className="text-white" />
+                            </div>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate max-w-[190px]">
+                              {receiptFile.name}
+                            </p>
+                            <p className="text-[10px] text-white/40 mt-0.5 flex items-center gap-1.5">
+                              <span>{formatBytes(receiptFile.size)}</span>
+                              <span>·</span>
+                              <span className="text-[#0ecb81] font-bold">Dekont hazır</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewReceiptModal({ url: receiptFile.dataUrl, name: receiptFile.name })}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+                            title="Büyük Önizleme"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReceiptFile(null);
+                              setReceiptError(null);
+                            }}
+                            className="p-2 rounded-lg bg-[#f6465d]/10 hover:bg-[#f6465d]/20 text-[#f6465d] transition-colors cursor-pointer"
+                            title="Dekontu Kaldır / Değiştir"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Sürükle / Seç Alanı */
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDraggingReceipt(true);
+                        }}
+                        onDragLeave={() => setIsDraggingReceipt(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsDraggingReceipt(false);
+                          const file = e.dataTransfer.files?.[0] || null;
+                          handleReceiptChange(file);
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
+                          isDraggingReceipt
+                            ? "border-[#0ecb81] bg-[#0ecb81]/10"
+                            : "border-white/15 hover:border-[#0ecb81]/50 hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        {isProcessingReceipt ? (
+                          <div className="flex items-center gap-2 text-xs text-white/70 py-2">
+                            <RefreshCw size={16} className="animate-spin text-[#0ecb81]" />
+                            <span>Dekont işleniyor ve sıkıştırılıyor...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-white/40">
+                              <UploadCloud size={20} className="text-[#0ecb81]" />
+                            </div>
+                            <div className="text-center">
+                              <span className="text-xs font-bold text-white block">
+                                Dekont Görselini Seçin veya Sürükleyin
+                              </span>
+                              <span className="text-[10px] text-white/40 mt-0.5 block">
+                                JPG, PNG veya WEBP (Ekran görüntüsü / mobil fotoğraf)
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {receiptError && (
+                      <div className="p-2.5 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/30 flex items-center gap-2 text-xs text-[#f6465d]">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>{receiptError}</span>
+                      </div>
+                    )}
+                  </div>
+
                   <motion.button
-                    whileTap={{ scale: 0.98 }}
+                    whileTap={{ scale: receiptFile ? 0.98 : 1 }}
                     onClick={handleSentDeposit}
-                    disabled={isSubmitting}
-                    className="w-full rounded-2xl py-4 text-sm font-black text-black cursor-pointer shadow-lg"
-                    style={{
-                      background: "linear-gradient(135deg,#0ecb81,#05a660)",
-                      boxShadow: "0 8px 24px rgba(14,203,129,0.3)",
-                    }}
+                    disabled={isSubmitting || !receiptFile}
+                    className={`w-full rounded-2xl py-4 text-sm font-black transition-all ${
+                      receiptFile
+                        ? "text-black cursor-pointer shadow-lg"
+                        : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
+                    }`}
+                    style={
+                      receiptFile
+                        ? {
+                            background: "linear-gradient(135deg,#0ecb81,#05a660)",
+                            boxShadow: "0 8px 24px rgba(14,203,129,0.3)",
+                          }
+                        : {}
+                    }
                   >
-                    {isSubmitting ? "İşleniyor..." : "✓ Transferi Gönderdim"}
+                    {isSubmitting
+                      ? "İşleniyor ve Dekont İletiliyor..."
+                      : receiptFile
+                      ? "✓ Transferi ve Dekontu Gönder"
+                      : "⚠️ Lütfen Dekont Yükleyiniz (Zorunlu)"}
                   </motion.button>
                 </motion.div>
               )}
@@ -1360,6 +1637,29 @@ export default function WalletPage() {
                         </div>
                       )}
 
+                      {/* Yüklenen Dekont Önizleme Butonu */}
+                      {req.receiptUrl && (
+                        <div className="mb-2.5 p-2.5 rounded-xl bg-[#0ecb81]/[0.05] border border-[#0ecb81]/25 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText size={15} className="text-[#0ecb81] shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-[9px] font-bold text-white/35 uppercase block">Havale / EFT Dekontu</span>
+                              <span className="text-xs text-white/80 font-medium truncate block max-w-[170px]">
+                                {req.receiptName || "Dekont Belgesi"}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Havale Dekontu" })}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0ecb81]/15 hover:bg-[#0ecb81]/25 text-[#0ecb81] text-xs font-bold transition-all cursor-pointer shrink-0"
+                          >
+                            <Eye size={13} />
+                            <span>Dekontu İncele</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* Reddedilme Sebebi ve Açıklama Kutusu */}
                       {req.status === "rejected" && req.rejectionReason && (
                         <div className="mb-2.5 p-3 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
@@ -1414,6 +1714,76 @@ export default function WalletPage() {
 
         </div>
       </div>
+
+      {/* ── Dekont Önizleme Modal (Kullanıcı) ── */}
+      <AnimatePresence>
+        {previewReceiptModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPreviewReceiptModal(null)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative max-w-lg w-full rounded-3xl bg-[#111114] border border-white/15 overflow-hidden shadow-2xl z-10 flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-[#0ecb81]/15 border border-[#0ecb81]/30 flex items-center justify-center">
+                    <FileText size={16} className="text-[#0ecb81]" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white truncate max-w-[240px]">
+                      {previewReceiptModal.name || "Havale Dekontu"}
+                    </h4>
+                    <p className="text-[10px] text-white/40">Yüklenen transfer dekontu</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewReceiptModal(null)}
+                  className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-auto flex items-center justify-center bg-black/60 min-h-[260px]">
+                <img
+                  src={previewReceiptModal.url}
+                  alt="Dekont Detay"
+                  className="max-h-[65vh] max-w-full object-contain rounded-xl border border-white/10 shadow-2xl"
+                />
+              </div>
+
+              <div className="p-3.5 border-t border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => setPreviewReceiptModal(null)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors cursor-pointer"
+                >
+                  Kapat
+                </button>
+                <a
+                  href={previewReceiptModal.url}
+                  download={previewReceiptModal.name || "dekont.jpg"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-[#0ecb81] hover:bg-[#0ecb81]/90 text-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <ExternalLink size={13} />
+                  <span>İndir / Yeni Sekmede Aç</span>
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

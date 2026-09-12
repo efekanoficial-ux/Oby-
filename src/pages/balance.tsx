@@ -54,7 +54,7 @@ function MethodRow({
 /* ── main page ─────────────────────────────────────────────────────────── */
 export default function Balance() {
   const [, navigate] = useLocation();
-  const { currentUser, requests } = useAuth();
+  const { currentUser, requests, isRejectionViewed } = useAuth();
   const { balance: demoBalance }  = useDemoAccount();
   const { isReal }                = useAccountMode();
   const { t }                     = useLanguage();
@@ -80,7 +80,7 @@ export default function Balance() {
     (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase())
   )) : [];
   const pendingReqs = allReqs.filter(r => r.status === "pending");
-  const rejectedReqsWithReason = allReqs.filter(r => r.status === "rejected" && r.rejectionReason);
+  const unviewedRejectedReqs = allReqs.filter(r => r.status === "rejected" && !isRejectionViewed(r));
   const approvedDep = allReqs.filter(r => r.type === "deposit"  && r.status === "accepted");
   const approvedWit = allReqs.filter(r => r.type === "withdraw" && r.status === "accepted");
   const pendingDep  = allReqs.filter(r => r.type === "deposit"  && r.status === "pending");
@@ -315,14 +315,14 @@ export default function Balance() {
 
         {/* ── Rejected Transactions Banner with Reasons ───────────────── */}
         <AnimatePresence>
-          {rejectedReqsWithReason.length > 0 && (
+          {unviewedRejectedReqs.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mx-4 mb-5 overflow-hidden rounded-2xl cursor-pointer"
+              className="mx-4 mb-5 overflow-hidden rounded-2xl cursor-pointer hover:border-[#f6465d]/40 transition-colors"
               style={{ background: "rgba(246,70,93,0.08)", border: "1px solid rgba(246,70,93,0.25)" }}
-              onClick={() => openWallet("deposit")}
+              onClick={() => navigate("/wallet?tab=pending")}
             >
               <div className="flex items-center justify-between px-4 py-3"
                 style={{ borderBottom: "1px solid rgba(246,70,93,0.12)" }}>
@@ -332,14 +332,14 @@ export default function Balance() {
                     <AlertCircle size={13} className="text-[#f6465d]" />
                   </div>
                   <span className="text-xs font-black text-[#f6465d]">
-                    {rejectedReqsWithReason.length} Talebiniz Reddedildi
+                    {unviewedRejectedReqs.length === 1 ? "İşleminiz Reddedildi" : `${unviewedRejectedReqs.length} Talebiniz Reddedildi`}
                   </span>
                 </div>
-                <span className="text-[10px] text-white/40 font-bold flex items-center gap-1">
-                  Cüzdanda İncele →
+                <span className="text-[10px] text-white/50 font-bold flex items-center gap-1">
+                  İşlemlerde İncele →
                 </span>
               </div>
-              {rejectedReqsWithReason.slice(0, 3).map(r => (
+              {unviewedRejectedReqs.slice(0, 3).map(r => (
                 <div key={r.id} className="px-4 py-2.5 border-b border-white/5 last:border-0">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white">
@@ -347,9 +347,11 @@ export default function Balance() {
                     </span>
                     <span className="text-[10px] font-black text-[#f6465d]">Reddedildi</span>
                   </div>
-                  <p className="text-xs text-white/80 mt-1 pl-2 border-l-2 border-[#f6465d]/50 leading-relaxed font-medium">
-                    {r.rejectionReason}
-                  </p>
+                  {r.rejectionReason && (
+                    <p className="text-xs text-white/80 mt-1 pl-2 border-l-2 border-[#f6465d]/50 leading-relaxed font-medium">
+                      {r.rejectionReason}
+                    </p>
+                  )}
                 </div>
               ))}
             </motion.div>
