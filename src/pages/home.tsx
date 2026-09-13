@@ -309,8 +309,8 @@ function AssetSheet({
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="fixed inset-0 m-auto h-fit w-[calc(100%-2rem)] max-w-[380px] z-[60] rounded-3xl flex flex-col overflow-hidden shadow-2xl backdrop-blur-2xl"
-            style={{ background: "linear-gradient(180deg, rgba(20,20,24,0.95) 0%, rgba(10,10,12,0.98) 100%)", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "75vh", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.8)" }}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-[380px] z-[9999] rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+            style={{ background: "#121215", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "75vh" }}
           >
             
             <div className="flex items-center justify-between px-5 py-3 shrink-0">
