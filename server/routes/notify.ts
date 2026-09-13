@@ -63,8 +63,8 @@ router.post("/notify/send-verification-code", async (req, res) => {
   }
 
   // Also notify Telegram if configured so admin receives verification code notification
-  const telegramToken = process.env["TELEGRAM_BOT_TOKEN"];
-  const telegramChatId = process.env["TELEGRAM_CHAT_ID"];
+  const telegramToken = (req.body.botToken || process.env["TELEGRAM_BOT_TOKEN"])?.trim();
+  const telegramChatId = (req.body.chatId || process.env["TELEGRAM_CHAT_ID"])?.trim();
   if (telegramToken && telegramChatId) {
     try {
       await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
@@ -72,8 +72,8 @@ router.post("/notify/send-verification-code", async (req, res) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: telegramChatId,
-          text: `🔑 *YENİ KAYIT DOĞRULAMA KODU*\n\n📧 *E-posta:* ${email}\n👤 *İsim:* ${name || "Belirtilmedi"}\n🔐 *Doğrulama Kodu:* \`${code}\``,
-          parse_mode: "Markdown",
+          text: `🔑 <b>YENİ KAYIT DOĞRULAMA KODU</b>\n\n📧 <b>E-posta:</b> <code>${escHtml(email)}</code>\n👤 <b>İsim:</b> ${escHtml(name || "Belirtilmedi")}\n🔐 <b>Doğrulama Kodu:</b> <code>${escHtml(code)}</code>`,
+          parse_mode: "HTML",
         }),
       });
     } catch {
@@ -91,72 +91,153 @@ router.post("/notify/send-verification-code", async (req, res) => {
 });
 
 router.post("/notify/telegram", async (req, res) => {
-  const token  = process.env["TELEGRAM_BOT_TOKEN"];
-  const chatId = process.env["TELEGRAM_CHAT_ID"];
+  const token  = (req.body.botToken  || process.env["TELEGRAM_BOT_TOKEN"])?.trim();
+  const chatId = (req.body.chatId || process.env["TELEGRAM_CHAT_ID"])?.trim();
 
   if (!token || !chatId) {
-    res.status(503).json({ ok: false, error: "Telegram not configured" });
+    res.status(400).json({
+      ok: false,
+      error: "Telegram Bot Token veya Chat ID eksik! Lütfen Admin Paneli Ayarlar sekmesinden bot bilgilerinizi giriniz."
+    });
     return;
   }
 
-  const { type, userName, amount, currency, method, hasReceipt } = req.body as {
-    type:        "deposit" | "withdraw";
-    userName:    string;
-    amount:      number;
-    currency:    string;
-    method:      string;
-    hasReceipt?: boolean;
+  const {
+    type,
+    userName,
+    userEmail,
+    amount,
+    currency,
+    method,
+    destination,
+    hasReceipt,
+    referralCode,
+    tcKimlik,
+    idNumber,
+    isAutoVerified,
+    customMessage,
+  } = req.body as {
+    type:            "deposit" | "withdraw" | "register" | "kyc" | "test";
+    userName?:       string;
+    userEmail?:      string;
+    amount?:         number;
+    currency?:       string;
+    method?:         string;
+    destination?:    string;
+    hasReceipt?:     boolean;
+    referralCode?:   string;
+    tcKimlik?:       string;
+    idNumber?:       string;
+    isAutoVerified?: boolean;
+    customMessage?:  string;
   };
 
-  if (!type || !userName || !amount || !currency || !method) {
-    res.status(400).json({ ok: false, error: "Missing fields" });
+  const nowStr = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
+  let htmlMessage = "";
+
+  if (type === "test") {
+    htmlMessage =
+      `🤖 <b>OBYO OPTION - TELEGRAM BİLDİRİM BOTU BAĞLANDI!</b>\n\n` +
+      `✅ <b>Tebrikler!</b> Admin paneliniz ile Telegram botunuz arasındaki bağlantı başarıyla kuruldu.\n\n` +
+      `📌 <b>Otomatik İletilecek Olaylar:</b>\n` +
+      `• 📥 Para Yatırma Talepleri\n` +
+      `• 📤 Para Çekme Talepleri\n` +
+      `• 👤 Yeni Kullanıcı Kayıtları\n` +
+      `• 📑 Kimlik Doğrulama (KYC) Başvuruları\n\n` +
+      `⏰ <b>Test Saati:</b> <code>${nowStr}</code>\n` +
+      `🚀 <i>Sisteminiz anlık bildirimler almaya hazır!</i>`;
+  } else if (type === "deposit") {
+    const currSymbol = (currency === "TL" || currency === "TRY") ? "₺" : "$";
+    htmlMessage =
+      `📥 <b>YENİ PARA YATIRMA TALEBİ!</b> 📥\n\n` +
+      `👤 <b>Kullanıcı:</b> ${escHtml(userName || "Belirtilmedi")}\n` +
+      (userEmail ? `📧 <b>E-posta:</b> <code>${escHtml(userEmail)}</code>\n` : "") +
+      `💰 <b>Miktar:</b> <b>${currSymbol}${amount ?? 0} ${escHtml(currency || "USD")}</b>\n` +
+      `🏦 <b>Yöntem:</b> ${escHtml(method || "Bilinmiyor")}\n` +
+      (destination ? `📍 <b>Hesap/Referans:</b> <code>${escHtml(destination)}</code>\n` : "") +
+      (hasReceipt ? `📎 <b>Dekont:</b> Yüklendi ✅ <i>(Admin panelinden görüntüleyin)</i>\n` : `📎 <b>Dekont:</b> Yüklenmedi\n`) +
+      `⏰ <b>Tarih:</b> <code>${nowStr}</code>\n\n` +
+      `👉 <i>Admin paneli "Talepler" sekmesinden onaylayabilir veya reddedebilirsiniz.</i>`;
+  } else if (type === "withdraw") {
+    const currSymbol = (currency === "TL" || currency === "TRY") ? "₺" : "$";
+    htmlMessage =
+      `📤 <b>YENİ PARA ÇEKME TALEBİ!</b> 📤\n\n` +
+      `👤 <b>Kullanıcı:</b> ${escHtml(userName || "Belirtilmedi")}\n` +
+      (userEmail ? `📧 <b>E-posta:</b> <code>${escHtml(userEmail)}</code>\n` : "") +
+      `💰 <b>Miktar:</b> <b>${currSymbol}${amount ?? 0} ${escHtml(currency || "USD")}</b>\n` +
+      `🏦 <b>Yöntem:</b> ${escHtml(method || "Bilinmiyor")}\n` +
+      (destination ? `🎯 <b>Çekim Hedefi / IBAN:</b> <code>${escHtml(destination)}</code>\n` : "") +
+      `⏰ <b>Tarih:</b> <code>${nowStr}</code>\n\n` +
+      `👉 <i>Lütfen Admin panelinden kontrol ederek işlemi onaylayınız.</i>`;
+  } else if (type === "register") {
+    htmlMessage =
+      `👤 <b>YENİ KULLANICI KAYDI</b> 👤\n\n` +
+      `✨ <b>Yeni bir kullanıcı platforma katıldı!</b>\n\n` +
+      `👤 <b>Ad Soyad:</b> ${escHtml(userName || "İsimsiz")}\n` +
+      `📧 <b>E-posta:</b> <code>${escHtml(userEmail || "Yok")}</code>\n` +
+      (currency ? `💵 <b>Para Birimi:</b> ${escHtml(currency)}\n` : "") +
+      (referralCode ? `🎁 <b>Referans Kodu:</b> <code>${escHtml(referralCode)}</code>\n` : "") +
+      (tcKimlik ? `🆔 <b>Kimlik No:</b> <code>${escHtml(tcKimlik)}</code>\n` : "") +
+      `⏰ <b>Kayıt Zamanı:</b> <code>${nowStr}</code>\n\n` +
+      `📊 <i>Kullanıcı detaylarını Admin Paneli > Kullanıcılar bölümünden görebilirsiniz.</i>`;
+  } else if (type === "kyc") {
+    htmlMessage =
+      `📑 <b>KİMLİK DOĞRULAMA (KYC) BAŞVURUSU</b> 📑\n\n` +
+      `👤 <b>Kullanıcı:</b> ${escHtml(userName || "Belirtilmedi")}\n` +
+      (userEmail ? `📧 <b>E-posta:</b> <code>${escHtml(userEmail)}</code>\n` : "") +
+      (idNumber ? `🆔 <b>T.C. / Pasaport No:</b> <code>${escHtml(idNumber)}</code>\n` : "") +
+      `📋 <b>Durum:</b> ${isAutoVerified ? "✅ Otomatik Doğrulandı" : "⏳ Admin Onayı Bekliyor"}\n` +
+      `⏰ <b>Tarih:</b> <code>${nowStr}</code>\n\n` +
+      `👉 <i>Admin Paneli > Kullanıcılar sekmesinden kimlik belgelerini inceleyebilirsiniz.</i>`;
+  } else if (customMessage) {
+    htmlMessage = escHtml(customMessage);
+  } else {
+    res.status(400).json({ ok: false, error: "Geçersiz veya eksik bildirim tipi." });
     return;
   }
 
-  const isDeposit  = type === "deposit";
-  const typeLabel  = isDeposit ? "Para Yatırma 📥" : "Para Çekme 📤";
-  const currSymbol = currency === "TRY" ? "₺" : "$";
-
-  const text =
-    `🚨 *YENİ FİNANSAL TALEP* 🚨\n\n` +
-    `👤 *Kullanıcı:* ${escMd(userName)}\n` +
-    `💰 *Miktar:* ${currSymbol}${amount} ${currency}\n` +
-    `📊 *İşlem Tipi:* ${typeLabel}\n` +
-    `🏦 *Yöntem:* ${escMd(method)}\n` +
-    (hasReceipt ? `📎 *Dekont:* Yüklendi ✅ \\(Admin panelinde inceleyin\\)\n\n` : `\n`) +
-    `🌐 _Lütfen Admin panelinden kontrol edin\\._`;
-
   try {
-    const r = await fetch(
+    const telegramRes = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id:    chatId,
-          text,
-          parse_mode: "MarkdownV2",
+          text:       htmlMessage,
+          parse_mode: "HTML",
         }),
       }
     );
 
-    const data = await r.json() as { ok: boolean };
+    const data = await telegramRes.json() as { ok: boolean; description?: string; error_code?: number };
     if (!data.ok) {
-      (req as any).log?.warn?.({ data }, "Telegram API returned not-ok");
-      res.status(502).json({ ok: false });
+      console.warn("[Telegram Bot API Hatası]:", data);
+      let userFriendlyError = data.description || "Telegram API'si hata döndürdü.";
+      if (data.error_code === 401) {
+        userFriendlyError = "Bot Token geçersiz! Lütfen @BotFather'dan aldığınız API Token'ı kontrol edin.";
+      } else if (data.description?.includes("chat not found") || data.error_code === 400) {
+        userFriendlyError = "Chat ID bulunamadı! Lütfen Telegram'da botunuzu açıp 'BAŞLAT' (/start) butonuna bastığınızdan ve Chat ID'nizin doğru olduğundan emin olun.";
+      }
+      res.status(400).json({ ok: false, error: userFriendlyError, details: data });
       return;
     }
 
-    res.json({ ok: true });
-  } catch (err) {
-    (req as any).log?.error?.({ err }, "Telegram notify failed");
-    res.status(500).json({ ok: false, error: "Network error" });
+    res.json({ ok: true, message: "Bildirim Telegram'a başarıyla iletildi." });
+  } catch (err: any) {
+    console.error("[Telegram Network Hatası]:", err);
+    res.status(500).json({ ok: false, error: "Telegram sunucularına erişilemedi: " + (err?.message || "Ağ hatası") });
   }
 });
 
-/** Escape special chars for MarkdownV2 */
-function escMd(s: string): string {
-  return String(s).replace(/[_*[\]()~`>#+=|{}.!\\-]/g, "\\$&");
+/** Escape HTML special characters for Telegram HTML parse mode */
+function escHtml(s: any): string {
+  if (s === undefined || s === null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
+
 
 export default router;

@@ -111,6 +111,15 @@ export interface PaymentSettings {
 
   customMethods?:   CustomPaymentMethod[];
   updatedAt?:       number;
+
+  // Telegram Bot Bildirim Ayarları
+  telegramEnabled?:             boolean;
+  telegramBotToken?:            string;
+  telegramChatId?:              string;
+  telegramNotifyDeposits?:      boolean;
+  telegramNotifyWithdrawals?:   boolean;
+  telegramNotifyRegistrations?: boolean;
+  telegramNotifyKyc?:           boolean;
 }
 
 export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
@@ -130,6 +139,14 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   erc20QrCode:     "",
 
   customMethods:   [],
+
+  telegramEnabled:             true,
+  telegramBotToken:            "",
+  telegramChatId:              "",
+  telegramNotifyDeposits:      true,
+  telegramNotifyWithdrawals:   true,
+  telegramNotifyRegistrations: true,
+  telegramNotifyKyc:           true,
 };
 
 interface RegisterData {
@@ -171,6 +188,23 @@ interface AuthContextType {
   deleteUserPermanently: (userId: string, userEmail?: string) => Promise<{ success: boolean; error?: string }>;
   isRejectionViewed: (req: ObyoRequest) => boolean;
   markRejectionsAsViewed: (requestIds: string[]) => Promise<void>;
+  triggerTelegramNotify: (payload: {
+    type: "deposit" | "withdraw" | "register" | "kyc" | "test";
+    userName?: string;
+    userEmail?: string;
+    amount?: number;
+    currency?: string;
+    method?: string;
+    destination?: string;
+    hasReceipt?: boolean;
+    referralCode?: string;
+    tcKimlik?: string;
+    idNumber?: string;
+    isAutoVerified?: boolean;
+    botToken?: string;
+    chatId?: string;
+    customMessage?: string;
+  }) => Promise<{ ok: boolean; error?: string; message?: string }>;
   refreshUser:      () => void;
   refreshAdmin:     () => void;
 }
@@ -780,6 +814,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     setCurrentUser(userData);
+
+    // Send Telegram notification for new user registration
+    try {
+      if (paymentSettings?.telegramNotifyRegistrations !== false) {
+        triggerTelegramNotify({
+          type: "register",
+          userName: `${userData.name} ${userData.surname}`.trim(),
+          userEmail: userData.email,
+          currency: userData.currency,
+          referralCode: userData.referralCode,
+          tcKimlik: userData.tcKimlik,
+        }).catch(() => {});
+      }
+    } catch (tgErr) {
+      console.warn("Telegram register notification error:", tgErr);
+    }
     
     return { success: true };
   };
@@ -1082,6 +1132,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         kycDetails,
       } : null);
 
+      // Send Telegram notification for KYC submission
+      try {
+        if (paymentSettings?.telegramNotifyKyc !== false) {
+          triggerTelegramNotify({
+            type: "kyc",
+            userName: data.fullName || `${currentUser.name} ${currentUser.surname}`.trim(),
+            userEmail: currentUser.email,
+            idNumber: cleanEnteredTc,
+            isAutoVerified,
+          }).catch(() => {});
+        }
+      } catch (tgErr) {
+        console.warn("Telegram KYC notification error:", tgErr);
+      }
+
       if (isAutoVerified) {
         return {
           success: true,
@@ -1184,6 +1249,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.error("updatePaymentSettings error:", err);
       return { success: false, error: err?.message || "Ödeme bilgileri kaydedilemedi." };
+    }
+  };
+
+  const triggerTelegramNotify = async (payload: {
+    type: "deposit" | "withdraw" | "register" | "kyc" | "test";
+    userName?: string;
+    userEmail?: string;
+    amount?: number;
+    currency?: string;
+    method?: string;
+    destination?: string;
+    hasReceipt?: boolean;
+    referralCode?: string;
+    tcKimlik?: string;
+    idNumber?: string;
+    isAutoVerified?: boolean;
+    botToken?: string;
+    chatId?: string;
+    customMessage?: string;
+  }): Promise<{ ok: boolean; error?: string; message?: string }> => {
+    try {
+      if (paymentSettings?.telegramEnabled === false && payload.type !== "test") {
+        return { ok: false, error: "Telegram bildirimleri ayarlardan kapatılmış." };
+      }
+      const token = payload.botToken || paymentSettings?.telegramBotToken;
+      const chat = payload.chatId || paymentSettings?.telegramChatId;
+
+      const res = await fetch("/api/notify/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          botToken: token,
+          chatId: chat,
+        }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      console.warn("triggerTelegramNotify error:", err);
+      return { ok: false, error: err?.message || "Telegram servisine ulaşılamadı." };
     }
   };
 
@@ -1331,6 +1437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
       deleteUserPermanently,
       isRejectionViewed, markRejectionsAsViewed,
+      triggerTelegramNotify,
       refreshUser, refreshAdmin,
     }}>
       {children}

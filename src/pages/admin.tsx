@@ -8,12 +8,13 @@ import {
   PlusCircle, Settings, Landmark, Zap, Bitcoin, Save, AlertCircle,
   RefreshCw, CheckCircle2, Plus, Trash2, Edit3, Wallet, CreditCard,
   QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle,
-  FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2
+  FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2,
+  Send, Bot, Bell, Key, Copy, CheckCheck, MessageSquare
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
-type AdminTab  = "requests" | "users" | "settings";
+type AdminTab  = "requests" | "users" | "settings" | "telegram";
 type ReqFilter = "all" | "deposit" | "withdraw" | "pending";
 
 function StatusBadge({ status }: { status: ObyoRequest["status"] }) {
@@ -107,6 +108,7 @@ export default function Admin() {
     updatePaymentSettings,
     adminUpdateKYC,
     deleteUserPermanently,
+    triggerTelegramNotify,
   } = useAuth();
 
   useEffect(() => {
@@ -340,6 +342,86 @@ export default function Admin() {
     }
   };
 
+  /* Telegram Bot settings state */
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [showBotToken, setShowBotToken] = useState(false);
+  const [telegramSaveMsg, setTelegramSaveMsg] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, key: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {}
+  };
+
+  const handleSaveTelegramSettings = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingSettings(true);
+    setTelegramSaveMsg(null);
+    try {
+      const res = await updatePaymentSettings({
+        telegramEnabled: formSettings.telegramEnabled !== false,
+        telegramBotToken: formSettings.telegramBotToken?.trim() || "",
+        telegramChatId: formSettings.telegramChatId?.trim() || "",
+        telegramNotifyDeposits: formSettings.telegramNotifyDeposits !== false,
+        telegramNotifyWithdrawals: formSettings.telegramNotifyWithdrawals !== false,
+        telegramNotifyRegistrations: formSettings.telegramNotifyRegistrations !== false,
+        telegramNotifyKyc: formSettings.telegramNotifyKyc !== false,
+      });
+      if (res.success) {
+        setTelegramSaveMsg("Telegram bot ayarları başarıyla kaydedildi.");
+      } else {
+        setTelegramSaveMsg(`Hata: ${res.error || "Kaydedilemedi"}`);
+      }
+    } finally {
+      setIsSavingSettings(false);
+      setTimeout(() => setTelegramSaveMsg(null), 4000);
+    }
+  };
+
+  const handleSendTestTelegram = async () => {
+    const token = formSettings.telegramBotToken?.trim();
+    const chat = formSettings.telegramChatId?.trim();
+    if (!token || !chat) {
+      setTelegramTestResult({
+        ok: false,
+        message: "Lütfen test göndermeden önce Bot Token ve Chat ID alanlarını doldurunuz.",
+      });
+      return;
+    }
+
+    setIsTestingTelegram(true);
+    setTelegramTestResult(null);
+    try {
+      const res = await triggerTelegramNotify({
+        type: "test",
+        botToken: token,
+        chatId: chat,
+      });
+      if (res.ok) {
+        setTelegramTestResult({
+          ok: true,
+          message: res.message || "Test bildirimi Telegram'a başarıyla gönderildi! Lütfen Telegram uygulamanızı kontrol edin.",
+        });
+      } else {
+        setTelegramTestResult({
+          ok: false,
+          message: res.error || "Telegram mesajı gönderilemedi. Token ve Chat ID bilgilerinizi kontrol ediniz.",
+        });
+      }
+    } catch (err: any) {
+      setTelegramTestResult({
+        ok: false,
+        message: err?.message || "Bağlantı hatası oluştu.",
+      });
+    } finally {
+      setIsTestingTelegram(false);
+    }
+  };
+
   const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'trc20QrCode' | 'erc20QrCode') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -432,26 +514,41 @@ export default function Admin() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[#111] shrink-0">
+      <div className="flex border-b border-[#111] shrink-0 overflow-x-auto no-scrollbar">
         {([
           { id: "requests", label: "İstekler",     badge: pendingCount },
           { id: "users",    label: "Kullanıcılar"                      },
           { id: "settings", label: "Hesap & Cüzdan Ayarları"            },
-        ] as { id: AdminTab; label: string; badge?: number }[]).map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as AdminTab)}
-            className="flex items-center gap-2 flex-1 justify-center py-3 text-xs sm:text-sm font-black relative cursor-pointer select-none"
-            style={{ color: tab === t.id ? "#FF6B00" : "#444" }}>
-            {t.label}
-            {t.badge ? (
-              <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black text-black"
-                style={{ background: "#FFB800" }}>{t.badge}</span>
-            ) : null}
-            {tab === t.id && (
-              <motion.div layoutId="admin-tab" className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                style={{ background: "#FF6B00" }} />
-            )}
-          </button>
-        ))}
+          { id: "telegram", label: "Telegram Botu", isTelegram: true   },
+        ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean }[]).map(t => {
+          const isActive = tab === t.id;
+          const isTgConfigured = Boolean(formSettings.telegramBotToken?.trim() && formSettings.telegramChatId?.trim());
+          const activeColor = t.isTelegram ? "#2AABEE" : "#FF6B00";
+          return (
+            <button key={t.id} onClick={() => setTab(t.id as AdminTab)}
+              className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-[120px] justify-center py-3 text-xs sm:text-sm font-black relative cursor-pointer select-none px-2 whitespace-nowrap"
+              style={{ color: isActive ? activeColor : "#555" }}>
+              {t.isTelegram && (
+                <Send size={13} className={`shrink-0 ${isActive ? "text-[#2AABEE]" : "text-[#2AABEE]/60"}`} />
+              )}
+              <span>{t.label}</span>
+              {t.isTelegram && (
+                <span
+                  title={isTgConfigured ? "Bot Aktif" : "Yapılandırılmadı"}
+                  className={`h-2 w-2 rounded-full shrink-0 ${isTgConfigured ? "bg-[#0ecb81] shadow-[0_0_8px_rgba(14,203,129,0.6)]" : "bg-amber-400"}`}
+                />
+              )}
+              {t.badge ? (
+                <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black text-black"
+                  style={{ background: "#FFB800" }}>{t.badge}</span>
+              ) : null}
+              {isActive && (
+                <motion.div layoutId="admin-tab" className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full"
+                  style={{ background: activeColor }} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
@@ -1428,6 +1525,443 @@ export default function Admin() {
               </motion.button>
 
             </form>
+          </div>
+        )}
+
+        {/* ── TELEGRAM BOT tab ────────────────────────────────────────── */}
+        {tab === "telegram" && (
+          <div className="p-4 sm:p-6 max-w-3xl mx-auto flex flex-col gap-6">
+
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-[#2AABEE]/15 border border-[#2AABEE]/30 text-[#2AABEE] shrink-0 shadow-[0_0_15px_rgba(42,171,238,0.2)]">
+                  <Send size={20} className="-rotate-12 translate-x-0.5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>Telegram Bot Bildirimleri</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2AABEE]/20 text-[#2AABEE] border border-[#2AABEE]/30">
+                      Canlı Entegrasyon
+                    </span>
+                  </h3>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Para yatırma, para çekme ve yeni kayıt talepleri anında kişisel Telegram hesabınıza iletilir.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Durum Banner'ı */}
+            {(() => {
+              const isConfigured = Boolean(formSettings.telegramBotToken?.trim() && formSettings.telegramChatId?.trim());
+              const isMasterEnabled = formSettings.telegramEnabled !== false;
+
+              if (isConfigured && isMasterEnabled) {
+                return (
+                  <div className="rounded-2xl p-4 border border-[#0ecb81]/30 bg-[#0ecb81]/[0.08] flex items-start gap-3.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#0ecb81]/20 text-[#0ecb81] shrink-0 mt-0.5 border border-[#0ecb81]/30">
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-black text-[#0ecb81]">Telegram Botu Bağlı & Aktif</span>
+                        <span className="h-2 w-2 rounded-full bg-[#0ecb81] animate-ping" />
+                      </div>
+                      <p className="text-xs text-white/70 mt-1 leading-relaxed">
+                        Sistemdeki tüm onay bekleyen işlemler ve yeni kayıtlar yapılandırılan Telegram hesabınıza anlık olarak gönderilecektir.
+                      </p>
+                      <div className="flex items-center gap-3 mt-2.5 text-[11px] font-mono text-white/50 flex-wrap">
+                        <span className="bg-black/40 px-2.5 py-1 rounded-lg border border-white/10">
+                          Chat ID: <b className="text-white">{formSettings.telegramChatId}</b>
+                        </span>
+                        <span className="bg-black/40 px-2.5 py-1 rounded-lg border border-white/10">
+                          Token: <b className="text-white">{formSettings.telegramBotToken ? `${formSettings.telegramBotToken.slice(0, 7)}...` : ""}</b>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isConfigured && !isMasterEnabled) {
+                return (
+                  <div className="rounded-2xl p-4 border border-amber-500/30 bg-amber-500/[0.08] flex items-start gap-3.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-amber-500/20 text-amber-400 shrink-0 mt-0.5 border border-amber-500/30">
+                      <AlertCircle size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-black text-amber-400">Telegram Bildirimleri Geçici Olarak Durduruldu</span>
+                      <p className="text-xs text-white/70 mt-1 leading-relaxed">
+                        Bot token ve Chat ID tanımlı ancak aşağıdaki ana şalter kapalı olduğu için şu an bildirim gitmemektedir.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="rounded-2xl p-4 border border-white/10 bg-[#121217] flex items-start gap-3.5">
+                  <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#2AABEE]/15 text-[#2AABEE] shrink-0 mt-0.5 border border-[#2AABEE]/30">
+                    <Bot size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-black text-white">Telegram Bot Yapılandırması Gerekli</span>
+                    <p className="text-xs text-white/60 mt-1 leading-relaxed">
+                      Sitedeki işlemlerden anında haberdar olmak için Telegram'dan bir bot oluşturup token ve chat ID bilginizi aşağıdaki alana kaydediniz.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Kayıt Başarı / Hata Bildirimi */}
+            {telegramSaveMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex items-center gap-2 p-3.5 rounded-2xl border text-xs font-bold ${
+                  telegramSaveMsg.includes("Hata")
+                    ? "border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border-[#0ecb81]/30 bg-[#0ecb81]/10 text-[#0ecb81]"
+                }`}
+              >
+                {telegramSaveMsg.includes("Hata") ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                <span>{telegramSaveMsg}</span>
+              </motion.div>
+            )}
+
+            {/* Test Sonuç Kutusu */}
+            {telegramTestResult && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`rounded-2xl p-4 border flex items-start gap-3 ${
+                  telegramTestResult.ok
+                    ? "border-[#0ecb81]/40 bg-[#0ecb81]/15 text-[#0ecb81]"
+                    : "border-red-500/40 bg-red-500/15 text-red-300"
+                }`}
+              >
+                <div className="shrink-0 mt-0.5">
+                  {telegramTestResult.ok ? (
+                    <CheckCircle2 size={18} className="text-[#0ecb81]" />
+                  ) : (
+                    <AlertCircle size={18} className="text-red-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black">
+                    {telegramTestResult.ok ? "Test Başarılı!" : "Test Gönderimi Başarısız Oldu"}
+                  </p>
+                  <p className="text-xs mt-1 text-white/80 leading-relaxed font-normal">
+                    {telegramTestResult.message}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleSaveTelegramSettings} className="flex flex-col gap-6">
+
+              {/* 1. KART: BOT BİLGİLERİ */}
+              <div className="rounded-2xl p-5 border border-white/10 bg-[#0d0d10] flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#2AABEE]/15 border border-[#2AABEE]/25 text-[#2AABEE]">
+                      <Key size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Bot API Kimlik Bilgileri</h4>
+                      <p className="text-[11px] text-white/40">Telegram @BotFather ve Chat ID bilgileriniz</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <ToggleSwitch
+                      label="Genel Bildirimler"
+                      checked={formSettings.telegramEnabled !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, telegramEnabled: v }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Bot Token Input */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-white/60 flex items-center justify-between">
+                    <span>TELEGRAM BOT TOKEN (API TOKEN) *</span>
+                    <span className="text-[10px] text-white/30 font-normal">@BotFather tarafından verilir</span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showBotToken ? "text" : "password"}
+                      value={formSettings.telegramBotToken || ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, telegramBotToken: e.target.value }))}
+                      placeholder="Örn: 7123456789:AAHq1234567890abcdefghijklmnop"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-3 pr-20 text-xs font-mono text-white outline-none focus:border-[#2AABEE]/60 transition-colors"
+                      required
+                    />
+                    <div className="absolute right-2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowBotToken(prev => !prev)}
+                        className="px-2 py-1 text-[11px] text-white/50 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                        title={showBotToken ? "Gizle" : "Göster"}
+                      >
+                        {showBotToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-white/40 mt-0.5">
+                    Telegram'da <b>@BotFather</b>'a <code>/newbot</code> komutu vererek aldığınız HTTP API token'dır.
+                  </p>
+                </div>
+
+                {/* Chat ID Input */}
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <label className="text-[11px] font-bold text-white/60 flex items-center justify-between">
+                    <span>TELEGRAM CHAT ID (ALICI SOHBET / KULLANICI ID) *</span>
+                    <span className="text-[10px] text-white/30 font-normal">Kişisel veya Grup ID</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formSettings.telegramChatId || ""}
+                    onChange={(e) => setFormSettings(prev => ({ ...prev, telegramChatId: e.target.value }))}
+                    placeholder="Örn: 123456789 veya gruplar için -1001234567890"
+                    className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-3 text-xs font-mono text-white outline-none focus:border-[#2AABEE]/60 transition-colors"
+                    required
+                  />
+                  <p className="text-[11px] text-white/40 mt-0.5">
+                    Bildirimin gideceği Telegram ID'niz. Telegram'da <b>@userinfobot</b> veya <b>@GetMyIDBot</b> botuna <code>/start</code> yazarak öğrenebilirsiniz.
+                  </p>
+                </div>
+
+              </div>
+
+              {/* 2. KART: BİLDİRİM TERCİHLERİ */}
+              <div className="rounded-2xl p-5 border border-white/10 bg-[#0d0d10] flex flex-col gap-4">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-white/5">
+                  <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#FFB800]/15 border border-[#FFB800]/25 text-[#FFB800]">
+                    <Bell size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white">Hangi Olaylarda Bildirim Gönderilsin?</h4>
+                    <p className="text-[11px] text-white/40">Gereksiz mesajları önlemek için bildirim türlerini özelleştirin</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                  {/* 1. Para Yatırma */}
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-[#0ecb81]/15 text-[#0ecb81] flex items-center justify-center shrink-0 border border-[#0ecb81]/25">
+                        <ArrowDownCircle size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">Para Yatırma Talepleri</p>
+                        <p className="text-[10px] text-white/40">Kullanıcı transfer veya dekont girdiğinde</p>
+                      </div>
+                    </div>
+                    <ToggleSwitch
+                      checked={formSettings.telegramNotifyDeposits !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, telegramNotifyDeposits: v }))}
+                    />
+                  </div>
+
+                  {/* 2. Para Çekme */}
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center shrink-0 border border-[#FF6B00]/25">
+                        <ArrowUpCircle size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">Para Çekme Talepleri</p>
+                        <p className="text-[10px] text-white/40">Kullanıcı çekim talebi açtığında</p>
+                      </div>
+                    </div>
+                    <ToggleSwitch
+                      checked={formSettings.telegramNotifyWithdrawals !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, telegramNotifyWithdrawals: v }))}
+                    />
+                  </div>
+
+                  {/* 3. Yeni Kayıt */}
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-[#627EEA]/15 text-[#627EEA] flex items-center justify-center shrink-0 border border-[#627EEA]/25">
+                        <Users size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">Yeni Kayıt Bildirimleri</p>
+                        <p className="text-[10px] text-white/40">Platforma yeni bir üye kaydolduğunda</p>
+                      </div>
+                    </div>
+                    <ToggleSwitch
+                      checked={formSettings.telegramNotifyRegistrations !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, telegramNotifyRegistrations: v }))}
+                    />
+                  </div>
+
+                  {/* 4. Kimlik Onay (KYC) */}
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-[#9B51E0]/15 text-[#9B51E0] flex items-center justify-center shrink-0 border border-[#9B51E0]/25">
+                        <Shield size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">Kimlik Doğrulama (KYC)</p>
+                        <p className="text-[10px] text-white/40">Kullanıcı kimlik belgesi yüklediğinde</p>
+                      </div>
+                    </div>
+                    <ToggleSwitch
+                      checked={formSettings.telegramNotifyKyc !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, telegramNotifyKyc: v }))}
+                    />
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Aksiyon Butonları */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-black text-black flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-50"
+                  style={{
+                    background: "linear-gradient(135deg, #0ecb81, #05a660)",
+                    boxShadow: "0 8px 25px rgba(14,203,129,0.3)"
+                  }}
+                >
+                  {isSavingSettings ? (
+                    <>
+                      <RefreshCw size={15} className="animate-spin" />
+                      <span>Kaydediliyor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={15} />
+                      <span>Ayarları Kaydet & Etkinleştir</span>
+                    </>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  onClick={handleSendTestTelegram}
+                  disabled={isTestingTelegram}
+                  className="rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-50 border border-[#2AABEE]/40"
+                  style={{
+                    background: "linear-gradient(135deg, #2AABEE, #188ec8)",
+                    boxShadow: "0 8px 25px rgba(42,171,238,0.3)"
+                  }}
+                >
+                  {isTestingTelegram ? (
+                    <>
+                      <RefreshCw size={15} className="animate-spin" />
+                      <span>Test Gönderiliyor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={15} />
+                      <span>Test Bildirimi Gönder</span>
+                    </>
+                  )}
+                </motion.button>
+              </div>
+
+            </form>
+
+            {/* 3. KART: ADIM ADIM KURULUM REHBERİ */}
+            <div className="rounded-3xl p-5 sm:p-6 border border-white/10 bg-[#0d0d12] flex flex-col gap-5 mt-2">
+              <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#2AABEE]/15 border border-[#2AABEE]/25 text-[#2AABEE]">
+                  <MessageSquare size={16} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white">Adım Adım Telegram Botu Kurulum Kılavuzu</h4>
+                  <p className="text-[11px] text-white/40">2 dakikada botunuzu oluşturup admin panelinize bağlayın</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* Adım 1 */}
+                <div className="rounded-2xl border border-white/10 bg-black/50 p-4 flex flex-col gap-2 relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#2AABEE]">1. Adım: Bot Oluşturma</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-white/40">@BotFather</span>
+                  </div>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    Telegram'da arama çubuğuna <b>@BotFather</b> yazıp sohbete girin. <code className="text-[#2AABEE]">/newbot</code> komutunu gönderin.
+                  </p>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    Botunuza bir isim ve ardından sonu <code>bot</code> ile biten bir kullanıcı adı verin (Örn: <code>obyo_bildirim_bot</code>).
+                  </p>
+                  <p className="text-[11px] text-white/50 bg-white/5 p-2 rounded-xl border border-white/5">
+                    BotFather size <b>HTTP API token</b> verecektir. O token'ı yukarıdaki <b>Bot Token</b> alanına yapıştırın.
+                  </p>
+                </div>
+
+                {/* Adım 2 */}
+                <div className="rounded-2xl border border-white/10 bg-black/50 p-4 flex flex-col gap-2 relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#2AABEE]">2. Adım: Chat ID'nizi Alma</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-white/40">@userinfobot</span>
+                  </div>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    Telegram'da arama çubuğuna <b>@userinfobot</b> veya <b>@GetMyIDBot</b> yazıp sohbete girin.
+                  </p>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    <code className="text-[#2AABEE]">/start</code> komutunu gönderin. Bot size sayısal ID'nizi gönderecektir (Örn: <code>987654321</code>).
+                  </p>
+                  <p className="text-[11px] text-white/50 bg-white/5 p-2 rounded-xl border border-white/5">
+                    Bu numarayı kopyalayıp yukarıdaki <b>Chat ID</b> alanına yapıştırın.
+                  </p>
+                </div>
+
+                {/* Adım 3 */}
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4 flex flex-col gap-2 relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-400">3. Adım: Bota /start Verme (ÖNEMLİ)</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Kritik</span>
+                  </div>
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    Telegram'ın güvenlik kuralları gereği, siz başlatmadan bir bot size doğrudan mesaj gönderemez.
+                  </p>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    Yeni oluşturduğunuz botun sohbetini Telegram'da açın ve alttaki <b>BAŞLAT</b> (<code className="text-amber-300">/start</code>) butonuna basın.
+                  </p>
+                </div>
+
+                {/* Adım 4 */}
+                <div className="rounded-2xl border border-[#0ecb81]/20 bg-[#0ecb81]/[0.04] p-4 flex flex-col gap-2 relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#0ecb81]">4. Adım: Kaydet ve Test Et</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0ecb81]/15 text-[#0ecb81]">Tamamlandı</span>
+                  </div>
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    Bilgileri yukarıdaki kutulara girdikten sonra <b>Ayarları Kaydet</b> butonuna basın.
+                  </p>
+                  <p className="text-xs text-white/70 leading-relaxed">
+                    Son olarak <b>Test Bildirimi Gönder</b> butonuna tıklayarak telefonunuza ilk test mesajının geldiğini onaylayın!
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Grup Notu */}
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-3.5 flex items-start gap-2.5">
+                <div className="h-5 w-5 rounded-full bg-[#2AABEE]/20 text-[#2AABEE] flex items-center justify-center shrink-0 mt-0.5">
+                  <Send size={11} />
+                </div>
+                <p className="text-[11px] text-white/60 leading-relaxed">
+                  <b>Birden fazla yönetici veya Telegram Grubu kullanmak isterseniz:</b> Botu kurduğunuz Telegram grubuna ekleyin, gruba yönetici yetkisi verin ve grubun Chat ID numarasını (genellikle <code>-100...</code> ile başlar) buraya yazın.
+                </p>
+              </div>
+
+            </div>
+
           </div>
         )}
 

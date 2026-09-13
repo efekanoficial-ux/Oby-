@@ -404,15 +404,25 @@ export default function WalletPage() {
   const notifyTelegram = (payload: {
     type: "deposit" | "withdraw";
     userName: string;
+    userEmail?: string;
     amount: number;
     currency: string;
     method: string;
     hasReceipt?: boolean;
+    destination?: string;
   }) => {
+    if (paymentSettings?.telegramEnabled === false) return;
+    if (payload.type === "deposit" && paymentSettings?.telegramNotifyDeposits === false) return;
+    if (payload.type === "withdraw" && paymentSettings?.telegramNotifyWithdrawals === false) return;
+
     fetch("/api/notify/telegram", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        botToken: paymentSettings?.telegramBotToken,
+        chatId: paymentSettings?.telegramChatId,
+      }),
     }).catch(() => { /* fire-and-forget */ });
   };
 
@@ -456,9 +466,11 @@ export default function WalletPage() {
       notifyTelegram({
         type: "deposit",
         userName,
+        userEmail: currentUser.email,
         amount: numAmt,
         currency: method.currency,
         method: methodLabelWithCode,
+        destination: dest,
         hasReceipt: Boolean(receiptFile?.dataUrl),
       });
 
@@ -494,9 +506,11 @@ export default function WalletPage() {
       notifyTelegram({
         type: "withdraw",
         userName,
+        userEmail: currentUser.email,
         amount: val,
         currency: method.currency,
         method: method.label,
+        destination,
       });
       setWStep("success");
     } finally {
