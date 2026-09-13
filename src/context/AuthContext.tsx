@@ -185,6 +185,7 @@ interface AuthContextType {
   updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
   adminUpdateKYC:   (userId: string, status: "verified" | "rejected", reason?: string) => Promise<{ success: boolean; error?: string }>;
+  deleteRequest: (id: string) => Promise<void>;
   deleteUserPermanently: (userId: string, userEmail?: string) => Promise<{ success: boolean; error?: string }>;
   isRejectionViewed: (req: ObyoRequest) => boolean;
   markRejectionsAsViewed: (requestIds: string[]) => Promise<void>;
@@ -911,6 +912,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return ref.id;
   };
 
+    const deleteRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "requests", id));
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      console.error(e);
+      alert("Hata oluştu.");
+    }
+  };
+
   const processRequest = async (id: string, accept: boolean, reason?: string) => {
     try {
       const req = requests.find(r => r.id === id);
@@ -1436,6 +1447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       addRequest, processRequest, addBalanceDirect,
       placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
       deleteUserPermanently,
+      deleteRequest,
       isRejectionViewed, markRejectionsAsViewed,
       triggerTelegramNotify,
       refreshUser, refreshAdmin,

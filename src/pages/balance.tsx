@@ -173,7 +173,7 @@ export default function Balance() {
               <AnimatedBalance
                 value={balance}
                 currency={currency}
-                className="text-5xl font-black leading-none tracking-tight"
+                className="text-3xl sm:text-5xl font-black leading-none tracking-tight block max-w-full truncate"
                 style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}
               />
             </div>
@@ -406,7 +406,7 @@ export default function Balance() {
                   <span className="text-[9px] font-bold uppercase tracking-wider"
                     style={{ color: "rgba(255,255,255,0.22)" }}>{s.label}</span>
                 </div>
-                <p className="text-xl font-black tabular-nums leading-none" style={{ color: s.color }}>
+                <p className="text-base sm:text-xl font-black tabular-nums leading-none truncate max-w-full" style={{ color: s.color }}>
                   {s.value}
                 </p>
                 <p className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.18)" }}>{s.sub}</p>

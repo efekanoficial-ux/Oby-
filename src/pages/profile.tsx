@@ -116,7 +116,7 @@ export default function Profile() {
           </div>
 
           {/* ── KYC Status Card ── */}
-          {currentUser && (
+          {currentUser && currentUser.kycStatus !== "verified" && (
             <div className="px-4 mb-3">
               <motion.button
                 whileTap={{ scale: 0.98 }}

@@ -108,6 +108,7 @@ export default function Admin() {
     updatePaymentSettings,
     adminUpdateKYC,
     deleteUserPermanently,
+    deleteRequest,
     triggerTelegramNotify,
   } = useAuth();
 
@@ -119,6 +120,12 @@ export default function Admin() {
   const [filter, setFilter] = useState<ReqFilter>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [processingReq, setProcessingReq] = useState<string | null>(null);
+
+  /* Delete Request / Reset Stats state */
+  const [reqToDelete, setReqToDelete] = useState<string | null>(null);
+  const [isDeletingReq, setIsDeletingReq] = useState(false);
+  const [showStatsResetConfirm, setShowStatsResetConfirm] = useState(false);
+  const [isResettingStats, setIsResettingStats] = useState(false);
 
   /* Request Rejection Modal state */
   const [rejectModalReq, setRejectModalReq] = useState<ObyoRequest | null>(null);
@@ -497,17 +504,28 @@ export default function Admin() {
         {[
           { label: "Toplam Kullanıcı", value: users.length,                     icon: Users,      color: "#627EEA" },
           { label: "Bekleyen İstek",   value: pendingCount,                     icon: Clock,      color: "#FFB800" },
-          { label: "Toplam Yatırım",   value: `$${totalDeposited.toFixed(0)}`,  icon: TrendingUp, color: "#0ecb81" },
+          { label: "Toplam Yatırım",   value: `${totalDeposited.toFixed(0)}`,  icon: TrendingUp, color: "#0ecb81" },
         ].map(s => {
           const Icon = s.icon;
           return (
-            <div key={s.label} className="flex flex-col gap-1 rounded-2xl p-3"
+            <div key={s.label} className="flex flex-col gap-1 rounded-2xl p-3 relative group"
               style={{ background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
-              <div className="flex items-center gap-1.5">
-                <Icon size={11} style={{ color: s.color }} />
-                <span className="text-[9px] font-bold text-white/30 uppercase">{s.label}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Icon size={11} style={{ color: s.color }} />
+                  <span className="text-[9px] font-bold text-white/30 uppercase">{s.label}</span>
+                </div>
+                {s.label === "Toplam Yatırım" && (
+                  <button
+                    onClick={() => setShowStatsResetConfirm(true)}
+                    className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-white/40 hover:text-red-500 cursor-pointer p-1"
+                    title="Sıfırla (Onaylanmış Yatırımları Sil)"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
-              <span className="text-lg font-black" style={{ color: s.color }}>{s.value}</span>
+              <span className="text-lg font-black truncate" style={{ color: s.color }}>{s.value}</span>
             </div>
           );
         })}
@@ -518,15 +536,15 @@ export default function Admin() {
         {([
           { id: "requests", label: "İstekler",     badge: pendingCount },
           { id: "users",    label: "Kullanıcılar"                      },
-          { id: "settings", label: "Hesap & Cüzdan Ayarları"            },
-          { id: "telegram", label: "Telegram Botu", isTelegram: true   },
+          { id: "settings", label: "Cüzdanlar"                         },
+          { id: "telegram", label: "Telegram",     isTelegram: true    },
         ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean }[]).map(t => {
           const isActive = tab === t.id;
           const isTgConfigured = Boolean(formSettings.telegramBotToken?.trim() && formSettings.telegramChatId?.trim());
           const activeColor = t.isTelegram ? "#2AABEE" : "#FF6B00";
           return (
             <button key={t.id} onClick={() => setTab(t.id as AdminTab)}
-              className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-[120px] justify-center py-3 text-xs sm:text-sm font-black relative cursor-pointer select-none px-2 whitespace-nowrap"
+              className="flex items-center gap-1.5 justify-center py-3 px-4 text-xs font-black relative cursor-pointer select-none whitespace-nowrap flex-1 md:flex-none"
               style={{ color: isActive ? activeColor : "#555" }}>
               {t.isTelegram && (
                 <Send size={13} className={`shrink-0 ${isActive ? "text-[#2AABEE]" : "text-[#2AABEE]/60"}`} />
@@ -817,6 +835,16 @@ export default function Admin() {
                               </div>
                             </div>
                           )}
+                          
+                          <div className="flex justify-end mt-2 pt-2 border-t border-white/5">
+                            <button
+                              onClick={() => setReqToDelete(req.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 transition-colors text-xs font-bold"
+                            >
+                              <Trash2 size={12} /> Talebi Sil
+                            </button>
+                          </div>
+
                         </div>
                       </motion.div>
                     )}
@@ -1114,7 +1142,7 @@ export default function Admin() {
 
         {/* ── SETTINGS TAB (Hesap & Cüzdan Ayarları) ────────────────────────── */}
         {tab === "settings" && (
-          <div className="p-4 max-w-2xl mx-auto flex flex-col gap-6">
+          <div className="p-4 md:p-8 max-w-5xl mx-auto flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
               <div>
                 <h3 className="text-base font-black text-white">Ödeme Yöntemleri & Hesap Yönetimi</h3>
@@ -1530,7 +1558,7 @@ export default function Admin() {
 
         {/* ── TELEGRAM BOT tab ────────────────────────────────────────── */}
         {tab === "telegram" && (
-          <div className="p-4 sm:p-6 max-w-3xl mx-auto flex flex-col gap-6">
+          <div className="p-4 sm:p-8 max-w-5xl mx-auto flex flex-col gap-6">
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
@@ -2310,7 +2338,105 @@ export default function Admin() {
           )}
         </AnimatePresence>
 
-        {/* ── User Delete Confirmation Modal ──────────────────────────────── */}
+        {/* ── Delete Request Modal ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {reqToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm rounded-2xl bg-[#0d0d0d] border border-[#222] shadow-2xl overflow-hidden"
+            >
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-start gap-3.5 bg-gradient-to-b from-red-500/10 to-transparent">
+                <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                  <Trash2 className="text-red-500" size={20} />
+                </div>
+                <div className="flex-1 min-w-0 mt-0.5">
+                  <h3 className="text-base font-black text-white">Talebi Sil</h3>
+                  <p className="text-xs text-white/50 mt-1">
+                    Bu talebi veritabanından kalıcı olarak silmek istediğinize emin misiniz? (Tüm dekontlar silinir)
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 bg-[#111] flex items-center gap-2">
+                <button
+                  disabled={isDeletingReq}
+                  onClick={() => setReqToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/70 text-xs font-bold hover:bg-white/5 transition-colors"
+                >
+                  İptal
+                </button>
+                <button
+                  disabled={isDeletingReq}
+                  onClick={async () => {
+                    setIsDeletingReq(true);
+                    await deleteRequest(reqToDelete);
+                    setIsDeletingReq(false);
+                    setReqToDelete(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isDeletingReq ? <span className="animate-pulse">Siliniyor...</span> : <span>Evet, Sil</span>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Stats Reset Modal ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showStatsResetConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm rounded-2xl bg-[#0d0d0d] border border-[#222] shadow-2xl overflow-hidden"
+            >
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-start gap-3.5 bg-gradient-to-b from-red-500/10 to-transparent">
+                <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="text-red-500" size={20} />
+                </div>
+                <div className="flex-1 min-w-0 mt-0.5">
+                  <h3 className="text-base font-black text-white">İstatistiği Sıfırla</h3>
+                  <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                    Toplam Yatırım istatistiğini sıfırlamak için onaylanmış tüm yatırım taleplerini (geçmişi) silmek ister misiniz? <br/><br/>
+                    <strong className="text-white/80">Not:</strong> Kullanıcı bakiyeleri etkilenmez.
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 bg-[#111] flex items-center gap-2">
+                <button
+                  disabled={isResettingStats}
+                  onClick={() => setShowStatsResetConfirm(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/70 text-xs font-bold hover:bg-white/5 transition-colors"
+                >
+                  İptal
+                </button>
+                <button
+                  disabled={isResettingStats}
+                  onClick={async () => {
+                    setIsResettingStats(true);
+                    const deposits = requests.filter(r => r.type === "deposit" && r.status === "accepted");
+                    for (const d of deposits) {
+                      await deleteRequest(d.id);
+                    }
+                    setIsResettingStats(false);
+                    setShowStatsResetConfirm(false);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isResettingStats ? <span className="animate-pulse">Siliniyor...</span> : <span>Evet, Sıfırla</span>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── User Delete Confirmation Modal ──────────────────────────────── */}
         <AnimatePresence>
           {userToDelete && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

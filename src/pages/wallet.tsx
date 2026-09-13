@@ -11,7 +11,7 @@ import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowLeft, Copy, Check, Clock, AlertCircle, CheckCircle2,
   Landmark, Zap, Bitcoin, ArrowDownCircle, ArrowUpCircle,
-  ChevronRight, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
+  ChevronRight, ChevronDown, ChevronUp, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
   ShieldCheck, RefreshCw, Wallet as WalletIcon, ExternalLink,
   CreditCard, QrCode, CircleDollarSign, Coins, FileText,
   UploadCloud, Eye, Trash2, X, Paperclip,
@@ -66,16 +66,11 @@ function Countdown({ startedAt }: { startedAt: number }) {
   }, [startedAt]);
   const mm = Math.floor(rem / 60).toString().padStart(2, "0");
   const ss = (rem % 60).toString().padStart(2, "0");
-  const low = rem < 120;
   return (
-    <div className="flex items-center gap-2 rounded-2xl px-4 py-3 border transition-colors"
-      style={{
-        background: low ? "rgba(246,70,93,0.08)" : "rgba(255,107,0,0.08)",
-        borderColor: low ? "rgba(246,70,93,0.25)" : "rgba(255,107,0,0.25)"
-      }}>
-      <Clock size={15} style={{ color: low ? "#f6465d" : "#FF6B00" }} />
-      <span className="text-sm font-black font-mono tracking-wider" style={{ color: low ? "#f6465d" : "#FF6B00" }}>{mm}:{ss}</span>
-      <span className="text-xs text-white/50 flex-1">içinde transferi tamamlayın</span>
+    <div className="flex items-center gap-2 rounded-xl px-4 py-3 border border-white/10 bg-white/[0.04]">
+      <Clock size={15} className="text-white" />
+      <span className="text-sm font-black font-mono tracking-wider text-white">{mm}:{ss}</span>
+      <span className="text-xs text-white flex-1">içinde transferi tamamlayın</span>
     </div>
   );
 }
@@ -256,6 +251,10 @@ export default function WalletPage() {
   const [refCode] = useState(() => `OBY-${Math.floor(100000 + Math.random() * 900000)}`);
   const transferCode = paymentSettings.ibanDescription?.trim() || refCode;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedReqs, setExpandedReqs] = useState<Record<string, boolean>>({});
+  const toggleExpandReq = (id: string) => {
+    setExpandedReqs(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Receipt upload states for IBAN / Havale deposit
@@ -450,7 +449,7 @@ export default function WalletPage() {
 
       const dest = method.customData?.accountNumber || "";
 
-      await addRequest({
+      const reqPayload: any = {
         userId: currentUser.id,
         userEmail: currentUser.email,
         userName,
@@ -459,9 +458,10 @@ export default function WalletPage() {
         currency: method.currency,
         method: methodLabelWithCode,
         destination: dest,
-        receiptUrl: receiptFile?.dataUrl,
-        receiptName: receiptFile?.name,
-      });
+      };
+      if (receiptFile?.dataUrl) reqPayload.receiptUrl = receiptFile.dataUrl;
+      if (receiptFile?.name) reqPayload.receiptName = receiptFile.name;
+      await addRequest(reqPayload);
 
       notifyTelegram({
         type: "deposit",
@@ -488,7 +488,7 @@ export default function WalletPage() {
   const handleWithdraw = async () => {
     if (!currentUser || !method || !amount || !destination) return;
     if (currentUser.kycStatus !== "verified") return;
-    const val = parseFloat(amount);
+    const val = parseInt(amount, 10);
     if (isNaN(val) || val < withdrawMin || val > currentUser.realBalance) return;
     setIsSubmitting(true);
     try {
@@ -709,7 +709,7 @@ export default function WalletPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-2">
                       {depositMethods.map((m) => {
                         const Icon = m.icon;
                         return (
@@ -717,22 +717,22 @@ export default function WalletPage() {
                             key={m.id}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => selectDepositMethod(m)}
-                            className="flex items-center gap-4 rounded-2xl p-4 border text-left transition-all hover:border-white/20 cursor-pointer"
+                            className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 border text-left transition-all hover:border-white/20 cursor-pointer h-[64px]"
                             style={{
                               background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
                               borderColor: `${m.color}25`,
                             }}
                           >
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center">
-                              <Icon size={34} style={{ color: m.color }} />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                              <Icon size={28} style={{ color: m.color }} />
                             </div>
 
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-black text-white">{m.label}</span>
+                                <span className="text-xs font-black text-white">{m.label}</span>
                                 {m.badge && (
                                   <span
-                                    className="text-[9px] font-black px-2 py-0.5 rounded-full"
+                                    className="text-[8px] font-black px-1.5 py-0.5 rounded-full"
                                     style={{
                                       backgroundColor: `${m.color}20`,
                                       color: m.color,
@@ -743,14 +743,14 @@ export default function WalletPage() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-white/45 mt-0.5">{m.sub}</p>
+                              <p className="text-[11px] text-white/45 mt-0.5">{m.sub}</p>
                             </div>
 
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[11px] font-bold text-white/35">
+                              <span className="text-[10px] font-bold text-white/35">
                                 Min {isTL || m.currency === "TL" ? `₺${m.min}` : `$${m.min}`}
                               </span>
-                              <ChevronRight size={16} className="text-white/25" />
+                              <ChevronRight size={14} className="text-white/25" />
                             </div>
                           </motion.button>
                         );
@@ -934,11 +934,10 @@ export default function WalletPage() {
                     ))}
                   </div>
 
-                  <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-[#FFB800]/25"
-                    style={{ background: "rgba(255,184,0,0.06)" }}>
-                    <AlertCircle size={16} className="text-[#FFB800] mt-0.5 shrink-0" />
-                    <p className="text-xs text-white/60 leading-relaxed">
-                      Lütfen bankanızın transfer açıklama kısmına kesinlikle <span className="text-[#FFB800] font-bold">"{transferCode}"</span> kodunu yazınız. Bu açıklama olmadan yapılan transferler eşleştirilemez.
+                  <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/10 bg-white/[0.03]">
+                    <AlertCircle size={16} className="text-white mt-0.5 shrink-0" />
+                    <p className="text-xs text-white leading-relaxed">
+                      Lütfen bankanızın transfer açıklama kısmına kesinlikle <span className="text-white font-bold underline">"{transferCode}"</span> kodunu yazınız. Bu açıklama olmadan yapılan transferler eşleştirilemez.
                     </p>
                   </div>
 
@@ -1102,8 +1101,8 @@ export default function WalletPage() {
                     {isSubmitting
                       ? "İşleniyor ve Dekont İletiliyor..."
                       : receiptFile
-                      ? "✓ Transferi ve Dekontu Gönder"
-                      : "⚠️ Lütfen Dekont Yükleyiniz (Zorunlu)"}
+                      ? "Transferi gerçekleştirdim."
+                      : "Lütfen Dekont Yükleyiniz (Zorunlu)"}
                   </motion.button>
                 </motion.div>
               )}
@@ -1383,9 +1382,9 @@ export default function WalletPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="flex flex-col gap-3"
                 >
-                  <div className="flex items-center justify-between p-4 rounded-2xl border border-white/8 bg-black/60">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl border border-white/8 bg-black/60">
                     <span className="text-xs text-white/40">Çekilebilir Bakiye</span>
-                    <span className="text-lg font-black text-[#0ecb81]">
+                    <span className="text-base font-normal text-white">
                       {userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -1403,7 +1402,7 @@ export default function WalletPage() {
                     Çekim Yöntemi Seçin
                   </p>
 
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-2">
                     {withdrawMethods.map((m) => {
                       const Icon = m.icon;
                       return (
@@ -1412,22 +1411,22 @@ export default function WalletPage() {
                           whileTap={{ scale: 0.98 }}
                           onClick={() => selectWithdrawMethod(m)}
                           disabled={realBal <= 0}
-                          className="flex items-center gap-4 rounded-2xl p-4 border text-left disabled:opacity-30 cursor-pointer"
+                          className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 border text-left disabled:opacity-30 cursor-pointer h-[64px]"
                           style={{
                             background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
                             borderColor: `${m.color}25`,
                           }}
                         >
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center">
-                            <Icon size={34} />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                            <Icon size={28} />
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm font-black text-white">{m.label}</span>
-                            <p className="text-xs text-white/45 mt-0.5">{m.sub}</p>
+                            <span className="text-xs font-black text-white">{m.label}</span>
+                            <p className="text-[11px] text-white/45 mt-0.5">{m.sub}</p>
                           </div>
 
-                          <ChevronRight size={16} className="text-white/25 shrink-0" />
+                          <ChevronRight size={14} className="text-white/25 shrink-0" />
                         </motion.button>
                       );
                     })}
@@ -1486,10 +1485,14 @@ export default function WalletPage() {
                       <input
                         ref={inputRef}
                         type="number"
-                        inputMode="decimal"
+                        step="1"
+                        inputMode="numeric"
                         placeholder={`${withdrawMin}`}
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '+') e.preventDefault();
+                        }}
                         className="flex-1 bg-transparent text-3xl font-black text-white outline-none placeholder:text-white/15"
                       />
                       <span className="text-xs font-black text-white/40">{isTL ? "TL" : method.currency}</span>
@@ -1613,7 +1616,7 @@ export default function WalletPage() {
                 userRequests.map((req) => {
                   const isD = req.type === "deposit";
                   const statusCfg = {
-                    pending:  { color: "#FFB800", label: "İncelemede / Bekliyor" },
+                    pending:  { color: "#FFB800", label: "İncelemede" },
                     accepted: { color: "#0ecb81", label: "Tamamlandı" },
                     rejected: { color: "#f6465d", label: "Reddedildi" },
                   }[req.status];
@@ -1621,104 +1624,122 @@ export default function WalletPage() {
                   return (
                     <div
                       key={req.id}
-                      className="rounded-2xl p-4 border border-white/6"
+                      className="rounded-xl border border-white/8 overflow-hidden transition-all"
                       style={{ background: "linear-gradient(135deg, #101013 0%, #0a0a0c 100%)" }}
                     >
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-xl"
+                      {/* Clickable Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandReq(req.id)}
+                        className="w-full flex items-center justify-between p-3.5 text-left cursor-pointer hover:bg-white/[0.02]"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg shrink-0"
                             style={{
                               background: isD ? "rgba(14,203,129,0.12)" : "rgba(255,107,0,0.12)",
                               border: `1px solid ${isD ? "rgba(14,203,129,0.25)" : "rgba(255,107,0,0.25)"}`
                             }}>
-                            {isD ? <ArrowDownCircle size={15} className="text-[#0ecb81]" /> : <ArrowUpCircle size={15} className="text-[#FF6B00]" />}
+                            {isD ? <ArrowDownCircle size={13} className="text-[#0ecb81]" /> : <ArrowUpCircle size={13} className="text-[#FF6B00]" />}
                           </div>
-                          <div>
-                            <span className="text-xs font-black text-white">{isD ? "Para Yatırma" : "Para Çekme"}</span>
-                            <p className="text-[10px] text-white/30">{req.method}</p>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-white block">{isD ? "Para Yatırma" : "Para Çekme"}</span>
+                            <span className="text-[10px] text-white/35 font-mono">{req.method}</span>
                           </div>
                         </div>
 
-                        <span className="text-sm font-black" style={{ color: isD ? "#0ecb81" : "#FF6B00" }}>
-                          {isD ? "+" : "-"}{req.currency === "TL" || req.currency === "TRY" ? "₺" : "$"}{req.amount} {req.currency}
-                        </span>
-                      </div>
-
-                      {req.destination && (
-                        <div className="mb-2 p-2 rounded-xl bg-white/[0.02] border border-white/5">
-                          <span className="text-[9px] font-bold text-white/30 uppercase block">Hedef Adres</span>
-                          <span className="text-[11px] font-mono text-white/70 break-all">{req.destination}</span>
-                        </div>
-                      )}
-
-                      {/* Yüklenen Dekont Önizleme Butonu */}
-                      {req.receiptUrl && (
-                        <div className="mb-2.5 p-2.5 rounded-xl bg-[#0ecb81]/[0.05] border border-[#0ecb81]/25 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <FileText size={15} className="text-[#0ecb81] shrink-0" />
-                            <div className="min-w-0">
-                              <span className="text-[9px] font-bold text-white/35 uppercase block">Havale / EFT Dekontu</span>
-                              <span className="text-xs text-white/80 font-medium truncate block max-w-[170px]">
-                                {req.receiptName || "Dekont Belgesi"}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Havale Dekontu" })}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0ecb81]/15 hover:bg-[#0ecb81]/25 text-[#0ecb81] text-xs font-bold transition-all cursor-pointer shrink-0"
-                          >
-                            <Eye size={13} />
-                            <span>Dekontu İncele</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Reddedilme Sebebi ve Açıklama Kutusu */}
-                      {req.status === "rejected" && req.rejectionReason && (
-                        <div className="mb-2.5 p-3 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
-                          <div className="flex items-center gap-1.5 text-[#f6465d] font-black text-xs mb-1">
-                            <AlertCircle size={14} className="shrink-0" />
-                            <span>İşlem Reddedildi - Açıklama:</span>
-                          </div>
-                          <p className="text-xs text-white/90 leading-relaxed pl-5 font-medium">
-                            {req.rejectionReason}
-                          </p>
-
-                          {/* Eğer çekim talebiyse ve yatırım yapması istenmişse hızlı yönlendirme */}
-                          {req.type === "withdraw" && (
-                            <div className="mt-2.5 pt-2 border-t border-[#f6465d]/15 flex justify-end">
-                              <button
-                                onClick={() => {
-                                  setTab("deposit");
-                                  setDStep("method");
-                                  setMethod(null);
-                                  setAmount("");
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white transition-all cursor-pointer"
-                              >
-                                <ArrowDownLeft size={12} className="text-[#0ecb81]" />
-                                <span>Para Yatırma Ekranına Git</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                        <span className="text-[10px] font-mono text-white/25">{req.id}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-white/30">
-                            {new Date(req.createdAt).toLocaleDateString("tr-TR", {
-                              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                            })}
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-xs font-normal" style={{ color: isD ? "#0ecb81" : "#FF6B00" }}>
+                            {isD ? "+" : "-"}{req.currency === "TL" || req.currency === "TRY" ? "₺" : "$"}{req.amount}
                           </span>
-                          <span className="rounded-full px-2.5 py-0.5 text-[9px] font-black"
+                          <span className="rounded-full px-2 py-0.5 text-[8px] font-bold"
                             style={{ background: `${statusCfg.color}15`, color: statusCfg.color, border: `1px solid ${statusCfg.color}30` }}>
                             {statusCfg.label}
                           </span>
+                          {expandedReqs[req.id] ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
                         </div>
-                      </div>
+                      </button>
+
+                      {/* Expandable Details Body */}
+                      <AnimatePresence>
+                        {expandedReqs[req.id] && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="px-3.5 pb-3.5 pt-1 border-t border-white/5 flex flex-col gap-2.5 text-xs"
+                          >
+                            {req.destination && (
+                              <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                                <span className="text-[9px] font-bold text-white/30 uppercase block mb-0.5">Hedef Adres</span>
+                                <span className="text-[11px] font-mono text-white/70 break-all">{req.destination}</span>
+                              </div>
+                            )}
+
+                            {/* Yüklenen Dekont Önizleme Butonu */}
+                            {req.receiptUrl && (
+                              <div className="p-2 rounded-lg bg-[#0ecb81]/[0.05] border border-[#0ecb81]/25 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText size={14} className="text-[#0ecb81] shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="text-[9px] font-bold text-white/35 uppercase block">Havale / EFT Dekontu</span>
+                                    <span className="text-[11px] text-white/80 font-medium truncate block max-w-[160px]">
+                                      {req.receiptName || "Dekont Belgesi"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Havale Dekontu" })}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#0ecb81]/15 hover:bg-[#0ecb81]/25 text-[#0ecb81] text-[10px] font-bold transition-all cursor-pointer shrink-0"
+                                >
+                                  <Eye size={12} />
+                                  <span>İncele</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Reddedilme Sebebi */}
+                            {req.status === "rejected" && req.rejectionReason && (
+                              <div className="p-2.5 rounded-lg bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
+                                <div className="flex items-center gap-1.5 text-[#f6465d] font-bold text-[11px] mb-1">
+                                  <AlertCircle size={13} className="shrink-0" />
+                                  <span>Red Gerekçesi:</span>
+                                </div>
+                                <p className="text-[11px] text-white/90 leading-relaxed pl-4 font-normal">
+                                  {req.rejectionReason}
+                                </p>
+
+                                {req.type === "withdraw" && (
+                                  <div className="mt-2 pt-1.5 border-t border-[#f6465d]/15 flex justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setTab("deposit");
+                                        setDStep("method");
+                                        setMethod(null);
+                                        setAmount("");
+                                      }}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white transition-all cursor-pointer"
+                                    >
+                                      <ArrowDownLeft size={11} className="text-[#0ecb81]" />
+                                      <span>Para Yatırma Ekranına Git</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-1 text-[10px] text-white/30">
+                              <span className="font-mono">{req.id}</span>
+                              <span>
+                                {new Date(req.createdAt).toLocaleDateString("tr-TR", {
+                                  day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   );
                 })

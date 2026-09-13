@@ -72,27 +72,27 @@ function AssetTabBar({
           <button
             key={a.label}
             onClick={() => onSelectAsset(a)}
-            className={`group relative flex items-center gap-1.5 rounded-lg transition-all select-none shrink-0 cursor-pointer ${
-              compact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
+            className={`group relative flex items-center rounded-xl transition-all select-none shrink-0 cursor-pointer ${
+              compact ? "px-2.5 py-1.5 text-xs gap-1.5" : "px-3.5 py-1.5 text-[13.5px] gap-2"
             } ${
               isActive
-                ? "bg-black text-white shadow-none"
-                : "bg-black text-white/60 hover:text-white"
+                ? "bg-black text-white shadow-none border border-white/10"
+                : "bg-black text-white/60 hover:text-white border border-transparent"
             }`}
             title={`${a.label} — %${a.payout} (Tıklayarak geçiş yap)`}
           >
             {/* Horizontal Flag(s) */}
             <div className="flex items-center shrink-0">
-              {renderAssetFlag(a, compact ? 16 : 18)}
+              {renderAssetFlag(a, compact ? 18 : 20)}
             </div>
 
             {/* Asset label */}
-            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[65px]" : "max-w-[85px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
+            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[75px] text-xs" : "max-w-[105px] text-[13.5px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
               {a.label}
             </span>
 
             {/* Payout badge */}
-            <span className={`text-[10px] font-black shrink-0 ${isActive ? "text-[#0ecb81]" : "text-[#0ecb81]/80"}`}>
+            <span className={`font-bold shrink-0 text-[#1aa369] ${compact ? "text-[10.5px]" : "text-xs"}`}>
               {a.payout}%
             </span>
 
@@ -103,10 +103,10 @@ function AssetTabBar({
                   e.stopPropagation();
                   onOpenAssetSheet();
                 }}
-                className="p-0.5 rounded text-white/30 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                className="p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-colors shrink-0"
                 title="Varlık Değiştir"
               >
-                <ChevronDown size={10} />
+                <ChevronDown size={compact ? 11 : 13} />
               </span>
             )}
 
@@ -117,10 +117,10 @@ function AssetTabBar({
                   e.stopPropagation();
                   onCloseTab(a, e);
                 }}
-                className="p-0.5 rounded-full text-white/30 hover:text-[#f6465d] hover:bg-white/15 transition-colors shrink-0 ml-0.5"
+                className="p-0.5 rounded-full text-white/30 hover:text-[#c0384a] hover:bg-white/15 transition-colors shrink-0 ml-0.5"
                 title="Bu Varlığı Kapat"
               >
-                <X size={10} strokeWidth={2.5} />
+                <X size={compact ? 10 : 11} strokeWidth={2.5} />
               </span>
             )}
           </button>
@@ -131,12 +131,12 @@ function AssetTabBar({
       {openAssets.length < 2 && (
         <button
           onClick={onOpenAssetSheet}
-          className={`flex items-center justify-center rounded-lg bg-black text-white hover:text-white/70 transition-all shrink-0 cursor-pointer ${
-            compact ? "h-6 w-6" : "h-7 w-7"
+          className={`flex items-center justify-center rounded-xl bg-black text-white hover:text-white/70 border border-white/10 transition-all shrink-0 cursor-pointer ${
+            compact ? "h-7 w-7" : "h-8 w-8"
           }`}
           title="İkinci Varlık Ekle (Maksimum 2 Varlık Yan Yana)"
         >
-          <Plus size={compact ? 13 : 15} className="text-white" strokeWidth={2.5} />
+          <Plus size={compact ? 14 : 16} className="text-white" strokeWidth={2.5} />
         </button>
       )}
     </div>
@@ -254,7 +254,7 @@ function ChartNotification({ notif }: { notif: ChartNotif | null }) {
           animate={{ y: 0,   opacity: 1 }}
           exit={{   y: -12, opacity: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 36 }}
-          className="absolute top-2 left-1/2 z-20 -translate-x-1/2"
+          className="absolute top-2 left-1/2 z-20 -translate-x-1/2 max-w-[calc(100vw-2rem)] px-2"
         >
           {(() => {
             const isOpen = notif.type === "open";
@@ -270,21 +270,16 @@ function ChartNotification({ notif }: { notif: ChartNotif | null }) {
               ? (notif.direction === "UP" ? "▲" : "▼")
               : (won ? "▲" : "▼");
             return (
-              <div className="relative flex items-center gap-2 rounded-2xl px-3 py-2 overflow-hidden"
+              <div className="relative flex items-center gap-2 rounded-2xl px-3.5 py-2 overflow-hidden shadow-2xl"
                 style={{
-                  background: `${accent}12`,
-                  border: `1px solid ${accent}35`,
+                  background: `${accent}15`,
+                  border: `1px solid ${accent}40`,
                   backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-                  boxShadow: `0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 ${accent}20`,
+                  boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
                 }}>
-                <span className="text-[13px] font-black" style={{ color: accent }}>{label}</span>
-                <span className="text-sm font-black tracking-tight" style={{ color: accent }}>{amtStr}</span>
-                {!isOpen && (
-                  <span className="text-[10px] font-semibold text-white/30">{notif.asset}</span>
-                )}
-                {isOpen && (
-                  <span className="text-[10px] font-semibold text-white/30">{notif.asset}</span>
-                )}
+                <span className="text-[13px] font-black shrink-0" style={{ color: accent }}>{label}</span>
+                <span className="text-sm font-black tracking-tight truncate max-w-[150px]" style={{ color: accent }}>{amtStr}</span>
+                <span className="text-[10px] font-semibold text-white/50 shrink-0 truncate max-w-[70px]">{notif.asset}</span>
                 <motion.div
                   initial={{ scaleX: 1 }} animate={{ scaleX: 0 }}
                   transition={{ duration: 3, ease: "linear", delay: 0.1 }}
@@ -312,14 +307,12 @@ function AssetSheet({
             className="fixed inset-0 z-50" onClick={onClose}
             style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }} />
           <motion.div
-            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col"
-            style={{ background: "#090909", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "80vh" }}
+            className="fixed inset-0 m-auto h-fit w-[calc(100%-2rem)] max-w-[380px] z-[60] rounded-3xl flex flex-col overflow-hidden shadow-2xl backdrop-blur-2xl"
+            style={{ background: "linear-gradient(180deg, rgba(20,20,24,0.95) 0%, rgba(10,10,12,0.98) 100%)", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "75vh", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.8)" }}
           >
-            <div className="flex justify-center pt-3 pb-1 shrink-0">
-              <div className="w-9 h-1 rounded-full bg-white/15" />
-            </div>
+            
             <div className="flex items-center justify-between px-5 py-3 shrink-0">
               <div>
                 <h2 className="text-sm font-black text-white">Varlık Seç</h2>
@@ -336,27 +329,23 @@ function AssetSheet({
                   <button key={a.label}
                     onClick={() => { onSelect(a); onClose(); }}
                     className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 mb-1.5 transition-colors"
-                    style={{ background: isActive ? `${a.color}14` : "rgba(255,255,255,0.02)", border: isActive ? `1px solid ${a.color}30` : "1px solid transparent" }}
+                    style={{ background: isActive ? "rgba(42,171,238,0.1)" : "rgba(255,255,255,0.02)", border: isActive ? "1px solid rgba(42,171,238,0.3)" : "1px solid transparent" }}
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
-                      {renderAssetFlag(a, 26)}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
+                      {renderAssetFlag(a, 28)}
                     </div>
                     <div className="flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-black text-white">{a.label}</span>
-                        {isActive && <span className="rounded px-1 py-0.5 text-[8px] font-black" style={{ background: `${a.color}25`, color: a.color }}>AKTİF</span>}
+                        <span className="text-[15px] font-bold text-white">{a.label}</span>
+                        
                       </div>
-                      <span className="text-[11px] text-white/35">{a.desc}</span>
+                      <span className="text-xs text-white/40">{a.desc}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-black text-[#0ecb81]">{a.payout}%</div>
-                      <div className="text-[9px] text-white/25">Payout</div>
+                      <div className="text-[15px] font-bold text-[#1aa369]">{a.payout}%</div>
+                      <div className="text-[9.5px] text-white/30">Payout</div>
                     </div>
-                    <div className="flex items-end gap-0.5 h-6 shrink-0">
-                      {[60,75,55,80,65,90,70].map((h, j) => (
-                        <div key={j} className="rounded-t-[1px]" style={{ width:3, height:`${h*0.24}px`, background: isActive ? a.color : "#2a2a2a" }} />
-                      ))}
-                    </div>
+
                   </button>
                 );
               })}
@@ -394,7 +383,7 @@ function TradeControls({
   const cardBorder = glass ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.06)";
 
   const commitAmount = (raw: string) => {
-    const parsed = parseFloat(raw.replace(",", "."));
+    const parsed = parseInt(raw.replace(/[^0-9]/g, ""), 10);
     const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
     setAmount(valid);
     setAmountStr(String(valid));
@@ -403,33 +392,36 @@ function TradeControls({
   return (
     <div className="flex flex-col gap-2">
       {/* Amount + Duration */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {/* Editable amount */}
-        <div className="flex flex-1 flex-col rounded-2xl px-3 py-2.5 border" style={{ background: cardBg, borderColor: cardBorder }} data-tour="step-2">
-          <span className="text-[9px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Tutar</span>
+        <div className="flex flex-1 flex-col rounded-xl px-2.5 py-1.5 border" style={{ background: cardBg, borderColor: cardBorder }} data-tour="step-2">
+          <span className="text-[8.5px] font-bold text-white/35 uppercase tracking-widest mb-0.5">Tutar</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => { const v = Math.max(minAmount, amount - step); setAmount(v); setAmountStr(String(v)); }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white/40 border border-white/10 hover:border-white/20 transition-colors"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/40 border border-white/10 hover:border-white/20 transition-colors"
               style={{ background: "rgba(255,255,255,0.06)" }}>
-              <Minus size={10} />
+              <Minus size={9} />
             </button>
             <div className="flex flex-1 items-center justify-center gap-0.5">
-              <span className="text-xs font-bold text-[#FF9500]">{cs}</span>
+              <span className="text-[11px] font-semibold text-[#FF9500]">{cs}</span>
               <input
-                type="text" inputMode="decimal"
+                type="text" inputMode="numeric"
                 value={amountStr}
-                onChange={e => setAmountStr(e.target.value)}
+                onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ""))}
                 onBlur={() => commitAmount(amountStr)}
-                onKeyDown={e => { if (e.key === "Enter") { commitAmount(amountStr); (e.target as HTMLInputElement).blur(); } }}
-                className="w-14 text-center bg-transparent text-sm font-black text-white outline-none"
+                onKeyDown={e => {
+                  if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '+') e.preventDefault();
+                  if (e.key === "Enter") { commitAmount(amountStr); (e.target as HTMLInputElement).blur(); }
+                }}
+                className="w-12 text-center bg-transparent text-[13.5px] font-semibold text-white outline-none"
               />
             </div>
             <button
               onClick={() => { const v = Math.min(displayBalance, amount + step); setAmount(v); setAmountStr(String(v)); }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white/40 border border-white/10 hover:border-white/20 transition-colors"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/40 border border-white/10 hover:border-white/20 transition-colors"
               style={{ background: "rgba(255,255,255,0.06)" }}>
-              <Plus size={10} />
+              <Plus size={9} />
             </button>
           </div>
         </div>
@@ -437,15 +429,15 @@ function TradeControls({
         {/* Duration picker button */}
         <button
           onClick={() => setShowDuration(true)}
-          className="flex flex-1 flex-col rounded-2xl px-3 py-2.5 border text-left transition-colors active:scale-[0.97]"
+          className="flex flex-1 flex-col rounded-xl px-2.5 py-1.5 border text-left transition-colors active:scale-[0.97]"
           style={{ background: cardBg, borderColor: cardBorder }}
           data-tour="step-3-old"
         >
-          <span className="text-[9px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Süre</span>
-          <div className="flex items-center justify-center gap-1.5">
-            <Clock size={11} className="text-[#FF9500]" />
-            <span className="text-sm font-black text-white">{tf.label}</span>
-            <ChevronDown size={9} className="text-white/40" />
+          <span className="text-[8.5px] font-bold text-white/35 uppercase tracking-widest mb-0.5">Süre</span>
+          <div className="flex items-center justify-center gap-1">
+            <Clock size={10} className="text-[#FF9500]" />
+            <span className="text-[13.5px] font-semibold text-white">{tf.label}</span>
+            <ChevronDown size={8.5} className="text-white/40" />
           </div>
         </button>
       </div>
@@ -471,7 +463,7 @@ function TradeControls({
               </div>
               <div className="flex items-center justify-between px-5 py-3">
                 <div>
-                  <h2 className="text-sm font-black text-white">İşlem Süresi</h2>
+                  <h2 className="text-sm font-bold text-white">İşlem Süresi</h2>
                   <p className="text-[11px] text-white/30 mt-0.5">Vade süresini seçin</p>
                 </div>
                 <button onClick={() => setShowDuration(false)}
@@ -495,7 +487,7 @@ function TradeControls({
                         boxShadow: isActive ? "0 4px 18px rgba(255,107,0,0.35)" : "none",
                       }}
                     >
-                      <span className={`text-base font-black ${isActive ? "text-black" : "text-white"}`}>{t.label}</span>
+                      <span className={`text-base font-bold ${isActive ? "text-black" : "text-white"}`}>{t.label}</span>
                       <span className={`text-[9px] font-semibold ${isActive ? "text-black/60" : "text-white/30"}`}>
                         {tfSubLabel(t.secs)}
                       </span>
@@ -525,17 +517,17 @@ function TradeControls({
       <div className="flex gap-2" data-tour="step-4">
         <motion.button whileTap={{ scale: 0.97 }} onClick={() => onTrade("UP")}
           disabled={tradeBlocked || balanceWarn || chartLoading}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-4 text-white font-black disabled:opacity-40"
-          style={{ background: "linear-gradient(135deg,#05a660,#0ecb81)", boxShadow: "0 6px 20px rgba(14,203,129,0.30)" }}>
-          <ArrowUp size={16} strokeWidth={3} />
-          <span className="text-base font-black">{cs}{payout}</span>
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
+          style={{ background: "linear-gradient(135deg,#128255,#199c66)", boxShadow: "0 3px 12px rgba(22,155,101,0.20)" }}>
+          <ArrowUp size={14} strokeWidth={2.5} />
+          <span className="text-[13.5px] font-semibold">{cs}{payout}</span>
         </motion.button>
         <motion.button whileTap={{ scale: 0.97 }} onClick={() => onTrade("DOWN")}
           disabled={tradeBlocked || balanceWarn || chartLoading}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-4 text-white font-black disabled:opacity-40"
-          style={{ background: "linear-gradient(135deg,#c0283e,#f6465d)", boxShadow: "0 6px 20px rgba(246,70,93,0.30)" }}>
-          <ArrowDown size={16} strokeWidth={3} />
-          <span className="text-base font-black">{cs}{payout}</span>
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
+          style={{ background: "linear-gradient(135deg,#9f2a38,#bd3546)", boxShadow: "0 3px 12px rgba(189,53,70,0.20)" }}>
+          <ArrowDown size={14} strokeWidth={2.5} />
+          <span className="text-[13.5px] font-semibold">{cs}{payout}</span>
         </motion.button>
       </div>
     </div>
@@ -892,7 +884,7 @@ function MobileTradePanel({
   })();
 
   const commitAmount = (raw: string) => {
-    const parsed = parseFloat(raw.replace(",", "."));
+    const parsed = parseInt(raw.replace(/[^0-9]/g, ""), 10);
     const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
     setAmount(valid);
     setAmountStr(String(valid));
@@ -995,33 +987,36 @@ function MobileTradePanel({
       />
 
       {/* ── Tutar + Zaman ─────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 8, padding: "2px 12px 6px" }}>
+      <div style={{ display: "flex", gap: 6, padding: "1px 12px 4px" }}>
         {/* Tutar */}
-        <div data-tour="step-2" style={{ flex: 1, background: "#1c1c1c", borderRadius: 12, padding: "7px 10px", border: "1px solid #252525" }}>
-          <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 2, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Tutar</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <div data-tour="step-2" style={{ flex: 1, background: "#1c1c1c", borderRadius: 10, padding: "5px 8px", border: "1px solid #252525" }}>
+          <p style={{ fontSize: 8.5, color: "rgba(255,255,255,0.35)", marginBottom: 1, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Tutar</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
             <button
               onClick={() => { const v = Math.max(minAmount, amount - step); setAmount(v); setAmountStr(String(v)); }}
-              style={{ color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+              style={{ color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer", padding: "1px 3px" }}
             >
-              <Minus size={12} />
+              <Minus size={10} />
             </button>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 900, color: "#FF9500" }}>{cs}</span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: "#FF9500" }}>{cs}</span>
               <input
-                type="text" inputMode="decimal"
+                type="text" inputMode="numeric"
                 value={amountStr}
-                onChange={e => setAmountStr(e.target.value)}
+                onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ""))}
                 onBlur={() => commitAmount(amountStr)}
-                onKeyDown={e => { if (e.key === "Enter") { commitAmount(amountStr); (e.target as HTMLInputElement).blur(); } }}
-                style={{ width: 46, textAlign: "center", background: "transparent", border: "none", outline: "none", fontSize: 17, fontWeight: 900, color: "#fff", fontFamily: "inherit" }}
+                onKeyDown={e => {
+                  if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '+') e.preventDefault();
+                  if (e.key === "Enter") { commitAmount(amountStr); (e.target as HTMLInputElement).blur(); }
+                }}
+                style={{ width: 42, textAlign: "center", background: "transparent", border: "none", outline: "none", fontSize: 13.5, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}
               />
             </div>
             <button
               onClick={() => { const v = Math.min(displayBalance, amount + step); setAmount(v); setAmountStr(String(v)); }}
-              style={{ color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+              style={{ color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer", padding: "1px 3px" }}
             >
-              <Plus size={12} />
+              <Plus size={10} />
             </button>
           </div>
         </div>
@@ -1030,10 +1025,10 @@ function MobileTradePanel({
         <button
           onClick={() => setShowDuration(true)}
           data-tour="step-3"
-          style={{ flex: 1, background: "#1c1c1c", borderRadius: 12, padding: "7px 10px", border: "1px solid #252525", textAlign: "left", cursor: "pointer" }}
+          style={{ flex: 1, background: "#1c1c1c", borderRadius: 10, padding: "5px 8px", border: "1px solid #252525", textAlign: "left", cursor: "pointer" }}
         >
-          <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 2, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Zaman</p>
-          <p style={{ fontSize: 17, fontWeight: 900, color: "#fff", margin: 0 }}>{expiryStr}</p>
+          <p style={{ fontSize: 8.5, color: "rgba(255,255,255,0.35)", marginBottom: 1, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Zaman</p>
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", margin: 0 }}>{expiryStr}</p>
         </button>
       </div>
 
@@ -1042,44 +1037,44 @@ function MobileTradePanel({
         {balanceWarn && (
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-            style={{ margin: "0 12px 8px", overflow: "hidden", display: "flex", alignItems: "center", gap: 8,
-              borderRadius: 12, padding: "8px 12px", background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}
+            style={{ margin: "0 12px 6px", overflow: "hidden", display: "flex", alignItems: "center", gap: 6,
+              borderRadius: 10, padding: "6px 10px", background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}
           >
-            <X size={12} color="#f6465d" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#f6465d" }}>Yetersiz bakiye — tutarı azaltın</span>
+            <X size={11} color="#f6465d" />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#f6465d" }}>Yetersiz bakiye — tutarı azaltın</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── UP / DOWN ─────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 8, padding: "0 12px", paddingBottom: "max(10px, env(safe-area-inset-bottom))" }} data-tour="step-4">
+      <div style={{ display: "flex", gap: 6, padding: "0 12px", paddingBottom: "max(8px, env(safe-area-inset-bottom))" }} data-tour="step-4">
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => onTrade("UP")}
           disabled={tradeBlocked || balanceWarn || chartLoading}
           style={{
-            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            borderRadius: 14, padding: "11px 0", border: "none", cursor: "pointer",
-            background: "#18c463",
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+            borderRadius: 11, padding: "8px 0", border: "none", cursor: "pointer",
+            background: "#199c66",
             opacity: tradeBlocked || balanceWarn || chartLoading ? 0.45 : 1,
           }}
         >
-          <ArrowUp size={16} strokeWidth={3} color="#fff" />
-          <span style={{ fontSize: 15, fontWeight: 900, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
+          <ArrowUp size={14} strokeWidth={2.5} color="#fff" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => onTrade("DOWN")}
           disabled={tradeBlocked || balanceWarn || chartLoading}
           style={{
-            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            borderRadius: 14, padding: "11px 0", border: "none", cursor: "pointer",
-            background: "#e84040",
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+            borderRadius: 11, padding: "8px 0", border: "none", cursor: "pointer",
+            background: "#c0384a",
             opacity: tradeBlocked || balanceWarn || chartLoading ? 0.45 : 1,
           }}
         >
-          <ArrowDown size={16} strokeWidth={3} color="#fff" />
-          <span style={{ fontSize: 15, fontWeight: 900, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
+          <ArrowDown size={14} strokeWidth={2.5} color="#fff" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
         </motion.button>
       </div>
 
@@ -1309,10 +1304,10 @@ export default function Home() {
   }, [minAmount]);
 
   useEffect(() => {
-    if (amount < minAmount) {
+    if (amount < minAmount || amount > displayBalance) {
       setAmountPersist(minAmount);
     }
-  }, [minAmount, amount, setAmountPersist]);
+  }, [minAmount, displayBalance, amount, setAmountPersist]);
 
   /* Update now every second — used to filter expired active trades from the UI
      before the 500ms settlement interval fires (prevents "stuck at 00:00" cards). */
@@ -1575,7 +1570,7 @@ export default function Home() {
       return;
     }
 
-    const tradeAmount = Math.max(minAmount, isNaN(amount) ? minAmount : amount);
+    const tradeAmount = Math.max(minAmount, isNaN(amount) ? minAmount : Math.round(amount));
     if (amount < minAmount) {
       setAmountPersist(minAmount);
     }
@@ -1707,7 +1702,7 @@ export default function Home() {
           }}
         >
           {/* Top bar */}
-          <div className="flex h-9 shrink-0 items-center justify-between px-2.5 bg-black gap-2">
+          <div className="flex h-10 shrink-0 items-center justify-between px-2.5 bg-black gap-2">
             {/* Left: Rotate back to portrait + Asset picker */}
             <div className="flex items-center gap-2 min-w-0">
               <button
@@ -1801,14 +1796,14 @@ export default function Home() {
             <div className="w-[165px] shrink-0 border-l border-white/10 bg-[#0c0c0c] flex flex-col justify-between p-2 gap-1.5 overflow-y-auto">
               {/* Amount */}
               <div className="flex flex-col gap-0.5">
-                <div className="flex justify-between text-[9.5px] font-bold text-white/40 uppercase">
+                <div className="flex justify-between text-[8.5px] font-bold text-white/40 uppercase">
                   <span>Tutar</span>
                   <span>{currency}</span>
                 </div>
                 <div className="flex items-center rounded-lg bg-[#181818] border border-white/10 p-0.5">
                   <button
                     onClick={() => setAmountPersist(Math.max(minAmount, amount - step))}
-                    className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-xs"
+                    className="w-5 h-5 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-[11px]"
                   >
                     -
                   </button>
@@ -1824,11 +1819,11 @@ export default function Home() {
                         setAmountPersist(minAmount);
                       }
                     }}
-                    className="w-full text-center font-bold text-white text-xs bg-transparent outline-none tabular-nums"
+                    className="w-full text-center font-semibold text-white text-[11px] bg-transparent outline-none tabular-nums"
                   />
                   <button
                     onClick={() => setAmountPersist(amount + step)}
-                    className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-xs"
+                    className="w-5 h-5 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-[11px]"
                   >
                     +
                   </button>
@@ -1837,13 +1832,13 @@ export default function Home() {
 
               {/* Expiry Duration */}
               <div className="flex flex-col gap-0.5 relative">
-                <div className="text-[9.5px] font-bold text-white/40 uppercase">Vade Süresi</div>
+                <div className="text-[8.5px] font-bold text-white/40 uppercase">Vade Süresi</div>
                 <button
                   onClick={() => setShowDurationLandscape(v => !v)}
-                  className="flex items-center justify-between rounded-lg bg-[#181818] border border-white/10 px-2 py-1 text-xs hover:bg-white/5"
+                  className="flex items-center justify-between rounded-lg bg-[#181818] border border-white/10 px-2 py-0.5 text-[11px] hover:bg-white/5"
                 >
-                  <span className="font-bold text-white text-xs">{tf.label}</span>
-                  <ChevronDown size={11} className="text-white/40" />
+                  <span className="font-semibold text-white text-[11px]">{tf.label}</span>
+                  <ChevronDown size={10} className="text-white/40" />
                 </button>
 
                 {showDurationLandscape && (
@@ -1863,47 +1858,47 @@ export default function Home() {
               </div>
 
               {/* Payout */}
-              <div className="flex items-center justify-between text-[10px] px-1 font-bold">
+              <div className="flex items-center justify-between text-[9.5px] px-1 font-semibold">
                 <span className="text-white/40">Getiri:</span>
-                <span className="text-[#0ecb81]">+{cs}{totalReturn}</span>
+                <span className="text-[#1aa369]">+{cs}{totalReturn}</span>
               </div>
 
               {/* Action buttons */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 <motion.button
                   whileTap={{ scale: 0.94 }}
                   onClick={() => handleTrade("UP")}
                   disabled={balanceWarn || chartLoading || tradeBlocked}
-                  className="flex flex-col items-center justify-center rounded-xl py-2 gap-0.5 text-white font-black transition-opacity"
+                  className="flex flex-col items-center justify-center rounded-lg py-1.5 gap-0.5 text-white font-bold transition-opacity cursor-pointer"
                   style={{
-                    background: "linear-gradient(135deg, #0ecb81, #059669)",
-                    boxShadow: "0 3px 10px rgba(14,203,129,0.3)",
+                    background: "linear-gradient(135deg, #128255, #199c66)",
+                    boxShadow: "0 2px 8px rgba(22,155,101,0.20)",
                     opacity: (balanceWarn || chartLoading || tradeBlocked) ? 0.5 : 1,
                   }}
                 >
                   <div className="flex items-center gap-1">
-                    <TrendingUp size={13} />
-                    <span className="text-xs">{t.upBtn}</span>
+                    <TrendingUp size={11} />
+                    <span className="text-[11px] font-semibold">{t.upBtn}</span>
                   </div>
-                  <span className="text-[9px] font-bold opacity-80">+{asset.payout}%</span>
+                  <span className="text-[8.5px] font-semibold opacity-90">+{asset.payout}%</span>
                 </motion.button>
 
                 <motion.button
                   whileTap={{ scale: 0.94 }}
                   onClick={() => handleTrade("DOWN")}
                   disabled={balanceWarn || chartLoading || tradeBlocked}
-                  className="flex flex-col items-center justify-center rounded-xl py-2 gap-0.5 text-white font-black transition-opacity"
+                  className="flex flex-col items-center justify-center rounded-lg py-1.5 gap-0.5 text-white font-bold transition-opacity cursor-pointer"
                   style={{
-                    background: "linear-gradient(135deg, #f6465d, #dc2626)",
-                    boxShadow: "0 3px 10px rgba(246,70,93,0.3)",
+                    background: "linear-gradient(135deg, #9f2a38, #bd3546)",
+                    boxShadow: "0 2px 8px rgba(189,53,70,0.20)",
                     opacity: (balanceWarn || chartLoading || tradeBlocked) ? 0.5 : 1,
                   }}
                 >
                   <div className="flex items-center gap-1">
-                    <TrendingDown size={13} />
-                    <span className="text-xs">{t.downBtn}</span>
+                    <TrendingDown size={11} />
+                    <span className="text-[11px] font-semibold">{t.downBtn}</span>
                   </div>
-                  <span className="text-[9px] font-bold opacity-80">+{asset.payout}%</span>
+                  <span className="text-[8.5px] font-semibold opacity-90">+{asset.payout}%</span>
                 </motion.button>
               </div>
             </div>
@@ -1933,7 +1928,7 @@ export default function Home() {
       <h1 className="sr-only">Obyo Option — Forex ve OTC İkili Opsiyon Trading Platformu</h1>
       <div className="flex h-full flex-col overflow-hidden" style={{ background: "#000" }}>
           {/* Asset bar — compact horizontal */}
-          <div className="relative flex h-8 shrink-0 items-center justify-between gap-1.5 px-2 bg-black" data-tour="step-1">
+          <div className="relative flex h-10 shrink-0 items-center justify-between gap-2 px-2.5 bg-black" data-tour="step-1">
             <div className="flex items-center min-w-0 overflow-x-auto no-scrollbar">
               <AssetTabBar
                 openAssets={openAssets}
@@ -2042,7 +2037,7 @@ export default function Home() {
         <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
 
           {/* Desktop Asset bar + Mobile-style compact toolbar (no scrollbar) */}
-          <div className="flex h-11 shrink-0 items-center justify-between px-3 bg-black border-b border-white/5">
+          <div className="flex h-12 shrink-0 items-center justify-between px-3 bg-black border-b border-white/5">
             {/* Left: Asset Tabs */}
             <div className="flex items-center gap-2 min-w-0 shrink-0">
               <AssetTabBar
@@ -2162,45 +2157,46 @@ export default function Home() {
 
                 <div className="flex flex-col gap-3 p-4">
                   {/* Asset info card */}
-                  <div className="rounded-xl p-3 border border-white/6 bg-black">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
-                        {renderAssetFlag(asset, 24)}
+                  <div className="rounded-2xl p-3.5 border border-white/8 bg-black">
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
+                        {renderAssetFlag(asset, 26)}
                       </div>
                       <div>
-                        <p className="text-sm font-black text-white">{asset.label}</p>
-                        <p className="text-[11px] text-white/35">{asset.desc}</p>
+                        <p className="text-[15px] font-bold text-white">{asset.label}</p>
+                        <p className="text-xs text-white/40">{asset.desc}</p>
                       </div>
                       <div className="ml-auto text-right">
-                        <p className="text-sm font-black text-[#0ecb81]">{asset.payout}%</p>
-                        <p className="text-[9px] text-white/25">Payout</p>
+                        <p className="text-[15px] font-bold text-[#1aa369]">{asset.payout}%</p>
+                        <p className="text-[9.5px] text-white/30 font-medium">Payout</p>
                       </div>
                     </div>
                     <button onClick={() => setShowAssets(true)}
-                      className="w-full rounded-lg py-1.5 text-xs font-bold border border-white/8 text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors">
-                      Varlık Değiştir ↓
+                      className="w-full rounded-xl py-2 text-xs font-bold border border-white/10 text-white/50 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+                      <span>Varlık Değiştir</span>
+                      <ChevronDown size={12} className="text-white/40" />
                     </button>
                   </div>
 
                   {/* Amount */}
-                  <div className="rounded-xl bg-black border border-white/6 p-3" data-tour="step-2">
-                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Tutar</span>
-                    <div className="flex items-center gap-2 mt-2">
+                  <div className="rounded-xl bg-black border border-white/6 p-2.5" data-tour="step-2">
+                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Tutar</span>
+                    <div className="flex items-center gap-1.5 mt-1.5">
                       <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - (currency === "TL" ? 10 : 5)))}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10">
-                        <Minus size={12} />
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
+                        <Minus size={11} />
                       </button>
                       <span className="text-[10px] text-[#FF6B00] font-bold">{currency === "TL" ? "₺" : "$"}</span>
-                      <span className="flex-1 text-center text-xl font-black text-white">{amount}</span>
+                      <span className="flex-1 text-center text-lg font-semibold text-white tracking-tight">{amount}</span>
                       <button onClick={() => setAmountPersist(a => Math.min(displayBalance, a + (currency === "TL" ? 10 : 5)))}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10">
-                        <Plus size={12} />
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
+                        <Plus size={11} />
                       </button>
                     </div>
-                    <div className="flex gap-1.5 mt-2">
+                    <div className="flex gap-1 mt-1.5">
                       {(currency === "TL" ? [50, 100, 250, 500] : [10, 25, 50, 100]).map((v) => (
                         <button key={v} onClick={() => setAmountPersist(v)}
-                          className={`flex-1 rounded-lg py-1 text-xs font-bold transition-colors ${amount === v ? "bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/25" : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6"}`}>
+                          className={`flex-1 rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${amount === v ? "bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/25" : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6"}`}>
                           {currency === "TL" ? "₺" : "$"}{v}
                         </button>
                       ))}
@@ -2208,26 +2204,26 @@ export default function Home() {
                   </div>
 
                   {/* Expiry (Aligned & Matching Amount card design) */}
-                  <div className="rounded-xl bg-black border border-white/6 p-3" data-tour="step-3-old">
+                  <div className="rounded-xl bg-black border border-white/6 p-2.5" data-tour="step-3-old">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Süre</span>
-                      <span className="text-[10px] font-bold text-[#FF6B00]">{tfSubLabel(tf.secs)}</span>
+                      <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Süre</span>
+                      <span className="text-[9.5px] font-bold text-[#FF6B00]">{tfSubLabel(tf.secs)}</span>
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-1.5 mt-1.5">
                       <button
                         onClick={() => {
                           const curIdx = TIMEFRAMES.findIndex(t => t.label === tf.label);
                           if (curIdx > 0) setTf(TIMEFRAMES[curIdx - 1]);
                         }}
                         disabled={TIMEFRAMES.findIndex(t => t.label === tf.label) === 0}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         title="Daha Kısa Süre"
                       >
-                        <Minus size={12} />
+                        <Minus size={11} />
                       </button>
                       <div className="flex-1 flex items-center justify-center gap-1.5">
-                        <Clock size={14} className="text-[#FF6B00]" />
-                        <span className="text-xl font-black text-white">{tf.label}</span>
+                        <Clock size={13} className="text-[#FF6B00]" />
+                        <span className="text-lg font-semibold text-white tracking-tight">{tf.label}</span>
                       </div>
                       <button
                         onClick={() => {
@@ -2235,20 +2231,20 @@ export default function Home() {
                           if (curIdx < TIMEFRAMES.length - 1) setTf(TIMEFRAMES[curIdx + 1]);
                         }}
                         disabled={TIMEFRAMES.findIndex(t => t.label === tf.label) === TIMEFRAMES.length - 1}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         title="Daha Uzun Süre"
                       >
-                        <Plus size={12} />
+                        <Plus size={11} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5 mt-2">
+                    <div className="grid grid-cols-4 gap-1 mt-1.5">
                       {TIMEFRAMES.slice(0, 4).map(t => (
                         <button
                           key={t.label}
                           onClick={() => setTf(t)}
-                          className={`rounded-lg py-1 text-xs font-bold transition-colors ${
+                          className={`rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
                             t.label === tf.label
-                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-black"
+                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-bold"
                               : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6 hover:text-white/60"
                           }`}
                         >
@@ -2256,14 +2252,14 @@ export default function Home() {
                         </button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                    <div className="grid grid-cols-3 gap-1 mt-1">
                       {TIMEFRAMES.slice(4).map(t => (
                         <button
                           key={t.label}
                           onClick={() => setTf(t)}
-                          className={`rounded-lg py-1 text-xs font-bold transition-colors ${
+                          className={`rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
                             t.label === tf.label
-                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-black"
+                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-bold"
                               : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6 hover:text-white/60"
                           }`}
                         >
@@ -2274,33 +2270,33 @@ export default function Home() {
                   </div>
 
                   {/* Payout preview */}
-                  <div className="rounded-xl bg-black border border-white/6 p-3">
-                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Potansiyel Kazanç</span>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-2xl font-black text-[#0ecb81]">+{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span>
-                      <span className="text-xs text-white/30">{asset.payout}% kazanç</span>
+                  <div className="rounded-xl bg-black border border-white/6 p-2.5">
+                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Potansiyel Kazanç</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xl font-semibold text-[#1aa369] tracking-tight">+{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span>
+                      <span className="text-[11px] text-white/30 font-medium">{asset.payout}% kazanç</span>
                     </div>
                   </div>
 
                   {/* Trade buttons */}
                   {balanceWarn && (
-                    <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}>
-                      <X size={12} className="text-[#f6465d] shrink-0" />
+                    <div className="flex items-center gap-2 rounded-xl px-2.5 py-1.5" style={{ background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}>
+                      <X size={11} className="text-[#f6465d] shrink-0" />
                       <span className="text-xs font-bold text-[#f6465d]">{t.insufficientBalance}</span>
                     </div>
                   )}
-                  <div className="flex flex-col gap-2" data-tour="step-4">
+                  <div className="flex flex-col gap-1.5" data-tour="step-4">
                     <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleTrade("UP")} disabled={tradeBlocked || balanceWarn || chartLoading}
-                      className="flex items-center justify-center gap-2 rounded-xl py-4 text-white font-black disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg,#05a660,#0ecb81)", boxShadow: "0 4px 18px rgba(14,203,129,0.28)" }}>
-                      <ArrowUp size={16} strokeWidth={3} />
-                      <span className="text-base">{t.upBtn} · {currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span>
+                      className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
+                      style={{ background: "linear-gradient(135deg,#128255,#199c66)", boxShadow: "0 3px 12px rgba(22,155,101,0.20)" }}>
+                      <ArrowUp size={15} strokeWidth={2.5} />
+                      <span className="text-[13.5px] font-bold tracking-wide">{t.upBtn} · <span className="font-semibold text-xs">{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
                     </motion.button>
                     <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleTrade("DOWN")} disabled={tradeBlocked || balanceWarn || chartLoading}
-                      className="flex items-center justify-center gap-2 rounded-xl py-4 text-white font-black disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg,#c0283e,#f6465d)", boxShadow: "0 4px 18px rgba(246,70,93,0.28)" }}>
-                      <ArrowDown size={16} strokeWidth={3} />
-                      <span className="text-base">{t.downBtn} · {currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span>
+                      className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
+                      style={{ background: "linear-gradient(135deg,#9f2a38,#bd3546)", boxShadow: "0 3px 12px rgba(189,53,70,0.20)" }}>
+                      <ArrowDown size={15} strokeWidth={2.5} />
+                      <span className="text-[13.5px] font-bold tracking-wide">{t.downBtn} · <span className="font-semibold text-xs">{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
                     </motion.button>
                   </div>
 
