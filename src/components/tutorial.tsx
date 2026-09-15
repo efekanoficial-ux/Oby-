@@ -58,16 +58,15 @@ export function Tutorial() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (isMobile) {
-      const seen = localStorage.getItem("hasSeenInteractiveTutorialv12");
-      if (!seen) {
-        setTimeout(() => setShow(true), 1500);
-      }
+    const seen = localStorage.getItem("hasSeenInteractiveTutorialv12");
+    if (!seen) {
+      const timer = setTimeout(() => setShow(true), 1500);
+      return () => clearTimeout(timer);
     }
-  }, [isMobile]);
+  }, []);
 
   useEffect(() => {
-    if (!show || !isMobile) return;
+    if (!show) return;
     const currentStep = STEPS[step];
     if (currentStep.target === "none") {
       setTargetRect(null);
@@ -109,7 +108,7 @@ export function Tutorial() {
       if (scroller) scroller.removeEventListener("scroll", updateRect);
       clearInterval(interval);
     };
-  }, [show, step, isMobile]);
+  }, [show, step]);
 
   // Handle actual click during trade step
   useEffect(() => {
@@ -132,7 +131,7 @@ export function Tutorial() {
     return () => window.removeEventListener("click", handleGlobalClick, true);
   }, [show, step, targetRect]);
 
-  if (!show || !isMobile) return null;
+  if (!show) return null;
 
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
@@ -149,21 +148,21 @@ export function Tutorial() {
   const handleClose = () => {
     setShow(false);
     localStorage.setItem("hasSeenInteractiveTutorialv12", "true");
+    setLocation("/auth");
   };
 
   const handleCloseAndRegister = () => {
     handleClose();
-    setLocation("/auth");
   };
 
-  let tooltipStyle: React.CSSProperties = {};
+  let tooltipStyle: React.CSSProperties = { maxWidth: 420, margin: "0 auto" };
   if (currentStep.position === "center") {
-    tooltipStyle = { top: "50%", left: 24, right: 24, transform: "translateY(-50%)" };
+    tooltipStyle = { top: "50%", left: 20, right: 20, transform: "translateY(-50%)", maxWidth: 420, margin: "0 auto" };
   } else if (targetRect) {
     if (currentStep.position === "bottom") {
-      tooltipStyle = { top: targetRect.bottom + 36, left: 16, right: 16 };
+      tooltipStyle = { top: targetRect.bottom + 24, left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
     } else {
-      tooltipStyle = { bottom: window.innerHeight - targetRect.top + 36, left: 16, right: 16 };
+      tooltipStyle = { bottom: Math.max(16, window.innerHeight - targetRect.top + 24), left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
     }
   }
 

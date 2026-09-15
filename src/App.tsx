@@ -28,9 +28,9 @@ import { RejectionAlert } from "@/components/RejectionAlert";
 const queryClient = new QueryClient();
 
 function MainRoutes() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const atHome = location === "/";
-  const { currentUser } = useAuth();
+  const { currentUser, ready } = useAuth();
   const isMobile = useIsMobile();
   const [guestEntered, setGuestEntered] = useState(() => {
     try {
@@ -39,6 +39,22 @@ function MainRoutes() {
       return false;
     }
   });
+
+  const hasSeenTutorial = typeof window !== "undefined" && (
+    localStorage.getItem("hasSeenInteractiveTutorialv12") === "true" ||
+    localStorage.getItem("obyo_tutorial_done") === "1"
+  );
+
+  // İlk tutorial'dan sonra giriş zorunlu olsun
+  useEffect(() => {
+    if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
+      setLocation("/auth");
+    }
+  }, [ready, currentUser, hasSeenTutorial, location, setLocation]);
+
+  if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
+    return null;
+  }
 
   // Only show on PC (!isMobile) when NOT logged in (!currentUser) and visitor hasn't entered demo yet
   const showDesktopAuth = !isMobile && !currentUser && atHome && !guestEntered;

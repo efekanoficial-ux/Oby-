@@ -1,71 +1,98 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAccountMode } from "@/context/AccountModeContext";
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface VIPLevelCardProps {
   totalDeposited: number;
+  currency?: "USD" | "TL";
 }
 
-export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
+interface LevelRawConfig {
+  id: string;
+  name: string;
+  color: string;
+  minAmount: number;
+  bonus: string;
+}
+
+const levelsUSDConfig: LevelRawConfig[] = [
+  { id: "free",   name: "FREE",   color: "#71717a", minAmount: 0,     bonus: "%0" },
+  { id: "silver", name: "SILVER", color: "#cbd5e1", minAmount: 10,    bonus: "%2" },
+  { id: "gold",   name: "GOLD",   color: "#fde047", minAmount: 50,    bonus: "%5" },
+  { id: "vip",    name: "VIP",    color: "#d8b4fe", minAmount: 200,   bonus: "%12" }
+];
+
+const levelsTLConfig: LevelRawConfig[] = [
+  { id: "free",   name: "FREE",   color: "#71717a", minAmount: 0,     bonus: "%0" },
+  { id: "silver", name: "SILVER", color: "#cbd5e1", minAmount: 500,   bonus: "%2" },
+  { id: "gold",   name: "GOLD",   color: "#fde047", minAmount: 2500,  bonus: "%5" },
+  { id: "vip",    name: "VIP",    color: "#d8b4fe", minAmount: 10000, bonus: "%12" }
+];
+
+export function VIPLevelCard({ totalDeposited, currency: propCurrency }: VIPLevelCardProps) {
+  const { currentUser } = useAuth();
+  const accountMode = useAccountMode();
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState("free");
 
-  const levels = [
-    {
-      id: "free",
-      name: "FREE",
-      color: "#71717a", // soluk gri
-      minTL: 0,
-      withdrawalTime: "24 Saat",
-      support: "Normal Destek",
-      bonus: "%0"
-    },
-    {
-      id: "silver",
-      name: "SILVER",
-      color: "#d1d5db", // canlı gri
-      minTL: 350,
-      withdrawalTime: "1 Saat",
-      support: "Öncelikli Destek",
-      bonus: "%2"
-    },
-    {
-      id: "gold",
-      name: "GOLD",
-      color: "#fde047", // soluk sarı
-      minTL: 3000,
-      withdrawalTime: "15 Dakika",
-      support: "VIP Temsilci",
-      bonus: "%5"
-    },
-    {
-      id: "vip",
-      name: "VIP",
-      color: "#d8b4fe", // soluk mor
-      minTL: 10000,
-      withdrawalTime: "Anında",
-      support: "Özel Danışman",
-      bonus: "%10"
+  const effectiveCurrency: "USD" | "TL" = 
+    propCurrency || 
+    (currentUser?.currency as "USD" | "TL") || 
+    (accountMode?.currency as "USD" | "TL") || 
+    "USD";
+
+  const isUSD = effectiveCurrency === "USD";
+  const rawLevels = isUSD ? levelsUSDConfig : levelsTLConfig;
+  const symbol = isUSD ? "$" : "₺";
+  const locale = isUSD ? "en-US" : "tr-TR";
+
+  // Map dynamic localized withdrawal speed and support descriptions
+  const getLevelDetails = (id: string) => {
+    switch (id) {
+      case "silver":
+        return { withdrawalTime: t.hours12, support: t.supportPriority };
+      case "gold":
+        return { withdrawalTime: t.hours2, support: t.supportVip };
+      case "vip":
+        return { withdrawalTime: t.instantWithdraw || t.instant, support: t.supportAdvisor };
+      case "free":
+      default:
+        return { withdrawalTime: t.hours24, support: t.supportNormal };
     }
-  ];
+  };
+
+  const levels = rawLevels.map(lvl => ({
+    ...lvl,
+    ...getLevelDetails(lvl.id)
+  }));
 
   let currentIdx = 0;
-  if (totalDeposited >= 10000) currentIdx = 3;
-  else if (totalDeposited >= 3000) currentIdx = 2;
-  else if (totalDeposited >= 350) currentIdx = 1;
+  for (let i = levels.length - 1; i >= 0; i--) {
+    if (totalDeposited >= levels[i].minAmount) {
+      currentIdx = i;
+      break;
+    }
+  }
 
   const currentLevel = levels[currentIdx];
   const nextLevel = levels[currentIdx + 1] || null;
 
   let progress = 100;
-  let leftTL = 0;
+  let leftAmount = 0;
   if (nextLevel) {
-    const prev = currentLevel.minTL;
-    const target = nextLevel.minTL;
+    const prev = currentLevel.minAmount;
+    const target = nextLevel.minAmount;
     const diff = target - prev;
     const curr = Math.max(0, totalDeposited - prev);
-    progress = Math.min(100, Math.max(0, (curr / diff) * 100));
-    leftTL = Math.max(0, target - totalDeposited);
+    progress = diff > 0 ? Math.min(100, Math.max(0, (curr / diff) * 100)) : 100;
+    leftAmount = Math.max(0, target - totalDeposited);
   }
+
+  const maxTarget = levels[levels.length - 1].minAmount;
+  const globalProgress = maxTarget > 0 ? Math.min(100, (totalDeposited / maxTarget) * 100) : 100;
 
   return (
     <>
@@ -95,7 +122,9 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
 
           <div className="relative z-10 flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-medium tracking-widest text-white/40 uppercase block mb-1">Mevcut Statü</span>
+              <span className="text-[10px] font-medium tracking-widest text-white/40 uppercase block mb-1">
+                {t.currentStatus}
+              </span>
               <div 
                 className="text-lg font-black tracking-wider"
                 style={{ color: currentLevel.color, textShadow: `0 0 20px ${currentLevel.color}40` }}
@@ -109,8 +138,8 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
             {nextLevel ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between text-[10px] font-medium text-white/50">
-                  <span>{nextLevel.name} Seviyesine</span>
-                  <span className="text-white/80">₺{leftTL.toLocaleString("tr-TR")}</span>
+                  <span>{nextLevel.name} {t.toNextLevel}</span>
+                  <span className="text-white/80">{symbol}{leftAmount.toLocaleString(locale)}</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden relative border border-white/5">
                   <motion.div
@@ -124,7 +153,7 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
               </div>
             ) : (
               <div className="text-xs font-medium tracking-wide mt-2" style={{ color: currentLevel.color }}>
-                ✦ Maksimum Seviyedesiniz
+                {t.maxLevelReached}
               </div>
             )}
           </div>
@@ -144,10 +173,10 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
           >
             {/* Top Bar */}
             <div className="flex items-center justify-between px-6 py-6 z-10">
-              <h3 className="text-2xl font-bold tracking-tight text-white">Statü</h3>
+              <h3 className="text-2xl font-bold tracking-tight text-white">{t.statusTitle}</h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-all cursor-pointer"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 6L6 18M6 6l12 12"/>
@@ -161,12 +190,12 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
               `}} />
 
               {/* Pill Tabs */}
-              <div className="flex gap-1.5 sm:gap-2 mb-6 w-full">
+              <div className="flex gap-1.5 sm:gap-2 mb-6 w-full overflow-x-auto pb-1">
                 {levels.map(lvl => (
                   <button 
                     key={lvl.id}
                     onClick={() => setActiveTab(lvl.id)}
-                    className="flex-1 py-2.5 rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap flex items-center justify-center"
+                    className="flex-1 py-2.5 px-2 rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap flex items-center justify-center cursor-pointer"
                     style={{
                       backgroundColor: activeTab === lvl.id ? `${lvl.color}15` : 'rgba(255,255,255,0.03)',
                       color: activeTab === lvl.id ? lvl.color : 'rgba(255,255,255,0.4)',
@@ -181,13 +210,15 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
               {/* Global Progress Bar */}
               <div className="mb-10 px-1">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Yatırım İlerlemesi</span>
-                  <span className="text-[10px] text-emerald-400 font-bold">₺{totalDeposited.toLocaleString("tr-TR")} / ₺10.000</span>
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{t.depositProgress}</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">
+                    {symbol}{totalDeposited.toLocaleString(locale)} / {symbol}{maxTarget.toLocaleString(locale)}
+                  </span>
                 </div>
                 <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (totalDeposited / 10000) * 100)}%` }}
+                    animate={{ width: `${globalProgress}%` }}
                     transition={{ duration: 1, ease: "easeOut" }}
                     className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-zinc-500 to-emerald-500"
                   />
@@ -200,11 +231,13 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                    if (lvl.id !== activeTab) return null;
 
                    const isActiveLevelCurrent = lvl.id === currentLevel.id;
-                   const isLocked = currentLevel.minTL < lvl.minTL;
+                   const isLocked = currentLevel.minAmount < lvl.minAmount;
                    
                    let tabProgress = 0;
                    if (isLocked) {
-                     tabProgress = Math.min(100, Math.max(0, (totalDeposited / lvl.minTL) * 100));
+                     tabProgress = lvl.minAmount > 0 
+                       ? Math.min(100, Math.max(0, (totalDeposited / lvl.minAmount) * 100)) 
+                       : 100;
                    }
 
                    return (
@@ -221,7 +254,7 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                           {isActiveLevelCurrent && (
                             <div className="mb-3">
                               <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-white/5 border border-white/10 text-white/70">
-                                Şu Anki Seviye
+                                {t.currentLevelBadge}
                               </span>
                             </div>
                           )}
@@ -229,7 +262,9 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                             {lvl.name}
                           </h4>
                           <p className="text-sm text-white/40 font-medium">
-                            {lvl.minTL === 0 ? "Herkese açık standart ayrıcalıklar." : `Kazanmak için minimum ₺${lvl.minTL.toLocaleString("tr-TR")} yatırım gerektirir.`}
+                            {lvl.minAmount === 0 
+                              ? t.freeLevelDesc 
+                              : (t.requireDepositDesc || "Requires min {amount}").replace("{amount}", `${symbol}${lvl.minAmount.toLocaleString(locale)}`)}
                           </p>
                         </div>
 
@@ -240,10 +275,10 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                           {isLocked && (
                             <div className="col-span-2 p-5 rounded-3xl bg-white/[0.02] border border-white/5 flex flex-col justify-center shadow-lg">
                               <div className="flex justify-between items-center mb-3 text-xs font-semibold uppercase tracking-wider">
-                                <span className="text-white/40">Kalan Yatırım</span>
+                                <span className="text-white/40">{t.remainingDeposit}</span>
                                 <span style={{ color: lvl.color }}>
-                                  ₺{(lvl.minTL - totalDeposited).toLocaleString("tr-TR")}
-                               </span>
+                                  {symbol}{(lvl.minAmount - totalDeposited).toLocaleString(locale)}
+                                </span>
                               </div>
                               <div className="h-2.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 shadow-inner">
                                  <motion.div 
@@ -265,7 +300,7 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mb-1">Çekim Hızı</p>
+                              <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mb-1">{t.withdrawalSpeed}</p>
                               <p className="text-xl font-bold text-white/90">{lvl.withdrawalTime}</p>
                             </div>
                           </div>
@@ -278,7 +313,7 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mb-1">Destek Tipi</p>
+                              <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mb-1">{t.supportType}</p>
                               <p className="text-xl font-bold text-white/90">{lvl.support}</p>
                             </div>
                           </div>
@@ -289,8 +324,8 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
                              <div className="absolute -top-12 -right-12 w-40 h-40 opacity-20 blur-[40px] rounded-full pointer-events-none" style={{ background: lvl.color }} />
                              
                              <div className="relative z-10">
-                               <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">Ekstra Kazanç</p>
-                               <p className="text-lg font-bold text-white/90">Yatırım Bonusu</p>
+                               <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">{t.extraProfit}</p>
+                               <p className="text-lg font-bold text-white/90">{t.depositBonus}</p>
                              </div>
                              
                              <div className="relative z-10 flex items-center gap-2">
@@ -312,3 +347,4 @@ export function VIPLevelCard({ totalDeposited }: VIPLevelCardProps) {
     </>
   );
 }
+

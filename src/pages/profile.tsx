@@ -36,7 +36,7 @@ export default function Profile() {
   const isVerified = currentUser?.kycStatus === "verified";
 
   const menuItems: any[] = [
-    { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: "Günlük",             action: () => navigate("/leaderboard"),     href: undefined, customColor: undefined },
+    { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: t.daily || "Günlük", action: () => navigate("/leaderboard"),     href: undefined, customColor: undefined },
     { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined, customColor: undefined },
     { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined, customColor: undefined },
     { icon: Bell,        label: t.notifications,                  value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined, customColor: undefined },
@@ -116,8 +116,13 @@ export default function Profile() {
 
           </div>
 
-          {/* ── VIP Level Widget ── */}
-          <VIPLevelCard totalDeposited={currentUser?.totalDeposited ?? 0} />
+          {/* ── VIP Level Widget (Kayıt veya giriş yapılmadan statü kısmı gözükmez) ── */}
+          {currentUser && (
+            <VIPLevelCard 
+              totalDeposited={currentUser.totalDeposited ?? 0} 
+              currency={currentUser.currency} 
+            />
+          )}
 
           {/* ── KYC Status Card ── */}
           {currentUser && currentUser.kycStatus !== "verified" && (
@@ -154,15 +159,15 @@ export default function Profile() {
                           color: isVerified ? "#0ecb81" : currentUser.kycStatus === "pending" ? "#FFB800" : "rgba(255,255,255,0.4)"
                         }}
                       >
-                        {isVerified ? t.kycVerified : currentUser.kycStatus === "pending" ? "Onay Bekliyor" : t.kycNotVerified}
+                        {isVerified ? t.kycVerified : currentUser.kycStatus === "pending" ? t.kycPending : t.kycNotVerified}
                       </span>
                     </div>
                     <p className="text-[11px] text-white/35 mt-0.5">
                       {isVerified
-                        ? "Kimliğiniz onaylandı. Detayları görüntülemek için dokunun."
+                        ? t.kycApprovedSub
                         : currentUser.kycStatus === "pending"
-                        ? "Kimlik belgeleriniz inceleniyor."
-                        : "Para çekme işlemleri için kimlik doğrulaması yapın"}
+                        ? t.kycReviewSub
+                        : t.kycUnverifiedSub}
                     </p>
                   </div>
                 </div>
@@ -244,21 +249,21 @@ export default function Profile() {
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-md rounded-t-3xl p-6" style={{ background: "#0f0f0f", borderTop: "1px solid #1e1e1e" }}>
               <div className="mb-5 flex items-center justify-between">
-                <h3 className="text-lg font-black text-white">Obyo Option Hakkında</h3>
+                <h3 className="text-lg font-black text-white">{t.aboutTitle}</h3>
                 <button onClick={() => setShowAbout(false)} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ backgroundColor: "#1a1a1a", color: "#555" }}>
                   <X size={14} />
                 </button>
               </div>
               <div className="flex flex-col gap-3 text-sm leading-relaxed" style={{ color: "#666" }}>
-                <p>Obyo Option, kullanıcıların kripto para, döviz ve emtia piyasalarında ikili opsiyon işlemleri yapmasına olanak tanıyan bir ticaret platformudur.</p>
-                <p>Platform yalnızca <span className="font-bold" style={{ color: "#FFB800" }}>eğitim ve simülasyon amaçlıdır</span>.</p>
+                <p>{t.aboutDesc1}</p>
+                <p>{t.aboutDesc2}</p>
                 <div className="rounded-xl p-3" style={{ backgroundColor: "#171717", border: "1px solid #222" }}>
-                  <p className="mb-1 text-xs font-bold text-white">Yasal Uyarı</p>
-                  <p className="text-xs leading-relaxed" style={{ color: "#555" }}>İkili opsiyonlar yüksek risk içerir. Bu platform yatırım tavsiyesi vermez. Simülasyon sonuçları gerçek piyasa performansını garanti etmez.</p>
+                  <p className="mb-1 text-xs font-bold text-white">{t.aboutLegalTitle}</p>
+                  <p className="text-xs leading-relaxed" style={{ color: "#555" }}>{t.aboutLegalDesc}</p>
                 </div>
               </div>
-              <button onClick={() => setShowAbout(false)} className="mt-5 w-full rounded-xl py-3 text-sm font-black text-black" style={{ background: "#FF6B00" }}>
-                Tamam
+              <button onClick={() => setShowAbout(false)} className="mt-5 w-full rounded-xl py-3 text-sm font-black text-black cursor-pointer" style={{ background: "#FF6B00" }}>
+                {t.aboutOk}
               </button>
             </motion.div>
           </motion.div>
