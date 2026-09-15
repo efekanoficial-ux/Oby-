@@ -619,16 +619,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className="flex h-[56px] shrink-0 items-center justify-between px-3.5"
           style={{ background: "#000000" }}
         >
-          {/* Left: avatar (PP) */}
+          {/* Left: avatar (PP) with overflowing bottom-left VIP badge inside Link */}
           <div className="flex items-center">
             <Link href="/profile">
               <motion.div
                 whileTap={{ scale: 0.94 }}
-                className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[11px] font-black text-black cursor-pointer shadow-sm overflow-hidden border border-white/10"
+                className="relative flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full text-[11px] font-black text-black cursor-pointer shadow-sm overflow-visible border border-white/10"
                 style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
               >
                 {currentUser?.photoURL ? (
-                  <img src={currentUser.photoURL} alt="PP" className="h-full w-full object-cover" />
+                  <img src={currentUser.photoURL} alt="PP" className="h-full w-full object-cover rounded-full" />
                 ) : (
                   initials(currentUser?.name, currentUser?.surname)
                 )}

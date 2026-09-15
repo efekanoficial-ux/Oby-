@@ -412,25 +412,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Auto-migration check: Make sure user document exists under unified email path
         try {
           const emailDocRef = doc(db, "users", email);
-          const emailSnap = await getDoc(emailDocRef);
+          const emailSnap = await getDoc(emailDocRef).catch(() => null);
           let finalUserDoc: any = null;
 
-          if (!emailSnap.exists()) {
+          if (!emailSnap || !emailSnap.exists()) {
             let foundData: any = null;
             let foundOldId: string | null = null;
 
             // Search by email field in query
             const q = query(collection(db, "users"), where("email", "==", email));
-            const qSnap = await getDocs(q);
-            if (!qSnap.empty) {
+            const qSnap = await getDocs(q).catch(() => null);
+            if (qSnap && !qSnap.empty) {
               foundOldId = qSnap.docs[0].id;
               foundData = qSnap.docs[0].data();
             }
 
             // Also check under firebaseUser.uid
             if (!foundData && firebaseUser?.uid) {
-              const uidSnap = await getDoc(doc(db, "users", firebaseUser.uid));
-              if (uidSnap.exists()) {
+              const uidSnap = await getDoc(doc(db, "users", firebaseUser.uid)).catch(() => null);
+              if (uidSnap && uidSnap.exists()) {
                 foundOldId = firebaseUser.uid;
                 foundData = uidSnap.data();
               }
@@ -442,28 +442,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...foundData,
                 id: email,
               };
-              await setDoc(emailDocRef, cleanForFirestore(migratedData), { merge: true });
+              await setDoc(emailDocRef, cleanForFirestore(migratedData), { merge: true }).catch(() => {});
 
               if (foundOldId && foundOldId !== email) {
                 await deleteDoc(doc(db, "users", foundOldId)).catch(() => {});
               }
               finalUserDoc = migratedData;
+            } else if (emailSnap && emailSnap.exists()) {
+              finalUserDoc = emailSnap.data();
             } else {
-              console.log("No user document found for this Firebase user. Signing out.");
-              await signOut(auth).catch(() => {});
-              localStorage.removeItem("obyo_active_email");
-              localStorage.removeItem("obyo_active_uid");
-              localStorage.removeItem(LS_CUSTOM_UID);
-              localStorage.removeItem(LS_IS_ADMIN);
-              setCurrentUser(null);
-              setReady(true);
-              clearTimeout(fallbackTimer);
-              return;
+              console.log("Firestore offline or user doc not found. Initializing local session state.");
+              finalUserDoc = {
+                id: email,
+                email: email,
+                name: firebaseUser?.displayName?.split(" ")[0] || "Kullanıcı",
+                surname: firebaseUser?.displayName?.split(" ").slice(1).join(" ") || "",
+                currency: "TL",
+                demoBalance: 10000,
+                realBalance: 0,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                createdAt: Date.now(),
+              };
             }
           } else {
             finalUserDoc = emailSnap.data();
-            if (finalUserDoc.id !== email) {
-              await setDoc(emailDocRef, cleanForFirestore({ id: email }), { merge: true });
+            if (finalUserDoc && finalUserDoc.id !== email) {
+              await setDoc(emailDocRef, cleanForFirestore({ id: email }), { merge: true }).catch(() => {});
             }
           }
 
@@ -476,7 +481,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
         } catch (migErr) {
-          console.error("User document migration/setup error:", migErr);
+          console.warn("User document migration/setup handled gracefully (offline mode):", migErr);
         }
 
         userUnsubRef.current = onSnapshot(

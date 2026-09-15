@@ -12,6 +12,7 @@ import { LanguageModal } from "@/components/language-modal";
 import { KycModal } from "@/components/kyc-modal";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { VIPLevelCard } from "@/components/vip-level-card";
 
 export default function Profile() {
   const [, navigate]   = useLocation();
@@ -114,6 +115,9 @@ export default function Profile() {
             )}
 
           </div>
+
+          {/* ── VIP Level Widget ── */}
+          <VIPLevelCard totalDeposited={currentUser?.totalDeposited ?? 0} />
 
           {/* ── KYC Status Card ── */}
           {currentUser && currentUser.kycStatus !== "verified" && (
