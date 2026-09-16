@@ -1959,150 +1959,16 @@ export default function Home() {
 
   /* ── Mobile Landscape / Rotated view ────────────────────────────────────── */
   if (isMobile && (isLandscape || viewportDims.w > viewportDims.h)) {
-    const isPortraitViewport = viewportDims.w <= viewportDims.h;
     return (
-      <>
-        <h1 className="sr-only">Obyo Option — Forex ve OTC İkili Opsiyon Trading Platformu</h1>
-        <div
-          style={isPortraitViewport ? {
-            position: "fixed",
-            top: 0,
-            left: `${viewportDims.w}px`,
-            width: `${viewportDims.h}px`,
-            height: `${viewportDims.w}px`,
-            transform: "rotate(90deg)",
-            transformOrigin: "top left",
-            zIndex: 9999,
-            background: "#000",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          } : {
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background: "#000",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {/* Pro Landscape Header */}
-          <div className="flex h-10 shrink-0 items-center justify-between px-3 bg-black border-b border-white/5 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-               <button onClick={handleToggleOrientation} className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white transition-colors shrink-0">
-                 <RotateCw size={12} />
-               </button>
-               <AssetTabBar
-                openAssets={openAssets}
-                activeAsset={asset}
-                onSelectAsset={handleAsset}
-                onOpenAssetSheet={() => setShowAssets(true)}
-                onCloseTab={handleCloseTab}
-                compact
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-               <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 border border-white/10">
-                 <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Bakiye:</span>
-                 <AnimatedBalance value={displayBalance} currency={currency} className="text-[10px] font-black text-white" />
-               </div>
-               <button onClick={() => navigate("/history")} className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white">
-                 <History size={13} />
-               </button>
-               <button onClick={() => setShowIntervalModal(true)} className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black text-white/80">
-                 {CHART_INTERVALS[chartIntervalIdx]?.label || "5s"}
-               </button>
-            </div>
-          </div>
-
-          {/* Main Layout: Chart with overlay controls */}
-          <div className="flex-1 flex overflow-hidden relative">
-             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                {chartArea}
-                {showRSI && (
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-black/40 backdrop-blur-sm border-t border-white/5">
-                    <RSIPanel candles={chartCandles} />
-                  </div>
-                )}
-             </div>
-
-             {/* Right Floating Trade Bar */}
-             <div className="w-[160px] shrink-0 bg-[#080808] border-l border-white/5 flex flex-col p-2.5 gap-2 overflow-y-auto no-scrollbar">
-                {/* Amount */}
-                <div className="flex flex-col gap-1">
-                   <div className="flex justify-between text-[8.5px] font-bold text-white/30 uppercase">
-                     <span>Tutar</span>
-                     <span>{currency}</span>
-                   </div>
-                   <div className="flex items-center h-8 rounded-lg bg-white/5 border border-white/10 px-1">
-                     <button onClick={() => setAmountPersist(Math.max(minAmount, amount - step))} className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/5 text-white/40"><Minus size={10} /></button>
-                     <input type="text" value={amountStr} onChange={e => setAmountStr(e.target.value)} onBlur={() => commitAmount(amountStr)} onKeyDown={e => { if (e.key === "Enter") commitAmount(amountStr); }} className="w-full text-center bg-transparent border-none outline-none text-[11px] font-black text-white" />
-                     <button onClick={() => setAmountPersist(Math.min(displayBalance, amount + step))} className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/5 text-white/40"><Plus size={10} /></button>
-                   </div>
-                </div>
-
-                {/* Expiry */}
-                <div className="flex flex-col gap-1">
-                   <span className="text-[8.5px] font-bold text-white/30 uppercase">Vade</span>
-                   <button onClick={() => setShowDurationLandscape(v => !v)} className="flex items-center justify-between h-8 rounded-lg bg-white/5 border border-white/10 px-2 text-[11px] font-black text-white">
-                     {tf.label}
-                     <ChevronDown size={10} className="text-white/40" />
-                   </button>
-                </div>
-
-                {/* Return */}
-                <div className="flex items-center justify-between px-0.5 text-[10px] font-bold">
-                   <span className="text-white/30">Getiri:</span>
-                   <span className="text-[#1aa369]">+{cs}{totalReturn}</span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-1.5 mt-auto">
-                   <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleTrade("UP")} disabled={balanceWarn || chartLoading || tradeBlocked}
-                     className="h-10 rounded-xl flex items-center justify-center gap-1.5 text-white font-black text-xs disabled:opacity-40"
-                     style={{ background: "linear-gradient(135deg, #128255, #199c66)" }}>
-                     <ArrowUp size={14} strokeWidth={3} />
-                     <span>YÜKSELİR</span>
-                   </motion.button>
-                   <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleTrade("DOWN")} disabled={balanceWarn || chartLoading || tradeBlocked}
-                     className="h-10 rounded-xl flex items-center justify-center gap-1.5 text-white font-black text-xs disabled:opacity-40"
-                     style={{ background: "linear-gradient(135deg, #9f2a38, #bd3546)" }}>
-                     <ArrowDown size={14} strokeWidth={3} />
-                     <span>DÜŞER</span>
-                   </motion.button>
-                </div>
-             </div>
-          </div>
+      <div className="fixed inset-0 z-[10000] bg-[#070709] flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+          <RotateCw size={32} className="text-[#FF6B00] animate-pulse" />
         </div>
-
-        {showDurationLandscape && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm" onClick={() => setShowDurationLandscape(false)}>
-             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="grid grid-cols-3 gap-2 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-                {TIMEFRAMES.map(t => (
-                  <button key={t.label} onClick={() => { setTf(t); setShowDurationLandscape(false); }}
-                    className={`rounded-xl py-3 text-xs font-bold border transition-all ${tf.label === t.label ? "bg-[#FF6B00] border-[#FF6B00] text-black shadow-lg shadow-[#FF6B00]/20" : "bg-black/80 border-white/10 text-white/50"}`}>
-                    {t.label}
-                  </button>
-                ))}
-             </motion.div>
-          </div>
-        )}
-
-        <AssetSheet visible={showAssets} current={asset} onSelect={handleSelectFromSheet} onClose={() => setShowAssets(false)} />
-        <Tutorial />
-        <AuthPrompt show={showAuthPrompt} onClose={() => setShowAuthPrompt(false)} onNavigate={() => navigate("/auth")} />
-        <DrawingToolsModal
-          show={showDrawingTools}
-          onClose={() => setShowDrawingTools(false)}
-          drawings={drawings}
-          onAddDrawing={handleAddDrawing}
-          onRemoveDrawing={handleDeleteDrawing}
-          onClearAll={handleClearDrawings}
-          currentPrice={price}
-        />
-      </>
+        <h2 className="text-xl font-black text-white mb-3 tracking-tight">Yatay Mod Desteklenmemektedir</h2>
+        <p className="text-sm text-white/50 leading-relaxed max-w-[280px]">
+          Lütfen en iyi deneyim için cihazınızı dikey (portre) moduna getirin.
+        </p>
+      </div>
     );
   }
 
