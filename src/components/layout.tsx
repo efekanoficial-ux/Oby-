@@ -610,7 +610,7 @@ function DesktopHeader({
         <button
           onClick={onWallet}
           className="flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-black text-black transition-transform active:scale-95 cursor-pointer shrink-0 whitespace-nowrap select-none"
-          style={{ background: "#FF6B00", boxShadow: "0 0 14px rgba(255,107,0,0.3)" }}
+          style={{ background: "#FF6B00" }}
         >
           <Wallet size={12} className="shrink-0" />
           <span className="whitespace-nowrap shrink-0">{t.wallet}</span>
@@ -761,7 +761,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               whileTap={{ scale: 0.92 }}
               onClick={() => navigate("/wallet")}
               className="flex h-[34px] items-center gap-1.5 rounded-xl px-2.5 font-black text-black text-xs shrink-0 whitespace-nowrap select-none"
-              style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)", boxShadow: "0 4px 14px rgba(255,107,0,0.35)" }}
+              style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
               title="Cüzdan"
             >
               <Wallet size={13} className="shrink-0" />
