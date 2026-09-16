@@ -167,11 +167,8 @@ function AppContent() {
 
             <AnimatePresence>
               {(!ready || !showApp) && (
-                <motion.div
+                <div
                   key="splash-screen"
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.8, ease: "easeInOut" }}
                   className="fixed inset-0 text-white flex flex-col items-center justify-between py-12 px-6 z-50 select-none"
                   style={{
                     background: "radial-gradient(circle at 50% 42%, #261306 0%, #0c0b0d 60%, #050506 100%)",
@@ -205,7 +202,7 @@ function AppContent() {
                   <div className="text-xs text-white/20 tracking-widest font-mono">
                     Version 1.0.0
                   </div>
-                </motion.div>
+                </div>
               )}
             </AnimatePresence>
           </div>

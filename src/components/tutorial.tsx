@@ -65,7 +65,7 @@ export function Tutorial() {
     
     const startTutorial = () => {
       // Small delay after loading screen is gone
-      timer = setTimeout(() => setShow(true), 800);
+      timer = setTimeout(() => setShow(true), 300);
     };
 
     if ((window as any).__APP_UI_READY__) {
