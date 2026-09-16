@@ -502,6 +502,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setCurrentUser(null);
               } else {
                 setCurrentUser(userData);
+                // Cache name for loading screen
+                if (userData.name) {
+                  localStorage.setItem("obyo_cached_name", userData.name);
+                }
               }
             } else {
               setCurrentUser(null);

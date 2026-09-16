@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnimatePresence, motion } from "motion/react";
 import { DemoAccountProvider } from "@/context/DemoAccountContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountModeProvider } from "@/context/AccountModeContext";
@@ -110,6 +111,28 @@ function AppContent() {
   const { ready, currentUser } = useAuth();
   const { t } = useLanguage();
   const [showApp, setShowApp] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  useEffect(() => {
+    const handleReady = () => {
+      console.log("App ready event received");
+      setIsAppReady(true);
+    };
+    window.addEventListener('app-ready', handleReady);
+    
+    // Safety timeout: Eğer 10 saniye içinde hazır olmazsa (yavaş bağlantı vs), yine de göster.
+    const safetyTimer = setTimeout(() => {
+      if (!isAppReady) {
+        console.log("Safety timeout reached, forcing app ready");
+        setIsAppReady(true);
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('app-ready', handleReady);
+      clearTimeout(safetyTimer);
+    };
+  }, [isAppReady]);
 
   useEffect(() => {
     if (currentUser && Notification.permission !== 'granted') {
@@ -118,63 +141,71 @@ function AppContent() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (ready) {
+    if (ready && isAppReady) {
       const timer = setTimeout(() => {
         setShowApp(true);
-      }, 1000); // 1 saniye ekstra bekleme süresi
+      }, 500); // Küçük bir geçiş payı
       return () => clearTimeout(timer);
-    } else {
+    } else if (!ready) {
       setShowApp(false);
+      setIsAppReady(false);
     }
-  }, [ready]);
-
-  if (!ready || !showApp) {
-    const rawName = currentUser?.name;
-    const displayName = rawName ? rawName.trim().toUpperCase() : null;
-    const greetingText = displayName ? `${t.hello}, ${displayName}` : t.hello;
-
-    return (
-      <div
-        className="fixed inset-0 text-white flex flex-col items-center justify-between py-12 px-6 z-50 select-none"
-        style={{
-          background: "radial-gradient(circle at 50% 42%, #261306 0%, #0c0b0d 60%, #050506 100%)",
-        }}
-      >
-        <div className="w-full" />
-
-        <div className="flex flex-col items-center text-center max-w-xs sm:max-w-sm">
-          {/* Greeting text */}
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            {greetingText}
-          </h1>
-
-          {/* Clean normal loading spinner (non-neon) */}
-          <div className="my-8 flex items-center justify-center">
-            <div className="w-7 h-7 rounded-full border-[2.5px] border-white/15 border-t-[#FF6B00] animate-spin" />
-          </div>
-
-          {/* Status text */}
-          <p className="text-sm sm:text-base text-white/60 font-normal tracking-wide">
-            {t.loadingStatus}
-          </p>
-        </div>
-
-        {/* App version */}
-        <div className="text-xs text-white/20 tracking-widest font-mono">
-          Version 1.0.0
-        </div>
-      </div>
-    );
-  }
+  }, [ready, isAppReady]);
 
   return (
     <DemoAccountProvider key={currentUser?.id ?? "guest"}>
       <AccountModeProvider>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <RejectionAlert />
-            <Router />
-          </WouterRouter>
+          <div className="relative h-full w-full overflow-hidden">
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <RejectionAlert />
+              <Router />
+            </WouterRouter>
+
+            <AnimatePresence>
+              {(!ready || !showApp) && (
+                <motion.div
+                  key="splash-screen"
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.8, ease: "easeInOut" }}
+                  className="fixed inset-0 text-white flex flex-col items-center justify-between py-12 px-6 z-50 select-none"
+                  style={{
+                    background: "radial-gradient(circle at 50% 42%, #261306 0%, #0c0b0d 60%, #050506 100%)",
+                  }}
+                >
+                  <div className="w-full" />
+
+                  <div className="flex flex-col items-center text-center max-w-xs sm:max-w-sm">
+                    {/* Greeting text */}
+                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                      {(() => {
+                        const cachedName = localStorage.getItem("obyo_cached_name");
+                        const rawName = currentUser?.name || cachedName;
+                        const displayName = rawName ? String(rawName).trim().toUpperCase() : null;
+                        return displayName ? `${t.hello}, ${displayName}` : t.hello;
+                      })()}
+                    </h1>
+
+                    {/* Clean normal loading spinner (non-neon) */}
+                    <div className="my-8 flex items-center justify-center">
+                      <div className="w-7 h-7 rounded-full border-[2.5px] border-white/15 border-t-[#FF6B00] animate-spin" />
+                    </div>
+
+                    {/* Status text */}
+                    <p className="text-sm sm:text-base text-white/60 font-normal tracking-wide">
+                      {t.loadingStatus}
+                    </p>
+                  </div>
+
+                  {/* App version */}
+                  <div className="text-xs text-white/20 tracking-widest font-mono">
+                    Version 1.0.0
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <Toaster />
         </TooltipProvider>
       </AccountModeProvider>

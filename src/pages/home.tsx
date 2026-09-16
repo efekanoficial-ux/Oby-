@@ -972,7 +972,7 @@ function ChartIntervalModal({
 
 /* ─── Mobile Trade Panel (Binomo-style bottom overlay) ───────────────────── */
 function MobileTradePanel({
-  asset, tf, setTf, amount, setAmount, displayBalance,
+  asset, tf, setTf, amount, setAmount, amountStr, setAmountStr, commitAmount, displayBalance,
   onTrade, balanceWarn, chartLoading, currency, minAmount, tradeBlocked,
   showRSI, onToggleRSI, showBollinger, onToggleBollinger,
   showMA, onToggleMA, showMACD, onToggleMACD,
@@ -992,6 +992,7 @@ function MobileTradePanel({
   displayBalance: number; onTrade: (dir: "UP" | "DOWN") => void;
   balanceWarn: boolean; chartLoading: boolean;
   currency: "TL" | "USD"; minAmount: number; tradeBlocked: boolean;
+  amountStr: string; setAmountStr: (s: string) => void; commitAmount: (s: string) => void;
   showRSI: boolean; onToggleRSI: () => void;
   showBollinger: boolean; onToggleBollinger: () => void;
   showMA: boolean; onToggleMA: () => void;
@@ -1013,8 +1014,6 @@ function MobileTradePanel({
   const [showDuration, setShowDuration] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showChartInterval, setShowChartInterval] = useState(false);
-  const [amountStr, setAmountStr] = useState(String(amount));
-  useEffect(() => { setAmountStr(String(amount)); }, [amount]);
 
   const activeIndicatorCount = [showRSI, showBollinger, showMA, showMACD, showSAR, showFrac, showAlig].filter(Boolean).length;
 
@@ -1025,13 +1024,6 @@ function MobileTradePanel({
     const d = new Date(Date.now() + tf.secs * 1000);
     return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   })();
-
-  const commitAmount = (raw: string) => {
-    const parsed = parseInt(raw.replace(/[^0-9]/g, ""), 10);
-    const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
-    setAmount(valid);
-    setAmountStr(String(valid));
-  };
 
   const tbBtn = (active: boolean, accent?: string): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center",
@@ -1150,7 +1142,7 @@ function MobileTradePanel({
               <Minus size={10} />
             </button>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: "#FF9500" }}>{cs}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 500, color: "#FF9500" }}>{cs}</span>
               <input
                 type="text" inputMode="numeric"
                 value={amountStr}
@@ -1160,7 +1152,7 @@ function MobileTradePanel({
                   if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '+') e.preventDefault();
                   if (e.key === "Enter") { commitAmount(amountStr); (e.target as HTMLInputElement).blur(); }
                 }}
-                style={{ width: 42, textAlign: "center", background: "transparent", border: "none", outline: "none", fontSize: 13.5, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}
+                style={{ width: 42, textAlign: "center", background: "transparent", border: "none", outline: "none", fontSize: 13.5, fontWeight: 500, color: "#fff", fontFamily: "inherit" }}
               />
             </div>
             <button
@@ -1179,7 +1171,7 @@ function MobileTradePanel({
           style={{ flex: 1, background: "#1c1c1c", borderRadius: 10, padding: "5px 8px", border: "1px solid #252525", textAlign: "left", cursor: "pointer" }}
         >
           <p style={{ fontSize: 8.5, color: "rgba(255,255,255,0.35)", marginBottom: 1, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Zaman</p>
-          <p style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", margin: 0 }}>{expiryStr}</p>
+          <p style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", margin: 0 }}>{expiryStr}</p>
         </button>
       </div>
 
@@ -1211,7 +1203,7 @@ function MobileTradePanel({
           }}
         >
           <ArrowUp size={14} strokeWidth={2.5} color="#fff" />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.97 }}
@@ -1225,7 +1217,7 @@ function MobileTradePanel({
           }}
         >
           <ArrowDown size={14} strokeWidth={2.5} color="#fff" />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
         </motion.button>
       </div>
 
@@ -1367,6 +1359,12 @@ export default function Home() {
   const [chartCandles,   setChartCandles]   = useState<Candle[]>([]);
   const [isLiveData,     setIsLiveData]     = useState(false);
   const [chartLoading,   setChartLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!chartLoading) {
+      window.dispatchEvent(new CustomEvent('app-ready'));
+    }
+  }, [chartLoading]);
   const [isLandscape,    setIsLandscape]    = useState(false);
   const [showDurationLandscape, setShowDurationLandscape] = useState(false);
   const [drawings,       setDrawings]       = useState<DrawingItem[]>(() => {
@@ -1489,6 +1487,19 @@ export default function Home() {
       dir === "in" ? Math.max(0, i - 1) : Math.min(CHART_INTERVALS.length - 1, i + 1)
     );
   }, []);
+
+  const cs = sym;
+  const step = (cs === "¥" || minAmount === 1) ? 1 : (currency === "TL" ? 10 : 5);
+  
+  const [amountStr, setAmountStr] = useState(String(amount));
+  useEffect(() => { setAmountStr(String(amount)); }, [amount]);
+
+  const commitAmount = (raw: string) => {
+    const parsed = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    const valid = isNaN(parsed) || parsed < minAmount ? minAmount : Math.max(minAmount, Math.min(displayBalance, parsed));
+    setAmountPersist(valid);
+    setAmountStr(String(valid));
+  };
 
   const prevPriceRef        = useRef(asset.base);
   const assetLabelRef       = useRef(asset.label);
@@ -1944,13 +1955,11 @@ export default function Home() {
     currency, minAmount, tradeBlocked, currencySymbol: sym,
   };
 
+  const totalReturn = (amount * (1 + asset.payout / 100)).toFixed(2);
+
   /* ── Mobile Landscape / Rotated view ────────────────────────────────────── */
   if (isMobile && (isLandscape || viewportDims.w > viewportDims.h)) {
     const isPortraitViewport = viewportDims.w <= viewportDims.h;
-    const cs = sym;
-    const step = (cs === "¥" || minAmount === 1) ? 1 : (currency === "TL" ? 10 : 5);
-    const totalReturn = (amount * (1 + asset.payout / 100)).toFixed(2);
-
     return (
       <>
         <h1 className="sr-only">Obyo Option — Forex ve OTC İkili Opsiyon Trading Platformu</h1>
@@ -1978,20 +1987,13 @@ export default function Home() {
             overflow: "hidden",
           }}
         >
-          {/* Top bar */}
-          <div className="flex h-10 shrink-0 items-center justify-between px-2.5 bg-black gap-2">
-            {/* Left: Rotate back to portrait + Asset picker */}
+          {/* Pro Landscape Header */}
+          <div className="flex h-10 shrink-0 items-center justify-between px-3 bg-black border-b border-white/5 gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <button
-                onClick={handleToggleOrientation}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#1c1c1c] border border-white/10 hover:bg-white/15 text-white transition-colors shrink-0"
-                title="Ekranı Dik Çevir"
-              >
-                <RotateCw size={12} className="text-white" />
-                <span className="text-[10.5px] font-bold text-white">Dik Çevir</span>
-              </button>
-
-              <AssetTabBar
+               <button onClick={handleToggleOrientation} className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white transition-colors shrink-0">
+                 <RotateCw size={12} />
+               </button>
+               <AssetTabBar
                 openAssets={openAssets}
                 activeAsset={asset}
                 onSelectAsset={handleAsset}
@@ -2001,198 +2003,92 @@ export default function Home() {
               />
             </div>
 
-            {/* Right: Quick intervals, indicators, balance, live badge */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {/* Interval */}
-              <div className="flex items-center rounded-lg bg-[#161616] border border-white/10 p-0.5">
-                {CHART_INTERVALS.slice(0, 4).map((ci, i) => (
-                  <button
-                    key={ci.value}
-                    onClick={() => setChartIntervalIdx(i)}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-black transition-colors ${chartIntervalIdx === i ? "bg-[#4DA2FF] text-black" : "text-white/40 hover:text-white"}`}
-                  >
-                    {ci.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Chart type */}
-              <button
-                onClick={() => setChartType(t => t === "candle" ? "line" : "candle")}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#161616] border border-white/10 text-white/50 hover:text-white"
-                title="Grafik Tipi"
-              >
-                {chartType === "candle" ? <CandlestickChart size={13} color="#ffffff" /> : <LineChart size={13} color="#ffffff" />}
-              </button>
-
-              {/* Indicators */}
-              <button
-                onClick={() => handleToggleIndicator(showBollinger, setShowBollinger)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showBollinger ? "bg-white/15 text-white border-white/30" : "text-white/40 border-white/10"}`}
-              >
-                BB
-              </button>
-              <button
-                onClick={() => handleToggleIndicator(showRSI, setShowRSI)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showRSI ? "bg-white/15 text-white border-white/30" : "text-white/40 border-white/10"}`}
-              >
-                RSI
-              </button>
-              <button
-                onClick={() => navigate("/history")}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#161616] border border-white/10 text-white/70 hover:text-white"
-                title="İşlem Geçmişi"
-              >
-                <History size={13} color="#ffffff" />
-              </button>
-              <button
-                onClick={() => setShowDrawingTools(true)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 transition-colors ${drawings.length > 0 ? "bg-[#FFB800]/20 text-[#FFB800] border-[#FFB800]/40" : "text-white/40 border-white/10 hover:text-white"}`}
-                title="Çizim Araçları (Dikey, Yatay, Çapraz)"
-              >
-                <Pencil size={11} />
-                {drawings.length > 0 && <span>{drawings.length}</span>}
-              </button>
-
-              <div className="h-4 w-px bg-white/10 mx-0.5" />
-
-              {/* Balance */}
-              <AnimatedBalance
-                value={displayBalance}
-                currency={currency}
-                className="text-xs font-medium text-white tracking-tight"
-              />
+            <div className="flex items-center gap-2">
+               <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+                 <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Bakiye:</span>
+                 <AnimatedBalance value={displayBalance} currency={currency} className="text-[10px] font-black text-white" />
+               </div>
+               <button onClick={() => navigate("/history")} className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white">
+                 <History size={13} />
+               </button>
+               <button onClick={() => setShowIntervalModal(true)} className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black text-white/80">
+                 {CHART_INTERVALS[chartIntervalIdx]?.label || "5s"}
+               </button>
             </div>
           </div>
 
-          {/* Main area: Chart on Left, Trade on Right */}
-          <div className="flex flex-1 min-h-0 overflow-hidden">
-            <div className="flex flex-1 min-w-0 flex-col overflow-hidden relative">
-              {chartArea}
-              {showRSI && (
-                <div className="shrink-0 overflow-hidden h-14 border-t border-white/10">
-                  <RSIPanel candles={chartCandles} />
-                </div>
-              )}
-              {showMACD && (
-                <div className="shrink-0 overflow-hidden h-14 border-t border-white/10">
-                  <MACDPanel candles={chartCandles} />
-                </div>
-              )}
-            </div>
-
-            {/* Right side compact trade panel */}
-            <div className="w-[165px] shrink-0 border-l border-white/10 bg-[#0c0c0c] flex flex-col justify-between p-2 gap-1.5 overflow-y-auto">
-              {/* Amount */}
-              <div className="flex flex-col gap-0.5">
-                <div className="flex justify-between text-[8.5px] font-bold text-white/40 uppercase">
-                  <span>Tutar</span>
-                  <span>{currency}</span>
-                </div>
-                <div className="flex items-center rounded-lg bg-[#181818] border border-white/10 p-0.5">
-                  <button
-                    onClick={() => setAmountPersist(Math.max(minAmount, amount - step))}
-                    className="w-5 h-5 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-[11px]"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="text"
-                    value={amount}
-                    onChange={(e) => {
-                      const n = parseFloat(e.target.value.replace(",", "."));
-                      if (!isNaN(n)) setAmountPersist(n);
-                    }}
-                    onBlur={() => {
-                      if (amount < minAmount || isNaN(amount)) {
-                        setAmountPersist(minAmount);
-                      }
-                    }}
-                    className="w-full text-center font-semibold text-white text-[11px] bg-transparent outline-none tabular-nums"
-                  />
-                  <button
-                    onClick={() => setAmountPersist(amount + step)}
-                    className="w-5 h-5 flex items-center justify-center text-white/60 hover:text-white rounded bg-white/5 font-bold text-[11px]"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Expiry Duration */}
-              <div className="flex flex-col gap-0.5 relative">
-                <div className="text-[8.5px] font-bold text-white/40 uppercase">Vade Süresi</div>
-                <button
-                  onClick={() => setShowDurationLandscape(v => !v)}
-                  className="flex items-center justify-between rounded-lg bg-[#181818] border border-white/10 px-2 py-0.5 text-[11px] hover:bg-white/5"
-                >
-                  <span className="font-semibold text-white text-[11px]">{tf.label}</span>
-                  <ChevronDown size={10} className="text-white/40" />
-                </button>
-
-                {showDurationLandscape && (
-                  <div className="absolute right-0 bottom-full mb-1 z-50 rounded-xl bg-[#1c1c1c] border border-white/10 p-1.5 shadow-2xl flex flex-col gap-0.5 w-32">
-                    {TIMEFRAMES.map((t) => (
-                      <button
-                        key={t.label}
-                        onClick={() => { setTf(t); setShowDurationLandscape(false); }}
-                        className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] font-bold transition-colors ${t.label === tf.label ? "bg-[#FF6B00] text-black" : "text-white/70 hover:bg-white/5"}`}
-                      >
-                        <span>{t.label}</span>
-                        <span className="text-[9px] opacity-60">({t.secs}s)</span>
-                      </button>
-                    ))}
+          {/* Main Layout: Chart with overlay controls */}
+          <div className="flex-1 flex overflow-hidden relative">
+             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+                {chartArea}
+                {showRSI && (
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-black/40 backdrop-blur-sm border-t border-white/5">
+                    <RSIPanel candles={chartCandles} />
                   </div>
                 )}
-              </div>
+             </div>
 
-              {/* Payout */}
-              <div className="flex items-center justify-between text-[9.5px] px-1 font-semibold">
-                <span className="text-white/40">Getiri:</span>
-                <span className="text-[#1aa369]">+{cs}{totalReturn}</span>
-              </div>
+             {/* Right Floating Trade Bar */}
+             <div className="w-[160px] shrink-0 bg-[#080808] border-l border-white/5 flex flex-col p-2.5 gap-2 overflow-y-auto no-scrollbar">
+                {/* Amount */}
+                <div className="flex flex-col gap-1">
+                   <div className="flex justify-between text-[8.5px] font-bold text-white/30 uppercase">
+                     <span>Tutar</span>
+                     <span>{currency}</span>
+                   </div>
+                   <div className="flex items-center h-8 rounded-lg bg-white/5 border border-white/10 px-1">
+                     <button onClick={() => setAmountPersist(Math.max(minAmount, amount - step))} className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/5 text-white/40"><Minus size={10} /></button>
+                     <input type="text" value={amountStr} onChange={e => setAmountStr(e.target.value)} onBlur={() => commitAmount(amountStr)} onKeyDown={e => { if (e.key === "Enter") commitAmount(amountStr); }} className="w-full text-center bg-transparent border-none outline-none text-[11px] font-black text-white" />
+                     <button onClick={() => setAmountPersist(Math.min(displayBalance, amount + step))} className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/5 text-white/40"><Plus size={10} /></button>
+                   </div>
+                </div>
 
-              {/* Action buttons */}
-              <div className="flex flex-col gap-1">
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => handleTrade("UP")}
-                  disabled={balanceWarn || chartLoading || tradeBlocked}
-                  className="flex flex-col items-center justify-center rounded-lg py-1.5 gap-0.5 text-white font-bold transition-opacity cursor-pointer"
-                  style={{
-                    background: "linear-gradient(135deg, #128255, #199c66)",
-                    boxShadow: "0 2px 8px rgba(22,155,101,0.20)",
-                    opacity: (balanceWarn || chartLoading || tradeBlocked) ? 0.5 : 1,
-                  }}
-                >
-                  <div className="flex items-center gap-1">
-                    <TrendingUp size={11} />
-                    <span className="text-[11px] font-semibold">{t.upBtn}</span>
-                  </div>
-                  <span className="text-[8.5px] font-semibold opacity-90">+{asset.payout}%</span>
-                </motion.button>
+                {/* Expiry */}
+                <div className="flex flex-col gap-1">
+                   <span className="text-[8.5px] font-bold text-white/30 uppercase">Vade</span>
+                   <button onClick={() => setShowDurationLandscape(v => !v)} className="flex items-center justify-between h-8 rounded-lg bg-white/5 border border-white/10 px-2 text-[11px] font-black text-white">
+                     {tf.label}
+                     <ChevronDown size={10} className="text-white/40" />
+                   </button>
+                </div>
 
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => handleTrade("DOWN")}
-                  disabled={balanceWarn || chartLoading || tradeBlocked}
-                  className="flex flex-col items-center justify-center rounded-lg py-1.5 gap-0.5 text-white font-bold transition-opacity cursor-pointer"
-                  style={{
-                    background: "linear-gradient(135deg, #9f2a38, #bd3546)",
-                    boxShadow: "0 2px 8px rgba(189,53,70,0.20)",
-                    opacity: (balanceWarn || chartLoading || tradeBlocked) ? 0.5 : 1,
-                  }}
-                >
-                  <div className="flex items-center gap-1">
-                    <TrendingDown size={11} />
-                    <span className="text-[11px] font-semibold">{t.downBtn}</span>
-                  </div>
-                  <span className="text-[8.5px] font-semibold opacity-90">+{asset.payout}%</span>
-                </motion.button>
-              </div>
-            </div>
+                {/* Return */}
+                <div className="flex items-center justify-between px-0.5 text-[10px] font-bold">
+                   <span className="text-white/30">Getiri:</span>
+                   <span className="text-[#1aa369]">+{cs}{totalReturn}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-1.5 mt-auto">
+                   <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleTrade("UP")} disabled={balanceWarn || chartLoading || tradeBlocked}
+                     className="h-10 rounded-xl flex items-center justify-center gap-1.5 text-white font-black text-xs disabled:opacity-40"
+                     style={{ background: "linear-gradient(135deg, #128255, #199c66)" }}>
+                     <ArrowUp size={14} strokeWidth={3} />
+                     <span>YÜKSELİR</span>
+                   </motion.button>
+                   <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleTrade("DOWN")} disabled={balanceWarn || chartLoading || tradeBlocked}
+                     className="h-10 rounded-xl flex items-center justify-center gap-1.5 text-white font-black text-xs disabled:opacity-40"
+                     style={{ background: "linear-gradient(135deg, #9f2a38, #bd3546)" }}>
+                     <ArrowDown size={14} strokeWidth={3} />
+                     <span>DÜŞER</span>
+                   </motion.button>
+                </div>
+             </div>
           </div>
         </div>
+
+        {showDurationLandscape && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm" onClick={() => setShowDurationLandscape(false)}>
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="grid grid-cols-3 gap-2 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                {TIMEFRAMES.map(t => (
+                  <button key={t.label} onClick={() => { setTf(t); setShowDurationLandscape(false); }}
+                    className={`rounded-xl py-3 text-xs font-bold border transition-all ${tf.label === t.label ? "bg-[#FF6B00] border-[#FF6B00] text-black shadow-lg shadow-[#FF6B00]/20" : "bg-black/80 border-white/10 text-white/50"}`}>
+                    {t.label}
+                  </button>
+                ))}
+             </motion.div>
+          </div>
+        )}
 
         <AssetSheet visible={showAssets} current={asset} onSelect={handleSelectFromSheet} onClose={() => setShowAssets(false)} />
         <Tutorial />
@@ -2249,7 +2145,7 @@ export default function Home() {
                     : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
                   return (
                     <div className="py-1.5 flex items-center gap-2 flex-1">
-                      <span className="text-[10px] font-black text-[#FF9500]">● {items.length} AKTİF İŞLEM</span>
+                      <span className="text-[10px] font-semibold text-[#FF9500]">● {items.length} AKTİF İŞLEM</span>
                       <div className="flex gap-1">
                         {items.slice(0, 6).map(t => (
                           <span key={t.id} className={`text-[9px] font-bold rounded px-1 ${t.direction === "UP" ? "text-[#0ecb81] bg-[#0ecb81]/10" : "text-[#f6465d] bg-[#f6465d]/10"}`}>
@@ -2294,6 +2190,7 @@ export default function Home() {
             <MobileTradePanel
               asset={asset} tf={tf} setTf={setTf}
               amount={amount} setAmount={setAmountPersist}
+              amountStr={amountStr} setAmountStr={setAmountStr} commitAmount={commitAmount}
               displayBalance={displayBalance}
               onTrade={handleTrade}
               balanceWarn={balanceWarn}
@@ -2347,397 +2244,208 @@ export default function Home() {
   return (
     <>
     <h1 className="sr-only">Obyo Option — Forex ve OTC İkili Opsiyon Trading Platformu</h1>
-    <div className="flex h-full overflow-hidden" style={{ background: "#000" }}>
-
-        {/* ── Chart column ─────────────────────────────────────────────────── */}
-        <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
-
-          {/* Desktop Asset bar + Mobile-style compact toolbar (no scrollbar) */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-3 bg-black border-b border-white/5">
-            {/* Left: Asset Tabs */}
-            <div className="flex items-center gap-2 min-w-0 shrink-0">
-              <AssetTabBar
-                openAssets={openAssets}
-                activeAsset={asset}
-                onSelectAsset={handleAsset}
-                onOpenAssetSheet={() => setShowAssets(true)}
-                onCloseTab={handleCloseTab}
-              />
-            </div>
-
-            {/* Right: Mobile-style compact toolbar (No scrollbar, exact mobile aesthetics) */}
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              {/* Chart Interval Button */}
-              <button
-                onClick={() => setShowIntervalModal(true)}
-                className="flex h-8 px-2.5 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-xs font-black text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer select-none"
-                title="Grafik Zaman Aralığı"
-              >
-                {CHART_INTERVALS[chartIntervalIdx]?.label || "5sn"}
-              </button>
-
-              {/* Indicators (SlidersHorizontal) */}
-              <button
-                onClick={() => setShowIndicatorsModal(true)}
-                className="relative flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                title="Göstergeler (RSI, Bollinger Bantları, Hareketli Ortalama)"
-              >
-                <SlidersHorizontal size={14} />
-                {activeIndicatorCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#4DA2FF]" />
-                )}
-              </button>
-
-              {/* Signal Robot (Radio) */}
-              <button
-                onClick={() => setShowSignalModal(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                title="Sinyal Robotu (1 Dakikalık Öneriler)"
-              >
-                <Radio size={14} />
-              </button>
-
-              {/* Chart Type Toggle (Candle / Line) */}
-              <button
-                onClick={() => setChartType(t => t === "candle" ? "line" : "candle")}
-                className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                title={chartType === "candle" ? "Çizgi Grafiğine Geç" : "Mum Grafiğine Geç"}
-              >
-                {chartType === "candle" ? (
-                  <CandlestickChart size={15} />
-                ) : (
-                  <LineChart size={15} />
-                )}
-              </button>
-
-              {/* Drawing Tools (Pencil) */}
-              <button
-                onClick={() => setShowDrawingTools(true)}
-                className={`relative flex h-8 w-8 items-center justify-center rounded-[10px] border transition-all cursor-pointer ${
-                  drawings.length > 0
-                    ? "bg-[#FFB800]/20 border-[#FFB800]/50 text-[#FFB800]"
-                    : "bg-[#1c1c1c] border-white/10 text-white hover:bg-white/10 hover:border-white/20"
-                }`}
-                title="Çizim Araçları (Dikey, Yatay, Trend Çizgileri)"
-              >
-                <Pencil size={14} />
-                {drawings.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#FFB800]" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Chart area fills remaining vertical space down to screen bottom */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {chartArea}
-          </div>
-
-          {/* RSI indicator sub-panel if toggled */}
-          {showRSI && (
-            <div className="shrink-0 border-t border-white/10">
-              <RSIPanel candles={chartCandles} />
-            </div>
-          )}
-
-          {/* MACD indicator sub-panel if toggled */}
-          {showMACD && (
-            <div className="shrink-0 border-t border-white/10">
-              <MACDPanel candles={chartCandles} />
-            </div>
-          )}
-        </div>
-
-        {/* ── Panel collapse tab ──────────────────────────────────────────── */}
-        <button
-          onClick={() => setShowPanel(v => !v)}
-          className="flex w-5 shrink-0 items-center justify-center border-l border-white/5 bg-[#050505] text-white/20 hover:text-[#FF6B00] hover:bg-white/3 transition-colors"
-          title={showPanel ? "Paneli Gizle" : "Paneli Göster"}
-        >
-          {showPanel ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-        </button>
-
-        {/* ── Right control panel (collapsible) ───────────────────────────── */}
-        <AnimatePresence>
-          {showPanel && (
-            <motion.div
-              key="trade-panel"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 284, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 40 }}
-              className="flex shrink-0 flex-col border-l border-white/5 bg-[#050505] overflow-y-auto overflow-x-hidden"
-              style={{ minWidth: 0 }}
-            >
-              <div style={{ minWidth: 284 }}>
-                <div className="flex h-11 items-center border-b border-white/5 px-4">
-                  <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">İşlem Aç</h3>
+    <div className="flex h-full overflow-hidden bg-[#050505]">
+        {/* Main centered container (inspired by mobile) */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          
+          {/* Pro Desktop Header (Mobile-like but wider) */}
+          <div className="flex h-14 shrink-0 items-center justify-between px-6 bg-black border-b border-white/5">
+             <div className="flex items-center gap-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1c1c1c] border border-white/10">
+                   <img src="/logo.jpg" alt="Logo" className="h-6 w-6 rounded-md object-cover" />
                 </div>
+                <AssetTabBar
+                  openAssets={openAssets}
+                  activeAsset={asset}
+                  onSelectAsset={handleAsset}
+                  onOpenAssetSheet={() => setShowAssets(true)}
+                  onCloseTab={handleCloseTab}
+                />
+             </div>
 
-                <div className="flex flex-col gap-3 p-4">
-                  {/* Asset info card */}
-                  <div className="rounded-2xl p-3.5 border border-white/8 bg-black">
-                    <div className="flex items-center gap-3 mb-2.5">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
-                        {renderAssetFlag(asset, 26)}
+             <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                   <span className="text-[11px] font-bold text-white/30 uppercase tracking-widest">Bakiye:</span>
+                   <AnimatedBalance value={displayBalance} currency={currency} className="text-sm font-black text-white" />
+                </div>
+                
+                <div className="h-4 w-px bg-white/10 mx-1" />
+
+                <button onClick={() => setShowIntervalModal(true)} className="flex h-9 px-3 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-[11px] font-black text-white/80 hover:text-white transition-all cursor-pointer">
+                  {CHART_INTERVALS[chartIntervalIdx]?.label || "5sn"}
+                </button>
+
+                <button onClick={() => setChartType(t => t === "candle" ? "line" : "candle")} className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all cursor-pointer">
+                  {chartType === "candle" ? <CandlestickChart size={15} /> : <LineChart size={15} />}
+                </button>
+
+                <button onClick={() => setShowIndicatorsModal(true)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all relative cursor-pointer">
+                  <SlidersHorizontal size={15} />
+                  {activeIndicatorCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#4DA2FF]" />}
+                </button>
+             </div>
+          </div>
+
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+             {/* Chart Area */}
+             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+                {chartArea}
+                {showRSI && (
+                  <div className="shrink-0 h-36 border-t border-white/5">
+                    <RSIPanel candles={chartCandles} />
+                  </div>
+                )}
+             </div>
+
+             {/* Pro Trade Panel (Side panel but styled mobile-like) */}
+             <div className="w-[320px] shrink-0 border-l border-white/5 bg-[#080808] flex flex-col p-5 gap-5 overflow-y-auto no-scrollbar">
+                {/* Asset Info */}
+                <div className="flex items-center justify-between rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                   <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10">
+                        {renderAssetFlag(asset, 24)}
                       </div>
                       <div>
-                        <p className="text-[15px] font-bold text-white">{asset.label}</p>
-                        <p className="text-xs text-white/40">{asset.desc}</p>
+                        <p className="text-[13px] font-black text-white">{asset.label}</p>
+                        <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider">%{asset.payout} Getiri</p>
                       </div>
-                      <div className="ml-auto text-right">
-                        <p className="text-[15px] font-bold text-[#1aa369]">{asset.payout}%</p>
-                        <p className="text-[9.5px] text-white/30 font-medium">Payout</p>
-                      </div>
-                    </div>
-                    <button onClick={() => setShowAssets(true)}
-                      className="w-full rounded-xl py-2 text-xs font-bold border border-white/10 text-white/50 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center gap-1.5">
-                      <span>Varlık Değiştir</span>
-                      <ChevronDown size={12} className="text-white/40" />
-                    </button>
-                  </div>
-
-                  {/* Amount */}
-                  <div className="rounded-xl bg-black border border-white/6 p-2.5" data-tour="step-2">
-                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Tutar</span>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - (isTournament ? 1 : (currency === "TL" ? 10 : 5))))}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
-                        <Minus size={11} />
-                      </button>
-                      <span className="text-[10px] text-[#FF6B00] font-bold">{sym}</span>
-                      <span className="flex-1 text-center text-lg font-semibold text-white tracking-tight">{amount}</span>
-                      <button onClick={() => setAmountPersist(a => Math.min(displayBalance, a + (isTournament ? 1 : (currency === "TL" ? 10 : 5))))}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
-                        <Plus size={11} />
-                      </button>
-                    </div>
-                    <div className="flex gap-1 mt-1.5">
-                      {(isTournament ? [1, 5, 10, 25] : (currency === "TL" ? [50, 100, 250, 500] : [10, 25, 50, 100])).map((v) => (
-                        <button key={v} onClick={() => setAmountPersist(v)}
-                          className={`flex-1 rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${amount === v ? "bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/25" : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6"}`}>
-                          {sym}{v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Expiry (Aligned & Matching Amount card design) */}
-                  <div className="rounded-xl bg-black border border-white/6 p-2.5" data-tour="step-3-old">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Süre</span>
-                      <span className="text-[9.5px] font-bold text-[#FF6B00]">{tfSubLabel(tf.secs)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <button
-                        onClick={() => {
-                          const curIdx = TIMEFRAMES.findIndex(t => t.label === tf.label);
-                          if (curIdx > 0) setTf(TIMEFRAMES[curIdx - 1]);
-                        }}
-                        disabled={TIMEFRAMES.findIndex(t => t.label === tf.label) === 0}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        title="Daha Kısa Süre"
-                      >
-                        <Minus size={11} />
-                      </button>
-                      <div className="flex-1 flex items-center justify-center gap-1.5">
-                        <Clock size={13} className="text-[#FF6B00]" />
-                        <span className="text-lg font-semibold text-white tracking-tight">{tf.label}</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const curIdx = TIMEFRAMES.findIndex(t => t.label === tf.label);
-                          if (curIdx < TIMEFRAMES.length - 1) setTf(TIMEFRAMES[curIdx + 1]);
-                        }}
-                        disabled={TIMEFRAMES.findIndex(t => t.label === tf.label) === TIMEFRAMES.length - 1}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        title="Daha Uzun Süre"
-                      >
-                        <Plus size={11} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 mt-1.5">
-                      {TIMEFRAMES.slice(0, 4).map(t => (
-                        <button
-                          key={t.label}
-                          onClick={() => setTf(t)}
-                          className={`rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-                            t.label === tf.label
-                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-bold"
-                              : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6 hover:text-white/60"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-3 gap-1 mt-1">
-                      {TIMEFRAMES.slice(4).map(t => (
-                        <button
-                          key={t.label}
-                          onClick={() => setTf(t)}
-                          className={`rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-                            t.label === tf.label
-                              ? "bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/35 font-bold"
-                              : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6 hover:text-white/60"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Payout preview */}
-                  <div className="rounded-xl bg-black border border-white/6 p-2.5">
-                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Potansiyel Kazanç</span>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xl font-semibold text-[#1aa369] tracking-tight">+{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span>
-                      <span className="text-[11px] text-white/30 font-medium">{asset.payout}% kazanç</span>
-                    </div>
-                  </div>
-
-                  {/* Trade buttons */}
-                  {balanceWarn && (
-                    <div className="flex items-center gap-2 rounded-xl px-2.5 py-1.5" style={{ background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}>
-                      <X size={11} className="text-[#f6465d] shrink-0" />
-                      <span className="text-xs font-bold text-[#f6465d]">{t.insufficientBalance}</span>
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-1.5" data-tour="step-4">
-                    <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleTrade("UP")} disabled={tradeBlocked || balanceWarn || chartLoading}
-                      className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
-                      style={{ background: "linear-gradient(135deg,#128255,#199c66)", boxShadow: "0 3px 12px rgba(22,155,101,0.20)" }}>
-                      <ArrowUp size={15} strokeWidth={2.5} />
-                      <span className="text-[13.5px] font-bold tracking-wide">{t.upBtn} · <span className="font-semibold text-xs">{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
-                    </motion.button>
-                    <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleTrade("DOWN")} disabled={tradeBlocked || balanceWarn || chartLoading}
-                      className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
-                      style={{ background: "linear-gradient(135deg,#9f2a38,#bd3546)", boxShadow: "0 3px 12px rgba(189,53,70,0.20)" }}>
-                      <ArrowDown size={15} strokeWidth={2.5} />
-                      <span className="text-[13.5px] font-bold tracking-wide">{t.downBtn} · <span className="font-semibold text-xs">{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
-                    </motion.button>
-                  </div>
-
-                  {/* Active trades list */}
-                  <AnimatePresence>
-                    {(() => {
-                      const activeList = isTournament
-                        ? tournamentEntries.filter(t => t.expiryTime > now - 800)
-                        : isReal
-                        ? realEntries.filter(t => t.expiryTime > now - 800)
-                        : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
-                      const activeCnt = isTournament ? liveTournamentCount : isReal ? liveRealCount : liveTradeCount;
-
-                      if (activeList.length === 0) return null;
-
-                      return (
-                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-black text-white/40 uppercase">{t.activeTrades}</span>
-                            <span className="text-[10px] font-black text-[#FF9500]">{activeCnt}/5</span>
-                          </div>
-                          <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
-                            {activeList
-                              .slice(0, 8)
-                              .map(tItem => {
-                                const isRealOrTour = isTournament || isReal;
-                                const expiry = isRealOrTour ? (tItem as any).expiryTime : (tItem as any).startTime + (tItem as any).duration * 1000;
-                                const startPrice = isRealOrTour ? (tItem as any).entryPrice : (tItem as any).startPrice;
-                                const tradeDur = isRealOrTour ? Math.max(1000, (tItem as any).expiryTime - (tItem as any).entryTime) : (tItem as any).duration * 1000;
-                                const rem = Math.max(0, expiry - now);
-                                const progress = Math.max(0, Math.min(1, rem / tradeDur));
-                                const isUp = tItem.direction === "UP";
-                                const accent = isUp ? "#0ecb81" : "#f6465d";
-                                const urgent = rem < 10_000;
-                                return (
-                                  <div key={tItem.id} className="rounded-xl overflow-hidden"
-                                    style={{
-                                      background: isUp ? "rgba(14,203,129,0.06)" : "rgba(246,70,93,0.06)",
-                                      border: `1px solid ${isUp ? "rgba(14,203,129,0.18)" : "rgba(246,70,93,0.18)"}`,
-                                    }}>
-                                    <div className="flex items-center justify-between px-3 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs font-black" style={{ color: accent }}>
-                                          {isUp ? "▲" : "▼"}
-                                        </span>
-                                        <div>
-                                          <p className="text-[11px] font-black text-white/80">
-                                            {price < 10 ? startPrice.toFixed(5) : startPrice.toFixed(2)}
-                                          </p>
-                                          <p className="text-[9px] text-white/30 font-mono">{sym}{tItem.amount}</p>
-                                        </div>
-                                      </div>
-                                      <span className="text-[11px] font-black font-mono"
-                                        style={{ color: urgent ? "#FFB800" : accent }}>
-                                        {Math.ceil(rem / 1000)}s
-                                      </span>
-                                    </div>
-                                    <div className="h-[2px] w-full" style={{ background: "rgba(255,255,255,0.05)" }}>
-                                      <div className="h-full transition-all duration-1000"
-                                        style={{ width: `${progress * 100}%`, background: urgent ? "#FFB800" : accent }} />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            {activeList.length > 8 && (
-                              <p className="text-[10px] text-white/25 text-center py-1">
-                                +{activeList.length - 8} daha
-                              </p>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })()}
-                  </AnimatePresence>
+                   </div>
+                   <button onClick={() => setShowAssets(true)} className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer">
+                     <ChevronDown size={14} />
+                   </button>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
-      <AssetSheet visible={showAssets} current={asset} onSelect={handleSelectFromSheet} onClose={() => setShowAssets(false)} />
-      <Tutorial />
-      <AuthPrompt show={showAuthPrompt} onClose={() => setShowAuthPrompt(false)} onNavigate={() => navigate("/auth")} />
-      <DrawingToolsModal
-        show={showDrawingTools}
-        onClose={() => setShowDrawingTools(false)}
-        drawings={drawings}
-        onAddDrawing={handleAddDrawing}
-        onRemoveDrawing={handleDeleteDrawing}
-        onClearAll={handleClearDrawings}
-        currentPrice={price}
-      />
-      <IndicatorsModal
-        visible={showIndicatorsModal}
-        onClose={() => setShowIndicatorsModal(false)}
-        showMA={showMA}
-        onToggleMA={() => handleToggleIndicator(showMA, setShowMA)}
-        showBollinger={showBollinger}
-        onToggleBollinger={() => handleToggleIndicator(showBollinger, setShowBollinger)}
-        showRSI={showRSI}
-        onToggleRSI={() => handleToggleIndicator(showRSI, setShowRSI)}
-        showMACD={showMACD}
-        onToggleMACD={() => handleToggleIndicator(showMACD, setShowMACD)}
-        showSAR={showSAR}
-        onToggleSAR={() => handleToggleIndicator(showSAR, setShowSAR)}
-        showFrac={showFrac}
-        onToggleFrac={() => handleToggleIndicator(showFrac, setShowFrac)}
-        showAlig={showAlig}
-        onToggleAlig={() => handleToggleIndicator(showAlig, setShowAlig)}
-      />
-      <SignalModal
-        visible={showSignalModal}
-        onClose={() => setShowSignalModal(false)}
-        assetLabel={asset.label}
-      />
-      <ChartIntervalModal
-        visible={showIntervalModal}
-        onClose={() => setShowIntervalModal(false)}
-        chartIntervalIdx={chartIntervalIdx}
-        onSelectInterval={setChartIntervalIdx}
-      />
+                {/* Amount */}
+                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Yatırım Tutarı</span>
+                   <div className="flex items-center gap-2 mt-1">
+                      <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - step))} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"><Minus size={16} /></button>
+                      <div className="flex-1 flex items-center justify-center font-black text-2xl text-white tracking-tight">
+                        <span className="opacity-30 mr-1">{sym}</span>
+                        <input 
+                          type="text" 
+                          value={amountStr} 
+                          onChange={e => setAmountStr(e.target.value)} 
+                          onBlur={() => commitAmount(amountStr)}
+                          onKeyDown={e => { if (e.key === "Enter") commitAmount(amountStr); }}
+                          className="w-24 text-center bg-transparent border-none outline-none focus:ring-0" 
+                        />
+                      </div>
+                      <button onClick={() => setAmountPersist(a => Math.min(displayBalance, a + step))} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"><Plus size={16} /></button>
+                   </div>
+                   <div className="grid grid-cols-4 gap-1.5 mt-2">
+                      {(isTournament ? [1, 5, 10, 25] : (currency === "TL" ? [50, 100, 250, 500] : [10, 25, 50, 100])).map(v => (
+                        <button key={v} onClick={() => setAmountPersist(v)} className={`rounded-xl py-2 text-[11px] font-bold transition-all cursor-pointer ${amount === v ? "bg-[#FF6B00] text-black" : "bg-white/5 text-white/30 hover:bg-white/10"}`}>{sym}{v}</button>
+                      ))}
+                   </div>
+                </div>
+
+                {/* Expiry */}
+                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">İşlem Süresi</span>
+                   <div className="grid grid-cols-3 gap-2 mt-1">
+                      {TIMEFRAMES.slice(0, 6).map(t => (
+                        <button key={t.label} onClick={() => setTf(t)} className={`rounded-xl py-2.5 text-[11px] font-bold border transition-all cursor-pointer ${tf.label === t.label ? "bg-[#FF6B00] border-[#FF6B00] text-black" : "bg-white/5 border-white/5 text-white/30 hover:bg-white/10"}`}>{t.label}</button>
+                      ))}
+                   </div>
+                </div>
+
+                {/* Trade Actions */}
+                <div className="flex flex-col gap-2 mt-auto">
+                   <div className="flex justify-between px-1 mb-1">
+                      <span className="text-[11px] font-bold text-white/30">Net Kazanç:</span>
+                      <span className="text-sm font-black text-[#1aa369]">+{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span>
+                   </div>
+
+                   <motion.button whileTap={{ scale: 0.98 }} onClick={() => handleTrade("UP")} disabled={tradeBlocked || balanceWarn || chartLoading}
+                     className="h-14 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-[15px] disabled:opacity-40 shadow-xl shadow-[#128255]/20 cursor-pointer"
+                     style={{ background: "linear-gradient(135deg, #128255, #199c66)" }}>
+                     <ArrowUp size={20} strokeWidth={3} />
+                     <span>YÜKSELİR</span>
+                   </motion.button>
+
+                   <motion.button whileTap={{ scale: 0.98 }} onClick={() => handleTrade("DOWN")} disabled={tradeBlocked || balanceWarn || chartLoading}
+                     className="h-14 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-[15px] disabled:opacity-40 shadow-xl shadow-[#9f2a38]/20 cursor-pointer"
+                     style={{ background: "linear-gradient(135deg, #9f2a38, #bd3546)" }}>
+                     <ArrowDown size={20} strokeWidth={3} />
+                     <span>DÜŞER</span>
+                   </motion.button>
+                </div>
+
+                {/* Active trades list */}
+                {(() => {
+                  const activeList = isTournament
+                    ? tournamentEntries.filter(t => t.expiryTime > now - 800)
+                    : isReal
+                    ? realEntries.filter(t => t.expiryTime > now - 800)
+                    : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
+                  if (activeList.length === 0) return null;
+                  return (
+                    <div className="mt-2">
+                       <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">Aktif İşlemler</p>
+                       <div className="flex flex-col gap-2">
+                          {activeList.slice(0, 3).map(t => (
+                            <div key={t.id} className="flex items-center justify-between rounded-xl bg-white/5 p-2.5">
+                               <div className="flex items-center gap-2">
+                                  <div className={`h-1.5 w-1.5 rounded-full ${t.direction === "UP" ? "bg-[#0ecb81]" : "bg-[#f6465d]"}`} />
+                                  <span className="text-[11px] font-bold text-white/80">{t.assetLabel}</span>
+                               </div>
+                               <span className={`text-[11px] font-black ${t.direction === "UP" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{sym}{t.amount}</span>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                  );
+                })()}
+             </div>
+          </div>
+        </div>
+
+        {/* Floating Utilities */}
+        <div className="fixed bottom-6 left-6 flex flex-col gap-3">
+           <button onClick={() => navigate("/history")} className="h-11 w-11 flex items-center justify-center rounded-2xl bg-black border border-white/10 text-white/60 hover:text-white hover:border-white/30 shadow-2xl transition-all cursor-pointer">
+              <History size={18} />
+           </button>
+           <button onClick={() => setShowSignalModal(true)} className="h-11 w-11 flex items-center justify-center rounded-2xl bg-black border border-white/10 text-white/60 hover:text-white hover:border-white/30 shadow-2xl transition-all cursor-pointer">
+              <Radio size={18} />
+           </button>
+        </div>
+    </div>
+
+    <AssetSheet visible={showAssets} current={asset} onSelect={handleSelectFromSheet} onClose={() => setShowAssets(false)} />
+    <Tutorial />
+    <AuthPrompt show={showAuthPrompt} onClose={() => setShowAuthPrompt(false)} onNavigate={() => navigate("/auth")} />
+    <DrawingToolsModal
+      show={showDrawingTools}
+      onClose={() => setShowDrawingTools(false)}
+      drawings={drawings}
+      onAddDrawing={handleAddDrawing}
+      onRemoveDrawing={handleDeleteDrawing}
+      onClearAll={handleClearDrawings}
+      currentPrice={price}
+    />
+    <SignalModal
+      visible={showSignalModal}
+      onClose={() => setShowSignalModal(false)}
+      assetLabel={asset.label}
+    />
+    <ChartIntervalModal 
+      visible={showIntervalModal} 
+      onClose={() => setShowIntervalModal(false)} 
+      chartIntervalIdx={chartIntervalIdx}
+      onSelectInterval={setChartIntervalIdx}
+    />
+    <IndicatorsModal
+      visible={showIndicatorsModal}
+      onClose={() => setShowIndicatorsModal(false)}
+      showMA={showMA} onToggleMA={() => handleToggleIndicator(showMA, setShowMA)}
+      showBollinger={showBollinger} onToggleBollinger={() => handleToggleIndicator(showBollinger, setShowBollinger)}
+      showRSI={showRSI} onToggleRSI={() => handleToggleIndicator(showRSI, setShowRSI)}
+      showMACD={showMACD} onToggleMACD={() => handleToggleIndicator(showMACD, setShowMACD)}
+      showSAR={showSAR} onToggleSAR={() => handleToggleIndicator(showSAR, setShowSAR)}
+      showFrac={showFrac} onToggleFrac={() => handleToggleIndicator(showFrac, setShowFrac)}
+      showAlig={showAlig} onToggleAlig={() => handleToggleIndicator(showAlig, setShowAlig)}
+    />
     </>
   );
 }
