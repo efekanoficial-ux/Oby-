@@ -12,7 +12,7 @@ import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowDownLeft, ArrowUpRight,
   Clock, ArrowDownLeft as DepIcon, ArrowUpRight as WithIcon,
-  Hourglass, TrendingUp, AlertCircle,
+  Hourglass, TrendingUp, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -56,7 +56,7 @@ export default function Balance() {
   const [, navigate] = useLocation();
   const { currentUser, requests, isRejectionViewed } = useAuth();
   const { balance: demoBalance }  = useDemoAccount();
-  const { isReal }                = useAccountMode();
+  const { isReal, isBalanceHidden, toggleBalanceHidden } = useAccountMode();
   const { t }                     = useLanguage();
   const isTurkey                  = useIsTurkey();
   const currency = (currentUser as any)?.currency ?? "USD";
@@ -165,14 +165,28 @@ export default function Balance() {
 
           {/* balance */}
           <div className="relative mb-6">
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-              style={{ color: isReal ? "rgba(14,203,129,0.45)" : "rgba(255,107,0,0.45)" }}>
-              {t.currentBalance}
-            </p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: isReal ? "rgba(14,203,129,0.45)" : "rgba(255,107,0,0.45)" }}>
+                {t.currentBalance}
+              </p>
+              {isReal && (
+                <button
+                  type="button"
+                  onClick={toggleBalanceHidden}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all text-[11px] cursor-pointer"
+                  title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+                >
+                  {isBalanceHidden ? <EyeOff size={12} className="text-amber-400" /> : <Eye size={12} />}
+                  <span>{isBalanceHidden ? "Gizli" : "Göster"}</span>
+                </button>
+              )}
+            </div>
             <div className="flex items-end gap-0.5">
               <AnimatedBalance
                 value={balance}
                 currency={currency}
+                isMasked={isReal && isBalanceHidden}
                 className="text-3xl sm:text-5xl font-black leading-none tracking-tight block max-w-full truncate"
                 style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}
               />

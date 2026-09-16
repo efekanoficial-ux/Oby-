@@ -36,6 +36,9 @@ interface Props {
   onZoomChange?: (dir: "in" | "out") => void;  // kept for compat, LW handles natively
   showBollinger?: boolean;
   showMA?: boolean;
+  showSAR?: boolean;
+  showFrac?: boolean;
+  showAlig?: boolean;
   chartType?: "candle" | "line";
   onCandlesChange?: (candles: Candle[]) => void;
   onRealDataChange?: (isReal: boolean) => void;
@@ -177,6 +180,99 @@ function calcBB(candles: Candle[], period = 20, mult = 2) {
   });
 }
 
+function calcSMMA(data: number[], period: number): (number | null)[] {
+  const res: (number | null)[] = new Array(data.length).fill(null);
+  if (data.length < period) return res;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += data[i];
+  let prev = sum / period;
+  res[period - 1] = prev;
+  for (let i = period; i < data.length; i++) {
+    prev = (prev * (period - 1) + data[i]) / period;
+    res[i] = prev;
+  }
+  return res;
+}
+
+function calcAlligator(candles: Candle[]) {
+  const median = candles.map(c => (c.high + c.low) / 2);
+  const jawRaw = calcSMMA(median, 13);
+  const teethRaw = calcSMMA(median, 8);
+  const lipsRaw = calcSMMA(median, 5);
+
+  const jaw: ({ time: number; value: number } | null)[] = new Array(candles.length).fill(null);
+  const teeth: ({ time: number; value: number } | null)[] = new Array(candles.length).fill(null);
+  const lips: ({ time: number; value: number } | null)[] = new Array(candles.length).fill(null);
+
+  for (let i = 0; i < candles.length; i++) {
+    if (i + 8 < candles.length && jawRaw[i] !== null) {
+      jaw[i + 8] = { time: candles[i + 8].time, value: jawRaw[i]! };
+    }
+    if (i + 5 < candles.length && teethRaw[i] !== null) {
+      teeth[i + 5] = { time: candles[i + 5].time, value: teethRaw[i]! };
+    }
+    if (i + 3 < candles.length && lipsRaw[i] !== null) {
+      lips[i + 3] = { time: candles[i + 3].time, value: lipsRaw[i]! };
+    }
+  }
+  return { jaw, teeth, lips };
+}
+
+function calcSAR(candles: Candle[]) {
+  if (candles.length < 3) return [];
+  const res: { time: number; value: number }[] = [];
+  let af = 0.02;
+  const maxAf = 0.2;
+  let isLong = candles[1].close > candles[0].close;
+  let sar = isLong ? candles[0].low : candles[0].high;
+  let ep = isLong ? candles[0].high : candles[0].low;
+
+  for (let i = 1; i < candles.length; i++) {
+    res.push({ time: candles[i].time, value: sar });
+    const prevSar = sar;
+    sar = prevSar + af * (ep - prevSar);
+    if (isLong) {
+      if (candles[i].low < sar) {
+        isLong = false;
+        sar = ep;
+        ep = candles[i].low;
+        af = 0.02;
+      } else {
+        if (candles[i].high > ep) {
+          ep = candles[i].high;
+          af = Math.min(maxAf, af + 0.02);
+        }
+      }
+      sar = Math.min(sar, candles[i - 1].low, i > 1 ? candles[i - 2].low : candles[i - 1].low);
+    } else {
+      if (candles[i].high > sar) {
+        isLong = true;
+        sar = ep;
+        ep = candles[i].high;
+        af = 0.02;
+      } else {
+        if (candles[i].low < ep) {
+          ep = candles[i].low;
+          af = Math.min(maxAf, af + 0.02);
+        }
+      }
+      sar = Math.max(sar, candles[i - 1].high, i > 1 ? candles[i - 2].high : candles[i - 1].high);
+    }
+  }
+  return res;
+}
+
+function calcFractals(candles: Candle[]) {
+  const res: { time: number; value: number }[] = [];
+  for (let i = 2; i < candles.length - 2; i++) {
+    const h = candles[i].high;
+    if (h > candles[i-1].high && h > candles[i-2].high && h > candles[i+1].high && h > candles[i+2].high) {
+      res.push({ time: candles[i].time, value: h * 1.001 });
+    }
+  }
+  return res;
+}
+
 /* ── Component ──────────────────────────────────────────────────────────── */
 export function CandleChart({
   symbol,
@@ -189,6 +285,9 @@ export function CandleChart({
   onZoomChange,
   showBollinger,
   showMA,
+  showSAR,
+  showFrac,
+  showAlig,
   chartType = "candle",
   onCandlesChange,
   onRealDataChange,
@@ -209,6 +308,11 @@ export function CandleChart({
   const bbUpRef     = useRef<ISeriesApi<"Line"> | null>(null);
   const bbDnRef     = useRef<ISeriesApi<"Line"> | null>(null);
   const bbMidRef    = useRef<ISeriesApi<"Line"> | null>(null);
+  const aligJawRef   = useRef<ISeriesApi<"Line"> | null>(null);
+  const aligTeethRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const aligLipsRef  = useRef<ISeriesApi<"Line"> | null>(null);
+  const sarRef       = useRef<ISeriesApi<"Line"> | null>(null);
+  const fracRef      = useRef<ISeriesApi<"Line"> | null>(null);
   const activeEntriesRef = useRef<(ActiveEntry & { amount?: number })[]>([]);
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   const onDrawingsRef = useRef(onDrawingsChange);
@@ -442,7 +546,25 @@ export function CandleChart({
     maRef.current.setData(pts);
   };
 
-  /* ── BB series update ────────────────────────────────────────────────── */
+  const updateSAR = () => {
+    if (!sarRef.current) return;
+    const pts = calcSAR(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
+    sarRef.current.setData(pts);
+  };
+
+  const updateFractals = () => {
+    if (!fracRef.current) return;
+    const pts = calcFractals(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
+    fracRef.current.setData(pts);
+  };
+
+  const updateAlligator = () => {
+    if (!aligJawRef.current || !aligTeethRef.current || !aligLipsRef.current) return;
+    const { jaw, teeth, lips } = calcAlligator(candlesRef.current);
+    aligJawRef.current.setData(jaw.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+    aligTeethRef.current.setData(teeth.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+    aligLipsRef.current.setData(lips.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+  };
   const updateBB = () => {
     if (!bbUpRef.current || !bbDnRef.current || !bbMidRef.current) return;
     const bb = calcBB(candlesRef.current);
@@ -487,6 +609,9 @@ export function CandleChart({
     areaRef.current?.setData(agg.map(toLine));
     if (showBBRef.current) updateBB();
     if (showMARef.current) updateMA();
+    if (showSARRef.current) updateSAR();
+    if (showFracRef.current) updateFractals();
+    if (showAligRef.current) updateAlligator();
     onCandlesRef.current?.([...candlesRef.current]);
     onPriceRef.current?.(live.close);
     if (resetView) recenter();
@@ -514,6 +639,9 @@ export function CandleChart({
         finalizedRef.current += 1;
         onCandlesRef.current?.([...candlesRef.current]);
         if (showBBRef.current) updateBB();
+        if (showSARRef.current) updateSAR();
+        if (showFracRef.current) updateFractals();
+        if (showAligRef.current) updateAlligator();
       }
       live = { time: bucketTime, open: c.open, high: c.high, low: c.low, close: c.close };
       liveBucketRef.current = live;
@@ -820,7 +948,58 @@ export function CandleChart({
     }
   }, [showMA]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── BOLLINGER BANDS (toggle) ────────────────────────────────────────── */
+  const showSARRef = useRef(showSAR);
+  const showFracRef = useRef(showFrac);
+  const showAligRef = useRef(showAlig);
+  useEffect(() => { showSARRef.current = showSAR; }, [showSAR]);
+  useEffect(() => { showFracRef.current = showFrac; }, [showFrac]);
+  useEffect(() => { showAligRef.current = showAlig; }, [showAlig]);
+
+  /* SAR (toggle) */
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (showSAR) {
+      if (!sarRef.current) {
+        sarRef.current = chart.addLineSeries({ color: "#34d399", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false, lastValueVisible: false });
+      }
+      updateSAR();
+    } else {
+      if (sarRef.current) { chart.removeSeries(sarRef.current); sarRef.current = null; }
+    }
+  }, [showSAR]);
+
+  /* Fractals (toggle) */
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (showFrac) {
+      if (!fracRef.current) {
+        fracRef.current = chart.addLineSeries({ color: "#f472b6", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+      }
+      updateFractals();
+    } else {
+      if (fracRef.current) { chart.removeSeries(fracRef.current); fracRef.current = null; }
+    }
+  }, [showFrac]);
+
+  /* Alligator (toggle) */
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (showAlig) {
+      if (!aligJawRef.current) {
+        aligJawRef.current = chart.addLineSeries({ color: "#2962FF", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+        aligTeethRef.current = chart.addLineSeries({ color: "#FF6D00", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+        aligLipsRef.current = chart.addLineSeries({ color: "#00C853", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      }
+      updateAlligator();
+    } else {
+      if (aligJawRef.current) { chart.removeSeries(aligJawRef.current); aligJawRef.current = null; }
+      if (aligTeethRef.current) { chart.removeSeries(aligTeethRef.current); aligTeethRef.current = null; }
+      if (aligLipsRef.current) { chart.removeSeries(aligLipsRef.current); aligLipsRef.current = null; }
+    }
+  }, [showAlig]);
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;

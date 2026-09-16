@@ -8,6 +8,7 @@ interface AnimatedBalanceProps {
   symbol?: string;
   prefix?: string;
   style?: React.CSSProperties;
+  isMasked?: boolean;
 }
 
 export function AnimatedBalance({
@@ -18,6 +19,7 @@ export function AnimatedBalance({
   symbol,
   prefix = "",
   style,
+  isMasked = false,
 }: AnimatedBalanceProps) {
   // Determine effective currency & symbol
   const effectiveCurrency = currency ?? (typeof window !== "undefined" && localStorage.getItem("obyo_guest_currency") === "USD" ? "USD" : "TL");
@@ -28,6 +30,7 @@ export function AnimatedBalance({
   const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (isMasked) return;
     const startVal = prevValRef.current;
     const endVal = value;
     const diff = endVal - startVal;
@@ -67,7 +70,19 @@ export function AnimatedBalance({
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [value]);
+  }, [value, isMasked]);
+
+  if (isMasked) {
+    const maskedText = sym === "₺" ? "*****₺" : "*****$";
+    return (
+      <span
+        className={`tabular-nums inline-block select-none whitespace-nowrap ${className}`}
+        style={style}
+      >
+        {maskedText}
+      </span>
+    );
+  }
 
   const locale = sym === "₺" || effectiveCurrency === "TL" || effectiveCurrency === "TRY" ? "tr-TR" : "en-US";
   const formattedNum = displayValue.toLocaleString(locale, {

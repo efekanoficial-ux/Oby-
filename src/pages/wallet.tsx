@@ -14,8 +14,9 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
   ShieldCheck, RefreshCw, Wallet as WalletIcon, ExternalLink,
   CreditCard, QrCode, CircleDollarSign, Coins, FileText,
-  UploadCloud, Eye, Trash2, X, Paperclip,
+  UploadCloud, Eye, Trash2, X, Paperclip, Gift,
 } from "lucide-react";
+import { listenUserClaims, type UserBonusClaim } from "@/lib/bonuses";
 
 /* ─── Fake QR code (SVG grid) ────────────────────────────────────────────── */
 function QRVisual({ data, imgSrc }: { data: string; imgSrc?: string }) {
@@ -119,7 +120,7 @@ interface MethodConfig {
 export default function WalletPage() {
   const [, navigate] = useLocation();
   const { currentUser, requests, addRequest, paymentSettings, isRejectionViewed, markRejectionsAsViewed } = useAuth();
-  const { isReal, currency, currencySymbol } = useAccountMode();
+  const { isReal, currency, currencySymbol, isBalanceHidden, toggleBalanceHidden } = useAccountMode();
   const { t } = useLanguage();
 
   const isTL = (currentUser?.currency || currency) === "TL";
@@ -129,6 +130,17 @@ export default function WalletPage() {
   const withdrawMin = isTL ? 150 : 5;
 
   const isTurkey = useIsTurkey();
+
+  const [userClaims, setUserClaims] = useState<UserBonusClaim[]>([]);
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = listenUserClaims(currentUser.id, currentUser.email, setUserClaims);
+    return () => unsub();
+  }, [currentUser]);
+
+  const activeDepositBonus = userClaims.find(
+    (c) => c.type === "deposit_match" && c.status === "activated" && c.expiresAt > Date.now()
+  );
 
   // Dynamic deposit methods based on admin settings (enabled / disabled & custom methods)
   const depositMethods: MethodConfig[] = [];
@@ -449,6 +461,13 @@ export default function WalletPage() {
 
       const dest = method.customData?.accountNumber || "";
 
+      let finalMethodLabel = methodLabelWithCode;
+      let bonusAmountToAdd = 0;
+      if (activeDepositBonus) {
+        bonusAmountToAdd = (numAmt * activeDepositBonus.amount) / 100;
+        finalMethodLabel = `${methodLabelWithCode} (+%${activeDepositBonus.amount} Bonus: +${bonusAmountToAdd.toFixed(2)} ${method.currency})`;
+      }
+
       const reqPayload: any = {
         userId: currentUser.id,
         userEmail: currentUser.email,
@@ -456,9 +475,14 @@ export default function WalletPage() {
         type: "deposit",
         amount: numAmt,
         currency: method.currency,
-        method: methodLabelWithCode,
+        method: finalMethodLabel,
         destination: dest,
       };
+      if (activeDepositBonus) {
+        reqPayload.bonusPercent = activeDepositBonus.amount;
+        reqPayload.bonusAmount = bonusAmountToAdd;
+        reqPayload.bonusClaimId = activeDepositBonus.id;
+      }
       if (receiptFile?.dataUrl) reqPayload.receiptUrl = receiptFile.dataUrl;
       if (receiptFile?.name) reqPayload.receiptName = receiptFile.name;
       await addRequest(reqPayload);
@@ -469,7 +493,7 @@ export default function WalletPage() {
         userEmail: currentUser.email,
         amount: numAmt,
         currency: method.currency,
-        method: methodLabelWithCode,
+        method: finalMethodLabel,
         destination: dest,
         hasReceipt: Boolean(receiptFile?.dataUrl),
       });
@@ -589,15 +613,21 @@ export default function WalletPage() {
           <div className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full"
             style={{ background: "radial-gradient(circle, rgba(255,107,0,0.12), transparent 70%)" }} />
 
-          <div className="relative flex items-center justify-between mb-3">
+          <div className="relative mb-3">
             <span className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
               {t.realWalletBalance}
             </span>
           </div>
 
-          <div className="relative flex items-baseline gap-2 mb-4">
-            <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-              {userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div 
+            onClick={toggleBalanceHidden}
+            className="relative flex items-baseline gap-2 mb-4 cursor-pointer select-none group"
+            title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+          >
+            <span className="text-3xl sm:text-4xl font-black text-white tracking-tight group-hover:text-white/90 transition-colors">
+              {isBalanceHidden
+                ? (isTL ? "*****₺" : "*****$")
+                : `${userSym}${realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </span>
             <span className="text-xs font-bold text-white/35">{userCurrCode}</span>
           </div>
@@ -681,7 +711,36 @@ export default function WalletPage() {
 
           {/* ═════════════════ TAB: DEPOSIT ═════════════════ */}
           {tab === "deposit" && (
-            <AnimatePresence mode="wait">
+            <div className="flex flex-col gap-3">
+              {/* Active Deposit Bonus Banner */}
+              {activeDepositBonus && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FF6B00]/20 via-[#FFB800]/10 to-transparent border border-[#FF6B00]/35 flex items-center justify-between gap-3 shadow-lg shadow-[#FF6B00]/5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-[#FF6B00]/20 flex items-center justify-center text-[#FF6B00] shrink-0 border border-[#FF6B00]/30">
+                      <Gift size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-black text-white truncate">{activeDepositBonus.bonusTitle}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#FF6B00] text-black uppercase tracking-wider">
+                          +% {activeDepositBonus.amount} AKTİF
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/70 leading-tight mt-0.5">
+                        Bu yatırımınıza <b>+% {activeDepositBonus.amount} ekstra bakiye</b> otomatik eklenecektir.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/bonuses")}
+                    className="text-[11px] font-bold text-[#FF6B00] hover:text-[#FFB800] transition-colors shrink-0 underline"
+                  >
+                    Detay
+                  </button>
+                </div>
+              )}
+
+              <AnimatePresence mode="wait">
               {/* STEP 1: Select Method */}
               {dStep === "method" && (
                 <motion.div
@@ -1347,6 +1406,7 @@ export default function WalletPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
           )}
 
           {/* ═════════════════ TAB: WITHDRAW ═════════════════ */}

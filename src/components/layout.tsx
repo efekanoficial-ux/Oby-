@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check } from "lucide-react";
+import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift } from "lucide-react";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
@@ -222,13 +222,15 @@ function BlueDiamond3D({ size = 36, className = "" }: { size?: number; className
 
 /* ── Account Mode Switcher ───────────────────────────────────────────────── */
 function AccountSwitcher({
-  show, onClose, mode, onSelect, demoBalance, realBalance, hasRealAccount, align = "left", onRealClick, currency = "TL"
+  show, onClose, mode, onSelect, demoBalance, realBalance, tournamentBalance = 0, hasRealAccount, hasJoinedTournament = false, align = "left", onRealClick, onTournamentJoinClick, currency = "TL"
 }: {
   show: boolean; onClose: () => void;
   mode: AccMode; onSelect: (m: AccMode) => void;
-  demoBalance: number; realBalance: number; hasRealAccount: boolean;
+  demoBalance: number; realBalance: number; tournamentBalance?: number; hasRealAccount: boolean;
+  hasJoinedTournament?: boolean;
   align?: "left" | "right";
   onRealClick?: () => void;
+  onTournamentJoinClick?: () => void;
   currency?: string;
 }) {
   const { t } = useLanguage();
@@ -250,7 +252,7 @@ function AccountSwitcher({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.96 }}
           transition={{ type: "spring", stiffness: 420, damping: 28 }}
-          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-2 z-50 w-56 rounded-2xl overflow-hidden`}
+          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-2 z-50 w-60 rounded-2xl overflow-hidden`}
           style={{ background: "#0d0d0d", border: "1px solid #222", boxShadow: "0 16px 40px rgba(0,0,0,0.7)" }}>
 
           <div className="px-3 pt-3 pb-1">
@@ -259,17 +261,17 @@ function AccountSwitcher({
 
           {/* Demo */}
           <button onClick={() => { onSelect("demo"); onClose(); }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4">
+            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
               style={{ background: mode === "demo" ? "rgba(255,107,0,0.15)" : "#111", border: mode === "demo" ? "1px solid rgba(255,107,0,0.3)" : "1px solid #1e1e1e" }}>
               <BarChart2 size={13} style={{ color: mode === "demo" ? "#FF6B00" : "#555" }} />
             </div>
-            <div className="flex-1 text-left">
+            <div className="flex-1 text-left min-w-0">
               <p className="text-xs font-black" style={{ color: mode === "demo" ? "#FF6B00" : "#888" }}>{t.demoAccount}</p>
               <AnimatedBalance value={demoBalance} currency={currency} className="text-[10px] font-bold text-[#FFB800]" />
             </div>
             {mode === "demo" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-[#FF6B00]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-[#FF6B00] shrink-0" />
             )}
           </button>
 
@@ -279,13 +281,13 @@ function AccountSwitcher({
               else onSelect("real");
               onClose(); 
             }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4"
+            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer"
             >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
               style={{ background: mode === "real" ? "rgba(14,203,129,0.12)" : "#111", border: mode === "real" ? "1px solid rgba(14,203,129,0.3)" : "1px solid #1e1e1e" }}>
               <Gem size={13} style={{ color: mode === "real" ? "#0ecb81" : "#555" }} />
             </div>
-            <div className="flex-1 text-left">
+            <div className="flex-1 text-left min-w-0">
               <p className="text-xs font-black" style={{ color: hasRealAccount ? (mode === "real" ? "#0ecb81" : "#888") : "#333" }}>
                 {t.realAccount}
               </p>
@@ -296,9 +298,33 @@ function AccountSwitcher({
               )}
             </div>
             {mode === "real" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-[#0ecb81]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-[#0ecb81] shrink-0" />
             )}
           </button>
+
+          {/* Tournament (yalnızca turnuvaya katılınca gözüksün) */}
+          {hasRealAccount && hasJoinedTournament && (
+            <button onClick={() => { 
+                onSelect("tournament");
+                onClose();
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: mode === "tournament" ? "rgba(168,85,247,0.15)" : "#111", border: mode === "tournament" ? "1px solid rgba(168,85,247,0.3)" : "1px solid #1e1e1e" }}>
+                <Trophy size={13} style={{ color: mode === "tournament" ? "#A855F7" : "#666" }} />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-black" style={{ color: mode === "tournament" ? "#A855F7" : "#888" }}>
+                  Turnuva Hesabı
+                </p>
+                <AnimatedBalance value={tournamentBalance} currency="¥" symbol="¥" className="text-[10px] font-bold text-[#A855F7]" />
+              </div>
+              {mode === "tournament" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-[#A855F7] shrink-0" />
+              )}
+            </button>
+          )}
 
           <div className="px-3 py-2.5 border-t border-[#1a1a1a]">
             <p className="text-[9px] text-white/20 leading-relaxed">
@@ -324,6 +350,7 @@ function DesktopSidebar({
     { path: "/",        icon: BarChart2, label: t.navTrade    },
     { path: "/history", icon: Clock,    label: t.navHistory  },
     { path: "/wallet",  icon: Wallet,   label: t.navBalance  },
+    { path: "/bonuses", icon: Gift,     label: "Bonuslar"    },
     { path: "/profile", icon: Gem,      label: t.navVip      },
   ];
 
@@ -483,13 +510,25 @@ function DesktopHeader({
   const { t } = useLanguage();
   const [, navigate] = useLocation();
   const { currentUser } = useAuth();
-  const { mode, setMode, displayBalance, isReal, currency } = useAccountMode();
+  const {
+    mode,
+    setMode,
+    displayBalance,
+    isReal,
+    isTournament,
+    hasJoinedTournament,
+    tournamentBalance,
+    currency,
+    isBalanceHidden,
+    toggleBalanceHidden,
+  } = useAccountMode();
   const { balance: demoBalance } = useDemoAccount();
   const [showSwitcher, setShowSwitcher] = useState(false);
 
   const realBalance = currentUser?.realBalance ?? 0;
-  const modeColor = isReal ? "#0ecb81" : "#FF6B00";
-  const modeLabel = isReal ? t.realAccount : t.demoAccount;
+  const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
+  const modeColor = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
+  const modeLabel = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-black px-6">
@@ -498,27 +537,48 @@ function DesktopHeader({
         {/* Müşteri Hizmetleri / Telefon Butonu */}
         <CallRequestMenu buttonClass="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all cursor-pointer shrink-0" iconSize={15} align="right" />
 
-        {/* Bakiye Kısmı (Hesap Seçici ve Bakiye - diğer butonlarla aynı h-9 boyutta) */}
-        <div className="relative">
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
-            className="flex h-9 items-center gap-2 px-3 rounded-xl bg-[#14151a] border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer select-none shrink-0"
-            title="Hesap Seçimi ve Bakiye"
-          >
-            <div className="flex items-center gap-1.5 shrink-0">
+        {/* Bakiye Kısmı (Hesap Seçici ve Bakiye) */}
+        <div className="relative shrink-0">
+          <div className="flex items-center gap-2 select-none shrink-0">
+            <div
+              onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
+              className="flex items-center gap-1.5 shrink-0 cursor-pointer"
+              title="Hesap Seçimi ve Bakiye"
+            >
               <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modeColor }} />
               <span className="text-xs font-semibold text-white/50 whitespace-nowrap">
                 {modeLabel}:
               </span>
+              <AnimatedBalance
+                value={displayBalance}
+                currency={currency}
+                symbol={isTournament ? "¥" : undefined}
+                isMasked={isReal && isBalanceHidden}
+                className="text-xs font-medium text-white tracking-tight ml-0.5 whitespace-nowrap"
+              />
             </div>
-            <AnimatedBalance
-              value={displayBalance}
-              currency={currency}
-              className="text-xs font-black text-white tracking-tight"
+
+            {/* Sadece gerçek bakiyede kapalı göz ikonu */}
+            {isReal && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBalanceHidden();
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:text-white transition-all cursor-pointer shrink-0"
+                title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+              >
+                {isBalanceHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+              </button>
+            )}
+
+            <ChevronDown
+              size={13}
+              onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
+              className="text-white/40 shrink-0 ml-0.5 cursor-pointer"
             />
-            <ChevronDown size={13} className="text-white/40 shrink-0 ml-0.5" />
-          </motion.button>
+          </div>
 
           <AccountSwitcher
             align="right"
@@ -528,8 +588,11 @@ function DesktopHeader({
             onSelect={(m) => setMode(m)}
             demoBalance={demoBalance}
             realBalance={realBalance}
+            tournamentBalance={tourBal}
             hasRealAccount={!!currentUser}
+            hasJoinedTournament={hasJoinedTournament}
             onRealClick={() => navigate("/auth")}
+            onTournamentJoinClick={() => navigate("/leaderboard?tab=tournaments")}
             currency={currency}
           />
         </div>
@@ -537,20 +600,20 @@ function DesktopHeader({
         {/* Dil Ayarları */}
         <button
           onClick={onSettings}
-          className="flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer shrink-0"
+          className="flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer shrink-0 whitespace-nowrap"
         >
-          <Settings size={13} />
-          {t.languageSettings}
+          <Settings size={13} className="shrink-0" />
+          <span className="whitespace-nowrap shrink-0">{t.languageSettings}</span>
         </button>
 
         {/* Cüzdan Butonu */}
         <button
           onClick={onWallet}
-          className="flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-black text-black transition-transform active:scale-95 cursor-pointer shrink-0"
+          className="flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-black text-black transition-transform active:scale-95 cursor-pointer shrink-0 whitespace-nowrap select-none"
           style={{ background: "#FF6B00", boxShadow: "0 0 14px rgba(255,107,0,0.3)" }}
         >
-          <Wallet size={12} />
-          {t.wallet}
+          <Wallet size={12} className="shrink-0" />
+          <span className="whitespace-nowrap shrink-0">{t.wallet}</span>
         </button>
 
         {/* Unauthenticated desktop: Kayıt Ol / Giriş Yap button */}
@@ -585,7 +648,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const [location, navigate] = useLocation();
   const { currentUser } = useAuth();
-  const { mode, setMode, displayBalance, isReal, currency } = useAccountMode();
+  const {
+    mode,
+    setMode,
+    displayBalance,
+    isReal,
+    isTournament,
+    hasJoinedTournament,
+    tournamentBalance,
+    currency,
+    isBalanceHidden,
+    toggleBalanceHidden,
+  } = useAccountMode();
   const { balance: demoBalance } = useDemoAccount();
   const [showSwitcher,      setShowSwitcher]       = useState(false);
   const [sidebarCollapsed,  setSidebarCollapsed]   = useState(false);
@@ -607,9 +681,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const realBalance = currentUser?.realBalance ?? 0;
+  const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
   const sym = currency === "TL" ? "₺" : "$";
-  const modeColor   = isReal ? "#0ecb81" : "#FF6B00";
-  const modeLabel   = isReal ? t.realAccount : t.demoAccount;
+  const modeColor   = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
+  const modeLabel   = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
 
   if (isMobile) {
     return (
@@ -637,39 +712,60 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Right: Telefon + Bakiye + Cüzdan */}
-          <div className="relative flex items-center gap-1.5">
+          <div className="relative flex items-center gap-1.5 shrink-0 flex-nowrap">
             {/* Müşteri Hizmetleri / Telefon Butonu (Bakiyenin hemen yanında) */}
             <CallRequestMenu buttonClass="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 shrink-0 cursor-pointer" iconSize={15} align="right" />
 
             {/* Bakiye Kısmı */}
-            <motion.button
-              whileTap={{ scale: 0.94 }}
-              onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg hover:bg-white/5 transition-colors text-left"
-            >
-              <div className="flex flex-col items-end justify-center">
-                <span className="text-[9px] font-medium leading-tight text-white/50">
-                  {isReal ? t.realAccount : t.demoAccount}
+            <div className="flex items-center gap-1 select-none shrink-0">
+              <div 
+                onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
+                className="flex flex-col items-end justify-center cursor-pointer select-none"
+              >
+                <span className="text-[9px] font-medium leading-tight text-white/50 whitespace-nowrap">
+                  {modeLabel}
                 </span>
                 <AnimatedBalance
                   value={displayBalance}
                   currency={currency}
-                  className="text-[12px] font-bold text-white tracking-tight"
+                  symbol={isTournament ? "¥" : undefined}
+                  isMasked={isReal && isBalanceHidden}
+                  className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap"
                 />
               </div>
-              <ChevronDown size={11} className="text-white/40 shrink-0" />
-            </motion.button>
+
+              {/* Sadece gerçek bakiyede kapalı göz ikonu */}
+              {isReal && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleBalanceHidden();
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:text-white transition-colors cursor-pointer shrink-0"
+                  title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+                >
+                  {isBalanceHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                </button>
+              )}
+
+              <ChevronDown 
+                size={12} 
+                onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
+                className="text-white/40 shrink-0 cursor-pointer" 
+              />
+            </div>
 
             {/* Cüzdan Butonu */}
             <motion.button
               whileTap={{ scale: 0.92 }}
               onClick={() => navigate("/wallet")}
-              className="flex h-[34px] items-center gap-1.5 rounded-xl px-2.5 font-black text-black text-xs shrink-0"
+              className="flex h-[34px] items-center gap-1.5 rounded-xl px-2.5 font-black text-black text-xs shrink-0 whitespace-nowrap select-none"
               style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)", boxShadow: "0 4px 14px rgba(255,107,0,0.35)" }}
               title="Cüzdan"
             >
-              <Wallet size={13} />
-              <span>{t.wallet}</span>
+              <Wallet size={13} className="shrink-0" />
+              <span className="whitespace-nowrap shrink-0">{t.wallet}</span>
             </motion.button>
 
             <AccountSwitcher
@@ -677,8 +773,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               show={showSwitcher} onClose={() => setShowSwitcher(false)}
               mode={mode} onSelect={(m) => setMode(m)}
               demoBalance={demoBalance} realBalance={realBalance}
+              tournamentBalance={tourBal}
               hasRealAccount={!!currentUser}
+              hasJoinedTournament={hasJoinedTournament}
               onRealClick={() => navigate("/auth")}
+              onTournamentJoinClick={() => navigate("/leaderboard?tab=tournaments")}
               currency={currency}
             />
           </div>

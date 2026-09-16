@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   User, Settings, Bell, Shield, ChevronRight,
   HelpCircle, LogOut, X, Hash, Wallet, Camera, Trophy, ShieldCheck, CheckCircle2,
+  Gift,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LeaderboardModal } from "@/components/leaderboard-modal";
@@ -13,6 +14,7 @@ import { KycModal } from "@/components/kyc-modal";
 
 import { useLanguage } from "@/context/LanguageContext";
 import { VIPLevelCard } from "@/components/vip-level-card";
+import { Bonus, UserBonusClaim, listenBonuses, listenUserClaims, getUnclaimedBonusCount } from "@/lib/bonuses";
 
 export default function Profile() {
   const [, navigate]   = useLocation();
@@ -24,6 +26,8 @@ export default function Profile() {
   const [showLangModal, setShowLangModal]     = useState(false);
   const [showKycModal, setShowKycModal]       = useState(false);
   const [notifState, setNotifState]           = useState(true);
+  const [bonuses, setBonuses]                 = useState<Bonus[]>([]);
+  const [claims, setClaims]                   = useState<UserBonusClaim[]>([]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("kyc=open")) {
@@ -31,12 +35,34 @@ export default function Profile() {
     }
   }, []);
 
+  useEffect(() => {
+    const unsubBonuses = listenBonuses((list) => {
+      setBonuses(list);
+    });
+    return () => unsubBonuses();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setClaims([]);
+      return;
+    }
+    const unsubClaims = listenUserClaims(currentUser.id, currentUser.email, (userClaims) => {
+      setClaims(userClaims);
+    });
+    return () => unsubClaims();
+  }, [currentUser]);
+
+  // Calculate available active bonuses matching bonuses page logic
+  const unclaimedBonusCount = getUnclaimedBonusCount(bonuses, claims, currentUser);
+
   const handleLogout = () => { logout(); navigate("/auth"); };
 
   const isVerified = currentUser?.kycStatus === "verified";
 
   const menuItems: any[] = [
     { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: t.daily || "Günlük", action: () => navigate("/leaderboard"),     href: undefined, customColor: undefined },
+    { icon: Gift,        label: "Bonuslar",                       value: "",                   badge: unclaimedBonusCount > 0 ? unclaimedBonusCount : undefined, action: () => navigate("/bonuses"),         href: undefined, customColor: undefined },
     { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined, customColor: undefined },
     { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined, customColor: undefined },
     { icon: Bell,        label: t.notifications,                  value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined, customColor: undefined },
@@ -190,6 +216,11 @@ export default function Profile() {
                       <span className="text-sm font-semibold text-white">{item.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f6465d] px-1.5 text-[10px] font-black text-white shadow-sm shadow-[#f6465d]/40">
+                          {item.badge}
+                        </span>
+                      )}
                       {item.value && (
                         <span className="text-xs font-bold" style={{ color: item.customColor || "#555" }}>
                           {item.value}

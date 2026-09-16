@@ -9,12 +9,27 @@ import {
   RefreshCw, CheckCircle2, Plus, Trash2, Edit3, Wallet, CreditCard,
   QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle,
   FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2,
-  Send, Bot, Bell, Key, Copy, CheckCheck, MessageSquare
+  Send, Bot, Bell, Key, Copy, CheckCheck, MessageSquare, Trophy,
+  Gift, Sparkles, Coins
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import {
+  Tournament,
+  DEFAULT_TOURNAMENTS,
+  listenTournaments,
+  saveTournament,
+  resetTournamentsToDefault,
+} from "@/lib/tournaments";
+import {
+  Bonus,
+  listenBonuses,
+  saveBonus,
+  deleteBonus,
+} from "@/lib/bonuses";
+import { AdminBonusesTab } from "@/components/admin/AdminBonusesTab";
 
-type AdminTab  = "requests" | "users" | "settings" | "telegram";
+type AdminTab  = "requests" | "users" | "tournaments" | "bonuses" | "settings" | "telegram";
 type ReqFilter = "all" | "deposit" | "withdraw" | "pending";
 
 function StatusBadge({ status }: { status: ObyoRequest["status"] }) {
@@ -152,6 +167,44 @@ export default function Admin() {
   /* Custom Payment Method modal and editing state */
   const [editingCustomMethod, setEditingCustomMethod] = useState<CustomPaymentMethod | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  /* Tournament Management Admin State */
+  const [tournaments, setTournaments] = useState<Tournament[]>(DEFAULT_TOURNAMENTS);
+  const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
+  const [tourSaveMsg, setTourSaveMsg] = useState<string | null>(null);
+  const [isSavingTour, setIsSavingTour] = useState(false);
+
+  useEffect(() => {
+    const unsub = listenTournaments((list) => {
+      setTournaments(list);
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, []);
+
+  const handleSaveTournament = async (t: Tournament) => {
+    setIsSavingTour(true);
+    const res = await saveTournament(t);
+    setIsSavingTour(false);
+    if (res.success) {
+      setTourSaveMsg(`"${t.title}" başarıyla güncellendi!`);
+      setEditingTournament(null);
+      setTimeout(() => setTourSaveMsg(null), 3500);
+    } else {
+      alert("Turnuva kaydedilemedi: " + (res.error || "Bilinmeyen hata"));
+    }
+  };
+
+  const handleResetTournaments = async () => {
+    if (confirm("Tüm turnuvalar varsayılan ayarlara, isimlere ve resimlere sıfırlansın mı?")) {
+      setIsSavingTour(true);
+      await resetTournamentsToDefault();
+      setIsSavingTour(false);
+      setTourSaveMsg("Turnuvalar varsayılana sıfırlandı!");
+      setTimeout(() => setTourSaveMsg(null), 3500);
+    }
+  };
 
   // Keep local form in sync with remote payment settings when loaded
   useEffect(() => {
@@ -534,20 +587,28 @@ export default function Admin() {
       {/* Tabs */}
       <div className="flex border-b border-[#111] shrink-0 overflow-x-auto no-scrollbar">
         {([
-          { id: "requests", label: "İstekler",     badge: pendingCount },
-          { id: "users",    label: "Kullanıcılar"                      },
-          { id: "settings", label: "Cüzdanlar"                         },
-          { id: "telegram", label: "Telegram",     isTelegram: true    },
-        ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean }[]).map(t => {
+          { id: "requests",    label: "İstekler",     badge: pendingCount },
+          { id: "users",       label: "Kullanıcılar"                      },
+          { id: "tournaments", label: "Turnuvalar",   isTour: true        },
+          { id: "bonuses",     label: "Bonuslar",     isBonus: true       },
+          { id: "settings",    label: "Cüzdanlar"                         },
+          { id: "telegram",    label: "Telegram",     isTelegram: true    },
+        ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean; isTour?: boolean; isBonus?: boolean }[]).map(t => {
           const isActive = tab === t.id;
           const isTgConfigured = Boolean(formSettings.telegramBotToken?.trim() && formSettings.telegramChatId?.trim());
-          const activeColor = t.isTelegram ? "#2AABEE" : "#FF6B00";
+          const activeColor = t.isTelegram ? "#2AABEE" : t.isTour ? "#A855F7" : t.isBonus ? "#FF6B00" : "#FF6B00";
           return (
             <button key={t.id} onClick={() => setTab(t.id as AdminTab)}
               className="flex items-center gap-1.5 justify-center py-3 px-4 text-xs font-black relative cursor-pointer select-none whitespace-nowrap flex-1 md:flex-none"
               style={{ color: isActive ? activeColor : "#555" }}>
               {t.isTelegram && (
                 <Send size={13} className={`shrink-0 ${isActive ? "text-[#2AABEE]" : "text-[#2AABEE]/60"}`} />
+              )}
+              {t.isTour && (
+                <Trophy size={13} className={`shrink-0 ${isActive ? "text-[#A855F7]" : "text-[#A855F7]/60"}`} />
+              )}
+              {t.isBonus && (
+                <Gift size={13} className={`shrink-0 ${isActive ? "text-[#FF6B00]" : "text-[#FF6B00]/60"}`} />
               )}
               <span>{t.label}</span>
               {t.isTelegram && (
@@ -630,6 +691,9 @@ export default function Admin() {
               const isDeposit = req.type === "deposit";
               const color     = isDeposit ? "#0ecb81" : "#FF6B00";
               const isOpen    = expanded === req.id;
+              const matchingUser = users.find(u => u.id === req.userId || u.email?.toLowerCase() === req.userEmail?.toLowerCase());
+              const isReqTL   = req.currency === "TL" || matchingUser?.currency === "TL";
+              const reqSym    = isReqTL ? "₺" : "$";
 
               return (
                 <motion.div key={req.id} layout
@@ -647,6 +711,13 @@ export default function Admin() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-black text-white">{req.userName}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black shrink-0 border ${
+                          isReqTL 
+                            ? "bg-[#FF6B00]/15 text-[#FF6B00] border-[#FF6B00]/30" 
+                            : "bg-[#0ecb81]/15 text-[#0ecb81] border-[#0ecb81]/30"
+                        }`}>
+                          {isReqTL ? "₺ TL Hesabı" : "$ Dolar Hesabı"}
+                        </span>
                         <StatusBadge status={req.status} />
                         {req.receiptUrl && (
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#0ecb81]/15 text-[#0ecb81] border border-[#0ecb81]/30 flex items-center gap-1">
@@ -656,7 +727,7 @@ export default function Admin() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-black" style={{ color }}>
-                          {isDeposit ? "+" : "-"}${req.amount} {req.currency}
+                          {isDeposit ? "+" : "-"}{reqSym}{req.amount} ({isReqTL ? "TL" : "USD"})
                         </span>
                         <span className="text-[10px] text-white/25">· {req.method}</span>
                       </div>
@@ -916,6 +987,8 @@ export default function Admin() {
               const isOpen  = expanded === u.id;
               const pending = requests.filter(r => (r.userId === u.id || r.userEmail?.toLowerCase() === u.email?.toLowerCase()) && r.status === "pending").length;
               const isAddingThis = adding === u.id;
+              const isUserTL = u.currency === "TL";
+              const userSym = isUserTL ? "₺" : "$";
 
               return (
                 <motion.div key={u.id} layout
@@ -933,8 +1006,15 @@ export default function Admin() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-black text-white truncate">{u.name} {u.surname}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black shrink-0 border ${
+                          isUserTL 
+                            ? "bg-[#FF6B00]/15 text-[#FF6B00] border-[#FF6B00]/30" 
+                            : "bg-[#0ecb81]/15 text-[#0ecb81] border-[#0ecb81]/30"
+                        }`}>
+                          {isUserTL ? "₺ TL Hesabı" : "$ Dolar Hesabı"}
+                        </span>
                         {pending > 0 && (
                           <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black text-black shrink-0"
                             style={{ background: "#FFB800" }}>{pending}</span>
@@ -944,8 +1024,12 @@ export default function Admin() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-xs font-black text-[#0ecb81]">${(u.realBalance ?? 0).toFixed(2)}</span>
-                        <span className="text-[10px] text-white/25">Gerçek</span>
+                        <span className="text-xs font-black text-[#0ecb81]">
+                          {userSym}{(u.realBalance ?? 0).toLocaleString(isUserTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] text-white/40 font-bold">
+                          {isUserTL ? "TL Gerçek" : "USD Gerçek"}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -971,16 +1055,18 @@ export default function Admin() {
                           {/* Stats grid */}
                           <div className="grid grid-cols-2 gap-2">
                             {[
+                              { label: "Hesap Para Birimi", value: isUserTL ? "₺ Türk Lirası (TL Hesabı)" : "$ Amerikan Doları (USD Hesabı)", full: true },
                               { label: "Kullanıcı ID",   value: u.id,                                       full: true },
                               { label: "E-posta",        value: u.email,                                    full: true },
                               ...(u.tcKimlik || u.idNumber ? [{ label: "T.C. Kimlik No", value: u.tcKimlik || u.idNumber, full: false }] : []),
                               ...(u.referralCode ? [{ label: "Referans Kodu", value: u.referralCode, full: false }] : []),
                               { label: "Doğum Tarihi",   value: u.birthDate                                            },
                               { label: "Kayıt Tarihi",   value: format(u.createdAt, "dd.MM.yyyy")                      },
-                              { label: "Demo Bakiye",    value: `$${(u.demoBalance ?? 0).toFixed(2)}`                  },
-                              { label: "Gerçek Bakiye",  value: `$${(u.realBalance ?? 0).toFixed(2)}`                  },
-                              { label: "Toplam Yatırım", value: `$${(u.totalDeposited ?? 0).toFixed(2)}`               },
-                              { label: "Toplam Çekim",   value: `$${(u.totalWithdrawn ?? 0).toFixed(2)}`               },
+                              { label: "Demo Bakiye",    value: `${userSym}${(u.demoBalance ?? 0).toFixed(2)}`          },
+                              { label: "Gerçek Bakiye",  value: `${userSym}${(u.realBalance ?? 0).toFixed(2)}`          },
+                              { label: "Turnuva Bakiyesi", value: `${(u.tournamentBalance ?? 100).toFixed(2)} ¥`       },
+                              { label: "Toplam Yatırım", value: `${userSym}${(u.totalDeposited ?? 0).toFixed(2)}`       },
+                              { label: "Toplam Çekim",   value: `${userSym}${(u.totalWithdrawn ?? 0).toFixed(2)}`       },
                             ].map(row => (
                               <div key={row.label} className={`flex flex-col gap-0.5 rounded-xl p-2.5 ${row.full ? "col-span-2" : ""}`}
                                 style={{ background: "#111", border: "1px solid #1e1e1e" }}>
@@ -1084,12 +1170,14 @@ export default function Admin() {
                           {/* Direct balance addition */}
                           <div className="rounded-xl p-3 flex flex-col gap-2"
                             style={{ background: "rgba(14,203,129,0.05)", border: "1px solid rgba(14,203,129,0.15)" }}>
-                            <p className="text-[10px] font-black text-[#0ecb81] uppercase">Doğrudan Bakiye Ekle</p>
+                            <p className="text-[10px] font-black text-[#0ecb81] uppercase">
+                              Doğrudan Bakiye Ekle ({isUserTL ? "₺ Türk Lirası" : "$ Amerikan Doları"})
+                            </p>
                             <div className="flex gap-2">
                               <input
                                 type="number"
                                 min="1"
-                                placeholder="Miktar ($)"
+                                placeholder={isUserTL ? "Miktar (₺ TL)" : "Miktar ($ USD)"}
                                 value={addAmounts[u.id] ?? ""}
                                 onChange={e => setAddAmounts(prev => ({ ...prev, [u.id]: e.target.value }))}
                                 className="flex-1 rounded-xl bg-[#111] border border-[#1e1e1e] px-3 py-2 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#0ecb81]/40 transition-colors"
@@ -1140,7 +1228,387 @@ export default function Admin() {
           </div>
         )}
 
-        {/* ── SETTINGS TAB (Hesap & Cüzdan Ayarları) ────────────────────────── */}
+        {/* ── TOURNAMENTS TAB (Turnuva Yönetimi) ─────────────────────────── */}
+        {tab === "tournaments" && (
+          <div className="p-4 md:p-8 max-w-5xl mx-auto flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                  <Trophy size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Turnuva Yönetimi</h3>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Liderlik sayfasındaki 5 borsa turnuvasının görsellerini, katılım ücretlerini ($ / ₺) ve başlangıç paralarını yönetin.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetTournaments}
+                disabled={isSavingTour}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                <RefreshCw size={13} className={isSavingTour ? "animate-spin" : ""} />
+                Varsayılana Sıfırla
+              </button>
+            </div>
+
+            {tourSaveMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 p-3.5 rounded-2xl border border-[#0ecb81]/30 bg-[#0ecb81]/10 text-xs font-bold text-[#0ecb81]"
+              >
+                <CheckCircle2 size={16} />
+                <span>{tourSaveMsg}</span>
+              </motion.div>
+            )}
+
+            {/* Tournaments Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {tournaments.slice(0, 5).map((tour, idx) => (
+                <div
+                  key={tour.id}
+                  className="rounded-2xl border border-white/10 bg-[#0d0d12] overflow-hidden flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Thumbnail Image Banner */}
+                    <div className="relative h-36 w-full overflow-hidden bg-black">
+                      <img
+                        src={tour.imageUrl}
+                        alt={tour.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d12] via-black/40 to-transparent" />
+                      
+                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md bg-amber-400 text-black text-[9px] font-black shadow">
+                          VIP GEREKLİ
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-purple-600/90 text-white text-[9px] font-black border border-purple-400/30">
+                          {tour.prizePool}
+                        </span>
+                      </div>
+
+                      <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-white/80 font-bold">
+                          #{idx + 1} Turnuva
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-black border border-emerald-500/30">
+                          {tour.status === "active" ? "Aktif (1 Hafta)" : "Yakında"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Information */}
+                    <div className="p-4 flex flex-col gap-3">
+                      <div>
+                        <h4 className="text-sm font-black text-white">{tour.title}</h4>
+                        <p className="text-xs text-white/50 mt-1 line-clamp-2 leading-relaxed">
+                          {tour.subtitle}
+                        </p>
+                      </div>
+
+                      {/* Specs */}
+                      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-white/30 uppercase block">Dolar Katılım</span>
+                          <span className="font-mono font-bold text-white">${tour.entryFeeUSD} USD</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-white/30 uppercase block">TL Katılım</span>
+                          <span className="font-mono font-bold text-[#FF6B00]">{tour.entryFeeTL.toLocaleString("tr-TR")} ₺</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-white/30 uppercase block">Turnuva Bakiyesi</span>
+                          <span className="font-mono font-bold text-[#A855F7]">{tour.startingBalance} {tour.currencySymbol}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-white/30 uppercase block">Katılımcı Sayısı</span>
+                          <span className="font-mono font-bold text-emerald-400">{tour.participantsCount} Yatırımcı</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="p-4 pt-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingTournament({ ...tour })}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-xs font-black transition-all cursor-pointer"
+                    >
+                      <Edit3 size={13} />
+                      Turnuvayı Düzenle
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── TOURNAMENT EDIT MODAL ── */}
+            <AnimatePresence>
+              {editingTournament && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="relative w-full max-w-lg rounded-3xl bg-[#0e0f14] border border-white/15 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                  >
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <Trophy size={16} className="text-purple-400" />
+                        <h3 className="text-sm font-black text-white">Turnuva Düzenle</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTournament(null)}
+                        className="h-8 w-8 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+
+                    {/* Modal Form Content */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (editingTournament) handleSaveTournament(editingTournament);
+                      }}
+                      className="p-5 overflow-y-auto flex flex-col gap-4 text-xs"
+                    >
+                      {/* Live Image Preview */}
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                          Turnuva Görsel Önizlemesi
+                        </label>
+                        <div className="h-32 w-full rounded-2xl overflow-hidden border border-white/10 bg-black/60 relative">
+                          <img
+                            src={editingTournament.imageUrl}
+                            alt="Önizleme"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80";
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Image URL */}
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                          Resim Bağlantısı (URL)
+                        </label>
+                        <input
+                          type="url"
+                          required
+                          value={editingTournament.imageUrl}
+                          onChange={(e) => setEditingTournament({ ...editingTournament, imageUrl: e.target.value })}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white outline-none focus:border-purple-500 transition-colors font-mono"
+                          placeholder="https://images.unsplash.com/..."
+                        />
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingTournament({ ...editingTournament, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80" })}
+                            className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/60 shrink-0 cursor-pointer"
+                          >
+                            Wall Street
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingTournament({ ...editingTournament, imageUrl: "https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=1200&q=80" })}
+                            className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/60 shrink-0 cursor-pointer"
+                          >
+                            Kripto Boğalar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingTournament({ ...editingTournament, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80" })}
+                            className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/60 shrink-0 cursor-pointer"
+                          >
+                            Forex Altın
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingTournament({ ...editingTournament, imageUrl: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80" })}
+                            className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/60 shrink-0 cursor-pointer"
+                          >
+                            Nasdaq Teknoloji
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Title & Subtitle */}
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                          Turnuva Başlığı
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingTournament.title}
+                          onChange={(e) => setEditingTournament({ ...editingTournament, title: e.target.value })}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white font-bold outline-none focus:border-purple-500 transition-colors"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                          Açıklama / Alt Başlık
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={editingTournament.subtitle}
+                          onChange={(e) => setEditingTournament({ ...editingTournament, subtitle: e.target.value })}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white outline-none focus:border-purple-500 transition-colors resize-none"
+                        />
+                      </div>
+
+                      {/* Entry Fees (USD & TL) */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Katılım Ücreti (USD)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            required
+                            value={editingTournament.entryFeeUSD}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, entryFeeUSD: Number(e.target.value) || 0 })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white font-mono font-bold outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Katılım Ücreti (TL)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            required
+                            value={editingTournament.entryFeeTL}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, entryFeeTL: Number(e.target.value) || 0 })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white font-mono font-bold outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Starting Balance & Currency Symbol */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Başlangıç Turnuva Parası
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={editingTournament.startingBalance}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, startingBalance: Number(e.target.value) || 100 })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white font-mono font-bold outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Para Birimi Simgesi
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={editingTournament.currencySymbol}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, currencySymbol: e.target.value })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white font-mono font-bold outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Prize Pool & Duration */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Ödül Havuzu Metni
+                          </label>
+                          <input
+                            type="text"
+                            value={editingTournament.prizePool}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, prizePool: e.target.value })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                            Süre
+                          </label>
+                          <input
+                            type="text"
+                            value={editingTournament.duration}
+                            onChange={(e) => setEditingTournament({ ...editingTournament, duration: e.target.value })}
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white outline-none focus:border-purple-500 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                          Turnuva Durumu
+                        </label>
+                        <select
+                          value={editingTournament.status}
+                          onChange={(e) => setEditingTournament({ ...editingTournament, status: e.target.value as any })}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-white outline-none focus:border-purple-500 transition-colors"
+                        >
+                          <option value="active">Aktif (Kullanıcılar katılabilir)</option>
+                          <option value="upcoming">Yakında Başlayacak</option>
+                          <option value="completed">Tamamlandı</option>
+                        </select>
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex gap-2.5 pt-3 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setEditingTournament(null)}
+                          className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/70 hover:text-white font-bold cursor-pointer"
+                        >
+                          İptal
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingTour}
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black shadow-lg shadow-purple-600/30 hover:opacity-95 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {isSavingTour ? (
+                            <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                          ) : (
+                            <>
+                              <Save size={14} />
+                              Değişiklikleri Kaydet
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        {tab === "bonuses" && (
+          <AdminBonusesTab users={users} />
+        )}
         {tab === "settings" && (
           <div className="p-4 md:p-8 max-w-5xl mx-auto flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">

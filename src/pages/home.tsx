@@ -20,7 +20,7 @@ import {
   ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, X,
   Clock, BarChart3, Activity, ChevronLeft, ChevronRight,
   SlidersHorizontal, CandlestickChart, LineChart, RotateCw,
-  Lock, ArrowRight, ShieldCheck,
+  Lock, ArrowRight, ShieldCheck, History,
 } from "lucide-react";
 import type { Candle } from "@/components/candle-chart";
 import { AssetIcon } from "@/lib/asset-icons";
@@ -197,9 +197,12 @@ function RSIPanel({ candles }: { candles: Candle[] }) {
     if (!canvas) return;
     const W = canvas.clientWidth, H = canvas.clientHeight;
     if (!W || !H) return;
-    canvas.width = W; canvas.height = H;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.scale(dpr, dpr);
     ctx.fillStyle = "#080808"; ctx.fillRect(0, 0, W, H);
     const rsi = calcRSI(candles, 14).filter(v => v !== null) as number[];
     if (rsi.length < 2) return;
@@ -230,7 +233,122 @@ function RSIPanel({ candles }: { candles: Candle[] }) {
   }, [candles]);
   return (
     <div className="h-[72px] shrink-0 border-t border-white/5 bg-[#080808]">
-      <canvas ref={canvasRef} className="w-full h-full" />
+      <canvas ref={canvasRef} className="w-full h-full block" />
+    </div>
+  );
+}
+
+function calcMACD(candles: Candle[]): { macd: (number | null)[], signal: (number | null)[], hist: (number | null)[] } {
+  const closes = candles.map(c => c.close);
+  if (closes.length < 26) return { macd: closes.map(() => null), signal: closes.map(() => null), hist: closes.map(() => null) };
+  
+  const ema = (data: number[], period: number) => {
+    const k = 2 / (period + 1);
+    const res: (number | null)[] = data.map(() => null);
+    let sum = 0;
+    if (data.length < period) return res;
+    for (let i = 0; i < period; i++) sum += data[i];
+    let prev = sum / period;
+    res[period - 1] = prev;
+    for (let i = period; i < data.length; i++) {
+      prev = (data[i] - prev) * k + prev;
+      res[i] = prev;
+    }
+    return res;
+  };
+
+  const ema12 = ema(closes, 12);
+  const ema26 = ema(closes, 26);
+  const macdLine: (number | null)[] = closes.map((_, i) => {
+    if (ema12[i] !== null && ema26[i] !== null) return (ema12[i] as number) - (ema26[i] as number);
+    return null;
+  });
+
+  const validMacd = macdLine.map(v => v ?? 0);
+  const signalLine = ema(validMacd, 9);
+  const hist = macdLine.map((m, i) => {
+    const s = signalLine[i];
+    if (m !== null && s !== null) return m - s;
+    return null;
+  });
+
+  return { macd: macdLine, signal: signalLine, hist };
+}
+
+function MACDPanel({ candles }: { candles: Candle[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W || !H) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = "#080808"; ctx.fillRect(0, 0, W, H);
+
+    const { macd, signal, hist } = calcMACD(candles);
+    const visMacd = macd.slice(-60);
+    const visSignal = signal.slice(-60);
+    const visHist = hist.slice(-60);
+
+    if (visMacd.length < 2) return;
+
+    let minV = Infinity, maxV = -Infinity;
+    [...visMacd, ...visSignal, ...visHist].forEach(v => {
+      if (v !== null) {
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+    });
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    const range = maxV - minV || 1;
+
+    const toY = (v: number) => H - 4 - ((v - minV) / range) * (H - 8);
+    const zeroY = toY(0);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+    ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(W, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const step = W / Math.max(visMacd.length - 1, 1);
+
+    visHist.forEach((h, i) => {
+      if (h === null) return;
+      const x = i * step;
+      const y = toY(h);
+      ctx.fillStyle = h >= 0 ? "#0ecb8188" : "#f6465d88";
+      ctx.fillRect(x - Math.max(0.5, step * 0.3), Math.min(zeroY, y), Math.max(1, step * 0.6), Math.abs(y - zeroY));
+    });
+
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "#a78bfa";
+    ctx.beginPath();
+    visMacd.forEach((v, i) => {
+      if (v === null) return;
+      const x = i * step, y = toY(v);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.strokeStyle = "#f59e0b";
+    ctx.beginPath();
+    visSignal.forEach((v, i) => {
+      if (v === null) return;
+      const x = i * step, y = toY(v);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff35"; ctx.font = "9px Inter,monospace";
+    ctx.textAlign = "left"; ctx.fillText("MACD(12,26,9)", 4, 12);
+  }, [candles]);
+
+  return (
+    <div className="h-[72px] shrink-0 border-t border-white/5 bg-[#080808]">
+      <canvas ref={canvasRef} className="w-full h-full block" />
     </div>
   );
 }
@@ -361,7 +479,7 @@ function AssetSheet({
 function TradeControls({
   asset, tf, setTf, amount, setAmount, price, expiryTimeStr,
   displayBalance, chartToast, onTrade, balanceWarn, chartLoading,
-  currency, minAmount, glass, tradeBlocked,
+  currency, minAmount, glass, tradeBlocked, currencySymbol,
 }: {
   asset: typeof ASSETS[0]; tf: typeof TIMEFRAMES[0];
   setTf: (t: typeof TIMEFRAMES[0]) => void; amount: number;
@@ -371,13 +489,14 @@ function TradeControls({
   balanceWarn: boolean; chartLoading: boolean;
   currency: "TL" | "USD"; minAmount: number;
   glass?: boolean; tradeBlocked: boolean;
+  currencySymbol?: string;
 }) {
   const [showDuration, setShowDuration] = useState(false);
   const [amountStr, setAmountStr] = useState(String(amount));
   useEffect(() => { setAmountStr(String(amount)); }, [amount]);
 
-  const cs = currency === "TL" ? "₺" : "$";
-  const step = currency === "TL" ? 10 : 5;
+  const cs = currencySymbol || (currency === "TL" ? "₺" : "$");
+  const step = (cs === "¥" || minAmount === 1) ? 1 : (currency === "TL" ? 10 : 5);
   const payout = (amount * (asset.payout / 100)).toFixed(2);
   const cardBg = glass ? "rgba(255,255,255,0.05)" : "#0d0d0d";
   const cardBorder = glass ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.06)";
@@ -635,6 +754,14 @@ function IndicatorsModal({
   onToggleBollinger,
   showRSI,
   onToggleRSI,
+  showMACD,
+  onToggleMACD,
+  showSAR,
+  onToggleSAR,
+  showFrac,
+  onToggleFrac,
+  showAlig,
+  onToggleAlig,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -644,8 +771,16 @@ function IndicatorsModal({
   onToggleBollinger: () => void;
   showRSI: boolean;
   onToggleRSI: () => void;
+  showMACD: boolean;
+  onToggleMACD: () => void;
+  showSAR: boolean;
+  onToggleSAR: () => void;
+  showFrac: boolean;
+  onToggleFrac: () => void;
+  showAlig: boolean;
+  onToggleAlig: () => void;
 }) {
-  const activeIndicatorCount = [showRSI, showBollinger, showMA].filter(Boolean).length;
+  const activeIndicatorCount = [showRSI, showBollinger, showMA, showMACD, showSAR, showFrac, showAlig].filter(Boolean).length;
 
   return (
     <AnimatePresence>
@@ -698,10 +833,10 @@ function IndicatorsModal({
               { key: "ma",  label: "Hareketli Ortalama", sub: "EMA 20", active: showMA, onToggle: onToggleMA, color: "#FFD700", impl: true },
               { key: "bb",  label: "Bollinger Bantları",  sub: "BB 20,2", active: showBollinger, onToggle: onToggleBollinger, color: "#4DA2FF", impl: true },
               { key: "rsi", label: "RSI",                 sub: "14 dönem", active: showRSI, onToggle: onToggleRSI, color: "#FF9500", impl: true },
-              { key: "macd",   label: "MACD",          sub: "12,26,9",  active: false, onToggle: undefined, color: "#a78bfa", impl: false },
-              { key: "sar",    label: "Parabolic SAR",  sub: "0.02,0.2", active: false, onToggle: undefined, color: "#34d399", impl: false },
-              { key: "frac",   label: "Fractals",       sub: "Williams", active: false, onToggle: undefined, color: "#f472b6", impl: false },
-              { key: "alig",   label: "Alligator",      sub: "Williams", active: false, onToggle: undefined, color: "#60a5fa", impl: false },
+              { key: "macd",   label: "MACD",          sub: "12,26,9",  active: showMACD, onToggle: onToggleMACD, color: "#a78bfa", impl: true },
+              { key: "sar",    label: "Parabolic SAR",  sub: "0.02,0.2", active: showSAR, onToggle: onToggleSAR, color: "#34d399", impl: true },
+              { key: "frac",   label: "Fractals",       sub: "Williams", active: showFrac, onToggle: onToggleFrac, color: "#f472b6", impl: true },
+              { key: "alig",   label: "Alligator",      sub: "Williams", active: showAlig, onToggle: onToggleAlig, color: "#60a5fa", impl: true },
             ].map(ind => (
               <div
                 key={ind.key}
@@ -716,11 +851,11 @@ function IndicatorsModal({
                 {/* Icon circle */}
                 <div style={{
                   width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                  background: ind.active ? `${ind.color}22` : "#1c1c1c",
-                  border: `1px solid ${ind.active ? `${ind.color}55` : "#2a2a2a"}`,
+                  background: ind.active ? "#242424" : "#1c1c1c",
+                  border: `1px solid ${ind.active ? "#444" : "#2a2a2a"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <Activity size={17} color={ind.active ? ind.color : "rgba(255,255,255,0.4)"} />
+                  <Activity size={17} color={ind.active ? "#fff" : "rgba(255,255,255,0.4)"} />
                 </div>
                 {/* Text */}
                 <div style={{ flex: 1 }}>
@@ -741,9 +876,6 @@ function IndicatorsModal({
                       boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
                     }} />
                   </div>
-                )}
-                {!ind.impl && (
-                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontWeight: 700, letterSpacing: "0.05em" }}>YAKINDA</span>
                 )}
               </div>
             ))}
@@ -843,11 +975,16 @@ function MobileTradePanel({
   asset, tf, setTf, amount, setAmount, displayBalance,
   onTrade, balanceWarn, chartLoading, currency, minAmount, tradeBlocked,
   showRSI, onToggleRSI, showBollinger, onToggleBollinger,
-  showMA, onToggleMA, chartType, onToggleChartType,
+  showMA, onToggleMA, showMACD, onToggleMACD,
+  showSAR, onToggleSAR, showFrac, onToggleFrac,
+  showAlig, onToggleAlig,
+  onOpenHistory,
+  chartType, onToggleChartType,
   chartIntervalIdx, onChartIntervalChange, isLiveData,
   isLandscape, onToggleOrientation,
   drawings = [], onOpenDrawings,
   onOpenSignalModal,
+  currencySymbol,
 }: {
   asset: typeof ASSETS[0]; tf: typeof TIMEFRAMES[0];
   setTf: (t: typeof TIMEFRAMES[0]) => void;
@@ -858,6 +995,11 @@ function MobileTradePanel({
   showRSI: boolean; onToggleRSI: () => void;
   showBollinger: boolean; onToggleBollinger: () => void;
   showMA: boolean; onToggleMA: () => void;
+  showMACD: boolean; onToggleMACD: () => void;
+  showSAR: boolean; onToggleSAR: () => void;
+  showFrac: boolean; onToggleFrac: () => void;
+  showAlig: boolean; onToggleAlig: () => void;
+  onOpenHistory?: () => void;
   chartType: "candle" | "line"; onToggleChartType: () => void;
   chartIntervalIdx: number; onChartIntervalChange: (i: number) => void;
   isLiveData: boolean;
@@ -866,6 +1008,7 @@ function MobileTradePanel({
   drawings?: DrawingItem[];
   onOpenDrawings?: () => void;
   onOpenSignalModal?: () => void;
+  currencySymbol?: string;
 }) {
   const [showDuration, setShowDuration] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
@@ -873,10 +1016,10 @@ function MobileTradePanel({
   const [amountStr, setAmountStr] = useState(String(amount));
   useEffect(() => { setAmountStr(String(amount)); }, [amount]);
 
-  const activeIndicatorCount = [showRSI, showBollinger, showMA].filter(Boolean).length;
+  const activeIndicatorCount = [showRSI, showBollinger, showMA, showMACD, showSAR, showFrac, showAlig].filter(Boolean).length;
 
-  const cs = currency === "TL" ? "₺" : "$";
-  const step = currency === "TL" ? 10 : 5;
+  const cs = currencySymbol || (currency === "TL" ? "₺" : "$");
+  const step = (cs === "¥" || minAmount === 1) ? 1 : (currency === "TL" ? 10 : 5);
   const totalReturn = (amount * (1 + asset.payout / 100)).toFixed(2);
   const expiryStr = (() => {
     const d = new Date(Date.now() + tf.secs * 1000);
@@ -914,7 +1057,7 @@ function MobileTradePanel({
         </button>
 
         {/* Indicators — opens sheet */}
-        <button onClick={() => setShowIndicators(true)} style={{ ...tbBtn(activeIndicatorCount > 0, "#4DA2FF"), position: "relative" }} title="İndikatörler">
+        <button onClick={() => setShowIndicators(true)} style={{ ...tbBtn(false), position: "relative" }} title="İndikatörler">
           <SlidersHorizontal size={15} color="#ffffff" />
           {activeIndicatorCount > 0 && (
             <span style={{
@@ -931,13 +1074,13 @@ function MobileTradePanel({
             : <LineChart size={15} color="#ffffff" />}
         </button>
 
-        {/* Ekranı Yan / Dik Çevir */}
+        {/* Geçmiş */}
         <button
-          onClick={onToggleOrientation}
-          style={tbBtn(false)}
-          title={isLandscape ? "Ekranı Dik Çevir" : "Ekranı Yan Çevir"}
+          onClick={() => onOpenHistory && onOpenHistory()}
+          style={tbBtn(false, undefined)}
+          title="İşlem Geçmişi"
         >
-          <RotateCw size={15} color="#ffffff" />
+          <History size={15} color="#ffffff" />
         </button>
 
         {/* Draw — pencil button */}
@@ -976,6 +1119,14 @@ function MobileTradePanel({
         onToggleBollinger={onToggleBollinger}
         showRSI={showRSI}
         onToggleRSI={onToggleRSI}
+        showMACD={showMACD}
+        onToggleMACD={onToggleMACD}
+        showSAR={showSAR}
+        onToggleSAR={onToggleSAR}
+        showFrac={showFrac}
+        onToggleFrac={onToggleFrac}
+        showAlig={showAlig}
+        onToggleAlig={onToggleAlig}
       />
 
       {/* ── Chart Interval Sheet ─────────────────────────────────────────── */}
@@ -1154,10 +1305,10 @@ export default function Home() {
   });
 
   const { balance, activeTrades, completedTrades, tradesLoading, placeTrade } = useDemoAccount();
-  const { placeRealTrade, settleRealTrade, currentUser } = useAuth();
-  const { displayBalance, isReal, currency, currencySymbol } = useAccountMode();
+  const { placeRealTrade, settleRealTrade, placeTournamentTrade, settleTournamentTrade, currentUser } = useAuth();
+  const { displayBalance, isReal, isTournament, currency, currencySymbol } = useAccountMode();
   const isMobile = useIsMobile();
-  const minAmount = currency === "TL" ? 34 : 1;
+  const minAmount = isTournament ? 1 : (currency === "TL" ? 34 : 1);
   const sym = currencySymbol;
   const [, navigate] = useLocation();
 
@@ -1191,9 +1342,12 @@ export default function Home() {
   });
   const [price,          setPrice]          = useState(asset.base);
   const [priceDir,       setPriceDir]       = useState<"up" | "down" | null>(null);
-  const [chartEntries,   setChartEntries]   = useState<(ActiveEntry & { id: string; amount: number; isReal?: boolean })[]>([]);
+  const [chartEntries,   setChartEntries]   = useState<(ActiveEntry & { id: string; amount: number; isReal?: boolean; isTournament?: boolean })[]>([]);
   const [realEntries,    setRealEntries]    = useState<(ActiveEntry & { id: string; amount: number; payoutRate: number; assetLabel: string })[]>([]);
   const realEntryFsIdMapRef = useRef<Map<string, string>>(new Map());
+  const [tournamentEntries, setTournamentEntries] = useState<(ActiveEntry & { id: string; amount: number; payoutRate: number; assetLabel: string })[]>([]);
+  const tournamentEntryFsIdMapRef = useRef<Map<string, string>>(new Map());
+  const tournamentExpiryTimerMapRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [chartToast,     setChartToast]     = useState<ChartNotif | null>(null);
   const [isPanned,       setIsPanned]       = useState(false);
   const [goLiveKey,      setGoLiveKey]      = useState(0);
@@ -1204,6 +1358,11 @@ export default function Home() {
   const [now,            setNow]            = useState(Date.now());
   const [showBollinger,  setShowBollinger]  = useState(false);
   const [showMA,         setShowMA]         = useState(false);
+  const [showMACD,       setShowMACD]       = useState(false);
+  const [showSAR,        setShowSAR]        = useState(false);
+  const [showFrac,       setShowFrac]       = useState(false);
+  const [showAlig,       setShowAlig]       = useState(false);
+
   const [chartType,      setChartType]      = useState<"candle" | "line">("candle");
   const [chartCandles,   setChartCandles]   = useState<Candle[]>([]);
   const [isLiveData,     setIsLiveData]     = useState(false);
@@ -1221,7 +1380,14 @@ export default function Home() {
   const [showIndicatorsModal, setShowIndicatorsModal] = useState(false);
   const [showSignalModal, setShowSignalModal] = useState(false);
   const [showIntervalModal,   setShowIntervalModal]   = useState(false);
-  const activeIndicatorCount = [showRSI, showBollinger, showMA].filter(Boolean).length;
+  const activeIndicatorCount = [showRSI, showBollinger, showMA, showMACD, showSAR, showFrac, showAlig].filter(Boolean).length;
+  const handleToggleIndicator = (currentVal: boolean, setter: (v: boolean | ((prev: boolean) => boolean)) => void) => {
+    if (!currentVal && activeIndicatorCount >= 3) {
+      alert("Maksimum 3 indikatör açabilirsiniz!");
+      return;
+    }
+    setter(v => !v);
+  };
 
   const handleDrawingsChange = useCallback((newDrawings: DrawingItem[]) => {
     setDrawings(newDrawings);
@@ -1383,6 +1549,44 @@ export default function Home() {
     };
   }, [realEntries]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* Timers for tournament trades — one per entry, recreated whenever tournamentEntries changes */
+  useEffect(() => {
+    for (const te of tournamentEntries) {
+      const delay = Math.max(0, te.expiryTime - Date.now());
+      const timer = setTimeout(() => {
+        const finalPrice = prevPriceRef.current;
+        const won = te.direction === "UP"
+          ? finalPrice >= te.entryPrice
+          : finalPrice <= te.entryPrice;
+        const payoutAmt = parseFloat((te.amount * (te.payoutRate / 100)).toFixed(2));
+        settleTournamentTrade(te.amount, won, payoutAmt);
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
+        if (currentUid) {
+          addDoc(collection(db, "trades"), {
+            userId: currentUid, asset: te.assetLabel, direction: te.direction,
+            amount: te.amount, result: won ? "WIN" : "LOSE",
+            profit: won ? payoutAmt : -te.amount, closedAt: Date.now(), mode: "tournament",
+            entryPrice: te.entryPrice,
+            exitPrice: finalPrice,
+          }).catch((err) => console.error("Error saving tournament trade to trades collection:", err));
+        }
+        const fsId = tournamentEntryFsIdMapRef.current.get(te.id);
+        if (fsId) {
+          deleteDoc(doc(db, "tournamentActiveTrades", fsId)).catch(() => {});
+          tournamentEntryFsIdMapRef.current.delete(te.id);
+        }
+        showChartNotif({ type: "close", direction: te.direction, asset: te.assetLabel, amount: te.amount, payout: payoutAmt, won });
+        setTournamentEntries(prev => prev.filter(e => e.id !== te.id));
+        setChartEntries(prev => prev.filter(e => e.id !== te.id));
+      }, delay);
+      tournamentExpiryTimerMapRef.current.set(te.id, timer);
+    }
+    return () => {
+      for (const timer of tournamentExpiryTimerMapRef.current.values()) clearTimeout(timer);
+      tournamentExpiryTimerMapRef.current.clear();
+    };
+  }, [tournamentEntries]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Notify on demo trade completion — skip the initial Firestore hydration burst */
   useEffect(() => {
     if (!completedLoadedRef.current) {
@@ -1393,8 +1597,8 @@ export default function Home() {
       return;
     }
     const prevIds = new Set(prevCompletedIdsRef.current);
-    // Exclude real trades — they get their own notification from the settlement timer
-    const newTrades = completedTrades.filter(t => !prevIds.has(t.id) && t.mode !== "real");
+    // Exclude real trades & tournament trades — they get their own notification from the settlement timer
+    const newTrades = completedTrades.filter(t => !prevIds.has(t.id) && (t.mode as string) !== "real" && (t.mode as string) !== "tournament");
     prevCompletedIdsRef.current = completedTrades.map(t => t.id);
     if (newTrades.length === 0) return;
     /* Show notification for every newly-completed trade (handles simultaneous completions). */
@@ -1413,10 +1617,10 @@ export default function Home() {
   useEffect(() => {
     const now = Date.now();
     setChartEntries(prev => {
-      const prevDemoIds = new Set(prev.filter(e => !e.isReal).map(e => e.id));
+      const prevDemoIds = new Set(prev.filter(e => !e.isReal && !(e as any).isTournament).map(e => e.id));
       const activeIds   = new Set(activeTrades.map(t => t.id));
       // Remove settled demo trades
-      const kept = prev.filter(e => e.isReal || activeIds.has(e.id));
+      const kept = prev.filter(e => e.isReal || (e as any).isTournament || activeIds.has(e.id));
       // Add demo trades that came from Firestore but aren't yet in chartEntries
       const toAdd = activeTrades
         .filter(t => !prevDemoIds.has(t.id) && t.startTime + t.duration * 1000 > now)
@@ -1480,6 +1684,56 @@ export default function Home() {
         setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...re, isReal: true }]);
       });
     }, () => {/* ignore permission errors (guest / logged-out) */});
+    return () => unsub();
+  }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Restore tournament active trades from Firestore when the user logs in */
+  useEffect(() => {
+    const uid = currentUser?.id ?? auth.currentUser?.uid;
+    if (!uid) return;
+    const q = query(collection(db, "tournamentActiveTrades"), where("userId", "==", uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const now = Date.now();
+      snap.docChanges().forEach(change => {
+        if (change.type !== "added") return;
+        const data = change.doc.data();
+        const tradeId = (data.id ?? data.tradeId) as string;
+        const expiryTime = data.expiryTime as number;
+        if (!tradeId) return;
+
+        // If trade expired while user was offline / navigating, settle it immediately
+        if (expiryTime <= now) {
+          const entryPrice = (data.entryPrice as number) || 0;
+          const currentPrice = livePriceRegistry[data.asset as string] || entryPrice;
+          const isUp = data.direction === "UP";
+          const won = isUp ? currentPrice >= entryPrice : currentPrice <= entryPrice;
+          const payoutAmt = parseFloat(((data.amount as number) * (((data.payoutRate as number) || 85) / 100)).toFixed(2));
+          settleTournamentTrade(data.amount as number, won, payoutAmt);
+          addDoc(collection(db, "trades"), {
+            userId: uid, asset: data.asset, direction: data.direction,
+            amount: data.amount, result: won ? "WIN" : "LOSE",
+            profit: won ? payoutAmt : -(data.amount as number), closedAt: expiryTime, mode: "tournament",
+            entryPrice, exitPrice: currentPrice,
+          }).catch((err) => console.error("Error saving expired tournament trade to trades collection:", err));
+          deleteDoc(doc(db, "tournamentActiveTrades", change.doc.id)).catch(() => {});
+          return;
+        }
+
+        const te = {
+          id: tradeId,
+          entryTime:  data.entryTime  as number,
+          entryPrice: data.entryPrice as number,
+          expiryTime,
+          direction:  data.direction  as "UP" | "DOWN",
+          amount:     data.amount     as number,
+          payoutRate: (data.payoutRate as number | undefined) ?? 85,
+          assetLabel: data.asset      as string,
+        };
+        tournamentEntryFsIdMapRef.current.set(tradeId, change.doc.id);
+        setTournamentEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, te]);
+        setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...te, isTournament: true } as any]);
+      });
+    }, () => {/* ignore permission errors */});
     return () => unsub();
   }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1549,7 +1803,7 @@ export default function Home() {
     });
   }, [asset.label]);
 
-  /* For demo & real: up to 5 simultaneous LIVE trades (exclude already-expired ones that
+  /* For demo, real & tournament: up to 5 simultaneous LIVE trades (exclude already-expired ones that
      haven't been settled yet by the interval, so they don't eat into the limit). */
   const liveTradeCount = activeTrades.filter(
     t => t.startTime + t.duration * 1000 > Date.now()
@@ -1557,7 +1811,10 @@ export default function Home() {
   const liveRealCount = realEntries.filter(
     r => r.expiryTime > Date.now()
   ).length;
-  const currentActiveCount = isReal ? liveRealCount : liveTradeCount;
+  const liveTournamentCount = tournamentEntries.filter(
+    r => r.expiryTime > Date.now()
+  ).length;
+  const currentActiveCount = isTournament ? liveTournamentCount : (isReal ? liveRealCount : liveTradeCount);
   const tradeBlocked = currentActiveCount >= 5;
 
   const isTradingRef = useRef(false);
@@ -1575,9 +1832,11 @@ export default function Home() {
       setAmountPersist(minAmount);
     }
 
-    const currentBal = isReal ? (currentUser?.realBalance ?? 0) : balance;
+    const currentBal = isTournament
+      ? (currentUser?.tournamentBalance ?? 100)
+      : (isReal ? (currentUser?.realBalance ?? 0) : balance);
     if (currentBal < tradeAmount || balanceWarn) {
-      alert(isReal ? "Yetersiz Bakiye. Lütfen cüzdanınıza para yatırın." : "Demo bakiyeniz yetersiz.");
+      alert(isTournament ? "Turnuva bakiyeniz yetersiz." : (isReal ? "Yetersiz Bakiye. Lütfen cüzdanınıza para yatırın." : "Demo bakiyeniz yetersiz."));
       return;
     }
 
@@ -1593,7 +1852,22 @@ export default function Home() {
 
     isTradingRef.current = true;
     try {
-      if (isReal) {
+      if (isTournament) {
+        const ok = await placeTournamentTrade(tradeAmount);
+        if (!ok) return;
+        const te = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
+        setTournamentEntries(prev => [...prev, te]);
+        setChartEntries(prev => [...prev, { ...te, isTournament: true } as any]);
+        /* Save to Firestore immediately so trade persists */
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
+        if (currentUid) {
+          addDoc(collection(db, "tournamentActiveTrades"), {
+            userId: currentUid, tradeId: id, id, asset: asset.label, direction: dir,
+            amount: tradeAmount, entryPrice: price, entryTime: now, expiryTime: expiryMs,
+            payoutRate: asset.payout,
+          }).then(ref => { tournamentEntryFsIdMapRef.current.set(id, ref.id); }).catch(() => {});
+        }
+      } else if (isReal) {
         const ok = await placeRealTrade(tradeAmount);
         if (!ok) return;
         const re = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
@@ -1631,11 +1905,14 @@ export default function Home() {
         chartInterval={CHART_INTERVALS[chartIntervalIdx].value}
         onPriceChange={handlePrice}
         currencySymbol={sym}
-        activeEntries={chartEntries.filter(e => !!e.isReal === isReal)}
+        activeEntries={chartEntries.filter(e => isTournament ? !!(e as any).isTournament : (isReal ? !!e.isReal : !e.isReal && !(e as any).isTournament))}
         onPanChange={setIsPanned}
         onZoomChange={handleZoom}
         showBollinger={showBollinger}
         showMA={showMA}
+        showSAR={showSAR}
+        showFrac={showFrac}
+        showAlig={showAlig}
         chartType={chartType}
         onCandlesChange={setChartCandles}
         onRealDataChange={setIsLiveData}
@@ -1664,14 +1941,14 @@ export default function Home() {
   const controlsProps = {
     asset, tf, setTf, amount, setAmount: setAmountPersist, price, expiryTimeStr,
     displayBalance, chartToast, onTrade: handleTrade, balanceWarn, chartLoading,
-    currency, minAmount, tradeBlocked,
+    currency, minAmount, tradeBlocked, currencySymbol: sym,
   };
 
   /* ── Mobile Landscape / Rotated view ────────────────────────────────────── */
   if (isMobile && (isLandscape || viewportDims.w > viewportDims.h)) {
     const isPortraitViewport = viewportDims.w <= viewportDims.h;
-    const cs = currency === "TL" ? "₺" : "$";
-    const step = currency === "TL" ? 10 : 5;
+    const cs = sym;
+    const step = (cs === "¥" || minAmount === 1) ? 1 : (currency === "TL" ? 10 : 5);
     const totalReturn = (amount * (1 + asset.payout / 100)).toFixed(2);
 
     return (
@@ -1750,16 +2027,23 @@ export default function Home() {
 
               {/* Indicators */}
               <button
-                onClick={() => setShowBollinger(v => !v)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showBollinger ? "bg-[#4DA2FF]/20 text-[#4DA2FF] border-[#4DA2FF]/40" : "text-white/40 border-white/10"}`}
+                onClick={() => handleToggleIndicator(showBollinger, setShowBollinger)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showBollinger ? "bg-white/15 text-white border-white/30" : "text-white/40 border-white/10"}`}
               >
                 BB
               </button>
               <button
-                onClick={() => setShowRSI(v => !v)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showRSI ? "bg-[#FF9500]/20 text-[#FF9500] border-[#FF9500]/40" : "text-white/40 border-white/10"}`}
+                onClick={() => handleToggleIndicator(showRSI, setShowRSI)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${showRSI ? "bg-white/15 text-white border-white/30" : "text-white/40 border-white/10"}`}
               >
                 RSI
+              </button>
+              <button
+                onClick={() => navigate("/history")}
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#161616] border border-white/10 text-white/70 hover:text-white"
+                title="İşlem Geçmişi"
+              >
+                <History size={13} color="#ffffff" />
               </button>
               <button
                 onClick={() => setShowDrawingTools(true)}
@@ -1776,7 +2060,7 @@ export default function Home() {
               <AnimatedBalance
                 value={displayBalance}
                 currency={currency}
-                className="text-xs font-bold text-white tracking-tight"
+                className="text-xs font-medium text-white tracking-tight"
               />
             </div>
           </div>
@@ -1788,6 +2072,11 @@ export default function Home() {
               {showRSI && (
                 <div className="shrink-0 overflow-hidden h-14 border-t border-white/10">
                   <RSIPanel candles={chartCandles} />
+                </div>
+              )}
+              {showMACD && (
+                <div className="shrink-0 overflow-hidden h-14 border-t border-white/10">
+                  <MACDPanel candles={chartCandles} />
                 </div>
               )}
             </div>
@@ -1946,23 +2235,32 @@ export default function Home() {
 
           {/* Active trades bar */}
           <AnimatePresence>
-            {activeTrades.length > 0 && (
+            {((isTournament ? tournamentEntries.filter(t => t.expiryTime > now - 800) : isReal ? realEntries.filter(t => t.expiryTime > now - 800) : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800)).length > 0) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                 className="shrink-0 flex items-center gap-2 px-3 overflow-hidden"
                 style={{ background: "rgba(255,107,0,0.06)" }}
               >
-                <div className="py-1.5 flex items-center gap-2 flex-1">
-                  <span className="text-[10px] font-black text-[#FF9500]">● {activeTrades.length} AKTİF İŞLEM</span>
-                  <div className="flex gap-1">
-                    {activeTrades.slice(0, 6).map(t => (
-                      <span key={t.id} className={`text-[9px] font-bold rounded px-1 ${t.direction === "UP" ? "text-[#0ecb81] bg-[#0ecb81]/10" : "text-[#f6465d] bg-[#f6465d]/10"}`}>
-                        {t.direction === "UP" ? "▲" : "▼"}
-                      </span>
-                    ))}
-                    {activeTrades.length > 6 && <span className="text-[9px] text-white/25">+{activeTrades.length - 6}</span>}
-                  </div>
-                </div>
+                {(() => {
+                  const items = isTournament
+                    ? tournamentEntries.filter(t => t.expiryTime > now - 800)
+                    : isReal
+                    ? realEntries.filter(t => t.expiryTime > now - 800)
+                    : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
+                  return (
+                    <div className="py-1.5 flex items-center gap-2 flex-1">
+                      <span className="text-[10px] font-black text-[#FF9500]">● {items.length} AKTİF İŞLEM</span>
+                      <div className="flex gap-1">
+                        {items.slice(0, 6).map(t => (
+                          <span key={t.id} className={`text-[9px] font-bold rounded px-1 ${t.direction === "UP" ? "text-[#0ecb81] bg-[#0ecb81]/10" : "text-[#f6465d] bg-[#f6465d]/10"}`}>
+                            {t.direction === "UP" ? "▲" : "▼"}
+                          </span>
+                        ))}
+                        {items.length > 6 && <span className="text-[9px] text-white/25">+{items.length - 6}</span>}
+                      </div>
+                    </div>
+                  );
+                })()}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1979,6 +2277,18 @@ export default function Home() {
             )}
           </AnimatePresence>
 
+          {/* MACD panel */}
+          <AnimatePresence>
+            {showMACD && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }} animate={{ height: 56, opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                className="shrink-0 overflow-hidden"
+              >
+                <MACDPanel candles={chartCandles} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Trade panel */}
           <div className="shrink-0">
             <MobileTradePanel
@@ -1991,9 +2301,14 @@ export default function Home() {
               currency={currency}
               minAmount={minAmount}
               tradeBlocked={tradeBlocked}
-              showRSI={showRSI} onToggleRSI={() => setShowRSI(v => !v)}
-              showBollinger={showBollinger} onToggleBollinger={() => setShowBollinger(v => !v)}
-              showMA={showMA} onToggleMA={() => setShowMA(v => !v)}
+              showRSI={showRSI} onToggleRSI={() => handleToggleIndicator(showRSI, setShowRSI)}
+              showBollinger={showBollinger} onToggleBollinger={() => handleToggleIndicator(showBollinger, setShowBollinger)}
+              showMA={showMA} onToggleMA={() => handleToggleIndicator(showMA, setShowMA)}
+              showMACD={showMACD} onToggleMACD={() => handleToggleIndicator(showMACD, setShowMACD)}
+              showSAR={showSAR} onToggleSAR={() => handleToggleIndicator(showSAR, setShowSAR)}
+              showFrac={showFrac} onToggleFrac={() => handleToggleIndicator(showFrac, setShowFrac)}
+              showAlig={showAlig} onToggleAlig={() => handleToggleIndicator(showAlig, setShowAlig)}
+              onOpenHistory={() => navigate("/history")}
               chartType={chartType} onToggleChartType={() => setChartType(t => t === "candle" ? "line" : "candle")}
               chartIntervalIdx={chartIntervalIdx} onChartIntervalChange={setChartIntervalIdx}
               isLiveData={isLiveData}
@@ -2002,6 +2317,7 @@ export default function Home() {
               drawings={drawings}
               onOpenDrawings={() => setShowDrawingTools(true)}
               onOpenSignalModal={() => setShowSignalModal(true)}
+              currencySymbol={sym}
             />
           </div>
         </div>
@@ -2063,16 +2379,12 @@ export default function Home() {
               {/* Indicators (SlidersHorizontal) */}
               <button
                 onClick={() => setShowIndicatorsModal(true)}
-                className={`relative flex h-8 w-8 items-center justify-center rounded-[10px] border transition-all cursor-pointer ${
-                  activeIndicatorCount > 0
-                    ? "bg-[#4DA2FF]/20 border-[#4DA2FF]/50 text-[#4DA2FF]"
-                    : "bg-[#1c1c1c] border-white/10 text-white hover:bg-white/10 hover:border-white/20"
-                }`}
+                className="relative flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1c1c1c] border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
                 title="Göstergeler (RSI, Bollinger Bantları, Hareketli Ortalama)"
               >
                 <SlidersHorizontal size={14} />
                 {activeIndicatorCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#4DA2FF]" />
+                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#4DA2FF]" />
                 )}
               </button>
 
@@ -2125,6 +2437,13 @@ export default function Home() {
           {showRSI && (
             <div className="shrink-0 border-t border-white/10">
               <RSIPanel candles={chartCandles} />
+            </div>
+          )}
+
+          {/* MACD indicator sub-panel if toggled */}
+          {showMACD && (
+            <div className="shrink-0 border-t border-white/10">
+              <MACDPanel candles={chartCandles} />
             </div>
           )}
         </div>
@@ -2182,22 +2501,22 @@ export default function Home() {
                   <div className="rounded-xl bg-black border border-white/6 p-2.5" data-tour="step-2">
                     <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Tutar</span>
                     <div className="flex items-center gap-1.5 mt-1.5">
-                      <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - (currency === "TL" ? 10 : 5)))}
+                      <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - (isTournament ? 1 : (currency === "TL" ? 10 : 5))))}
                         className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
                         <Minus size={11} />
                       </button>
-                      <span className="text-[10px] text-[#FF6B00] font-bold">{currency === "TL" ? "₺" : "$"}</span>
+                      <span className="text-[10px] text-[#FF6B00] font-bold">{sym}</span>
                       <span className="flex-1 text-center text-lg font-semibold text-white tracking-tight">{amount}</span>
-                      <button onClick={() => setAmountPersist(a => Math.min(displayBalance, a + (currency === "TL" ? 10 : 5)))}
+                      <button onClick={() => setAmountPersist(a => Math.min(displayBalance, a + (isTournament ? 1 : (currency === "TL" ? 10 : 5))))}
                         className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/8 text-white/50 hover:bg-white/10 cursor-pointer">
                         <Plus size={11} />
                       </button>
                     </div>
                     <div className="flex gap-1 mt-1.5">
-                      {(currency === "TL" ? [50, 100, 250, 500] : [10, 25, 50, 100]).map((v) => (
+                      {(isTournament ? [1, 5, 10, 25] : (currency === "TL" ? [50, 100, 250, 500] : [10, 25, 50, 100])).map((v) => (
                         <button key={v} onClick={() => setAmountPersist(v)}
                           className={`flex-1 rounded-md py-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${amount === v ? "bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/25" : "bg-white/3 text-white/30 border border-white/6 hover:bg-white/6"}`}>
-                          {currency === "TL" ? "₺" : "$"}{v}
+                          {sym}{v}
                         </button>
                       ))}
                     </div>
@@ -2273,7 +2592,7 @@ export default function Home() {
                   <div className="rounded-xl bg-black border border-white/6 p-2.5">
                     <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">Potansiyel Kazanç</span>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-xl font-semibold text-[#1aa369] tracking-tight">+{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span>
+                      <span className="text-xl font-semibold text-[#1aa369] tracking-tight">+{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span>
                       <span className="text-[11px] text-white/30 font-medium">{asset.payout}% kazanç</span>
                     </div>
                   </div>
@@ -2290,73 +2609,86 @@ export default function Home() {
                       className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
                       style={{ background: "linear-gradient(135deg,#128255,#199c66)", boxShadow: "0 3px 12px rgba(22,155,101,0.20)" }}>
                       <ArrowUp size={15} strokeWidth={2.5} />
-                      <span className="text-[13.5px] font-bold tracking-wide">{t.upBtn} · <span className="font-semibold text-xs">{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
+                      <span className="text-[13.5px] font-bold tracking-wide">{t.upBtn} · <span className="font-semibold text-xs">{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
                     </motion.button>
                     <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleTrade("DOWN")} disabled={tradeBlocked || balanceWarn || chartLoading}
                       className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-white font-bold disabled:opacity-40 cursor-pointer"
                       style={{ background: "linear-gradient(135deg,#9f2a38,#bd3546)", boxShadow: "0 3px 12px rgba(189,53,70,0.20)" }}>
                       <ArrowDown size={15} strokeWidth={2.5} />
-                      <span className="text-[13.5px] font-bold tracking-wide">{t.downBtn} · <span className="font-semibold text-xs">{currency === "TL" ? "₺" : "$"}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
+                      <span className="text-[13.5px] font-bold tracking-wide">{t.downBtn} · <span className="font-semibold text-xs">{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span></span>
                     </motion.button>
                   </div>
 
                   {/* Active trades list */}
                   <AnimatePresence>
-                    {activeTrades.length > 0 && (
-                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-black text-white/40 uppercase">{t.activeTrades}</span>
-                          <span className="text-[10px] font-black text-[#FF9500]">{liveTradeCount}/5</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
-                          {activeTrades
-                            .filter(t => t.startTime + t.duration * 1000 > now - 800)
-                            .slice(0, 8)
-                            .map(t => {
-                              const expiry = t.startTime + t.duration * 1000;
-                              const rem = Math.max(0, expiry - now);
-                              const progress = Math.max(0, Math.min(1, rem / (t.duration * 1000)));
-                              const isUp = t.direction === "UP";
-                              const accent = isUp ? "#0ecb81" : "#f6465d";
-                              const urgent = rem < 10_000;
-                              return (
-                                <div key={t.id} className="rounded-xl overflow-hidden"
-                                  style={{
-                                    background: isUp ? "rgba(14,203,129,0.06)" : "rgba(246,70,93,0.06)",
-                                    border: `1px solid ${isUp ? "rgba(14,203,129,0.18)" : "rgba(246,70,93,0.18)"}`,
-                                  }}>
-                                  <div className="flex items-center justify-between px-3 py-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-black" style={{ color: accent }}>
-                                        {isUp ? "▲" : "▼"}
-                                      </span>
-                                      <div>
-                                        <p className="text-[11px] font-black text-white/80">
-                                          {price < 10 ? t.startPrice.toFixed(5) : t.startPrice.toFixed(2)}
-                                        </p>
-                                        <p className="text-[9px] text-white/30 font-mono">{currency === "TL" ? "₺" : "$"}{t.amount}</p>
+                    {(() => {
+                      const activeList = isTournament
+                        ? tournamentEntries.filter(t => t.expiryTime > now - 800)
+                        : isReal
+                        ? realEntries.filter(t => t.expiryTime > now - 800)
+                        : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
+                      const activeCnt = isTournament ? liveTournamentCount : isReal ? liveRealCount : liveTradeCount;
+
+                      if (activeList.length === 0) return null;
+
+                      return (
+                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black text-white/40 uppercase">{t.activeTrades}</span>
+                            <span className="text-[10px] font-black text-[#FF9500]">{activeCnt}/5</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+                            {activeList
+                              .slice(0, 8)
+                              .map(tItem => {
+                                const isRealOrTour = isTournament || isReal;
+                                const expiry = isRealOrTour ? (tItem as any).expiryTime : (tItem as any).startTime + (tItem as any).duration * 1000;
+                                const startPrice = isRealOrTour ? (tItem as any).entryPrice : (tItem as any).startPrice;
+                                const tradeDur = isRealOrTour ? Math.max(1000, (tItem as any).expiryTime - (tItem as any).entryTime) : (tItem as any).duration * 1000;
+                                const rem = Math.max(0, expiry - now);
+                                const progress = Math.max(0, Math.min(1, rem / tradeDur));
+                                const isUp = tItem.direction === "UP";
+                                const accent = isUp ? "#0ecb81" : "#f6465d";
+                                const urgent = rem < 10_000;
+                                return (
+                                  <div key={tItem.id} className="rounded-xl overflow-hidden"
+                                    style={{
+                                      background: isUp ? "rgba(14,203,129,0.06)" : "rgba(246,70,93,0.06)",
+                                      border: `1px solid ${isUp ? "rgba(14,203,129,0.18)" : "rgba(246,70,93,0.18)"}`,
+                                    }}>
+                                    <div className="flex items-center justify-between px-3 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black" style={{ color: accent }}>
+                                          {isUp ? "▲" : "▼"}
+                                        </span>
+                                        <div>
+                                          <p className="text-[11px] font-black text-white/80">
+                                            {price < 10 ? startPrice.toFixed(5) : startPrice.toFixed(2)}
+                                          </p>
+                                          <p className="text-[9px] text-white/30 font-mono">{sym}{tItem.amount}</p>
+                                        </div>
                                       </div>
+                                      <span className="text-[11px] font-black font-mono"
+                                        style={{ color: urgent ? "#FFB800" : accent }}>
+                                        {Math.ceil(rem / 1000)}s
+                                      </span>
                                     </div>
-                                    <span className="text-[11px] font-black font-mono"
-                                      style={{ color: urgent ? "#FFB800" : accent }}>
-                                      {Math.ceil(rem / 1000)}s
-                                    </span>
+                                    <div className="h-[2px] w-full" style={{ background: "rgba(255,255,255,0.05)" }}>
+                                      <div className="h-full transition-all duration-1000"
+                                        style={{ width: `${progress * 100}%`, background: urgent ? "#FFB800" : accent }} />
+                                    </div>
                                   </div>
-                                  <div className="h-[2px] w-full" style={{ background: "rgba(255,255,255,0.05)" }}>
-                                    <div className="h-full transition-all duration-1000"
-                                      style={{ width: `${progress * 100}%`, background: urgent ? "#FFB800" : accent }} />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          {activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800).length > 8 && (
-                            <p className="text-[10px] text-white/25 text-center py-1">
-                              +{activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800).length - 8} daha
-                            </p>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
+                                );
+                              })}
+                            {activeList.length > 8 && (
+                              <p className="text-[10px] text-white/25 text-center py-1">
+                                +{activeList.length - 8} daha
+                              </p>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
                   </AnimatePresence>
                 </div>
               </div>
@@ -2381,11 +2713,19 @@ export default function Home() {
         visible={showIndicatorsModal}
         onClose={() => setShowIndicatorsModal(false)}
         showMA={showMA}
-        onToggleMA={() => setShowMA(v => !v)}
+        onToggleMA={() => handleToggleIndicator(showMA, setShowMA)}
         showBollinger={showBollinger}
-        onToggleBollinger={() => setShowBollinger(v => !v)}
+        onToggleBollinger={() => handleToggleIndicator(showBollinger, setShowBollinger)}
         showRSI={showRSI}
-        onToggleRSI={() => setShowRSI(v => !v)}
+        onToggleRSI={() => handleToggleIndicator(showRSI, setShowRSI)}
+        showMACD={showMACD}
+        onToggleMACD={() => handleToggleIndicator(showMACD, setShowMACD)}
+        showSAR={showSAR}
+        onToggleSAR={() => handleToggleIndicator(showSAR, setShowSAR)}
+        showFrac={showFrac}
+        onToggleFrac={() => handleToggleIndicator(showFrac, setShowFrac)}
+        showAlig={showAlig}
+        onToggleAlig={() => handleToggleIndicator(showAlig, setShowAlig)}
       />
       <SignalModal
         visible={showSignalModal}

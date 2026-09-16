@@ -54,6 +54,9 @@ export interface ObyoUser {
   kycDetails?:    KYCDetails;
   emailVerified?: boolean;
   referralCode?:  string;
+  tournamentBalance?: number;
+  joinedTournaments?: string[];
+  activeTournamentId?: string;
 }
 
 export interface ObyoRequest {
@@ -182,6 +185,8 @@ interface AuthContextType {
   addBalanceDirect: (userId: string, amount: number, userName: string, userEmail: string) => Promise<void>;
   placeRealTrade:   (amount: number) => Promise<boolean>;
   settleRealTrade:  (amount: number, won: boolean, payout: number) => Promise<void>;
+  placeTournamentTrade:  (amount: number) => Promise<boolean>;
+  settleTournamentTrade: (amount: number, won: boolean, payout: number) => Promise<void>;
   updateProfilePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   submitKYC:        (data: { fullName: string; birthDate: string; idNumber: string; documentFrontUrl?: string; documentBackUrl?: string }) => Promise<{ success: boolean; isVerified: boolean; message: string }>;
   adminUpdateKYC:   (userId: string, status: "verified" | "rejected", reason?: string) => Promise<{ success: boolean; error?: string }>;
@@ -961,10 +966,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (targetUserId) {
         const userRef = doc(db, "users", targetUserId);
         if (req.type === "deposit") {
+          const bonusAmt = Number((req as any).bonusAmount) || 0;
+          const totalDepositCredit = amt + bonusAmt;
+
           await setDoc(userRef, {
-            realBalance:    increment(amt),
-            totalDeposited: increment(amt),
+            realBalance:    increment(totalDepositCredit),
+            totalDeposited: increment(totalDepositCredit),
           }, { merge: true });
+
+          if ((req as any).bonusClaimId) {
+            await updateDoc(doc(db, "bonus_claims", (req as any).bonusClaimId), {
+              status: "used",
+              usedAt: Date.now(),
+            }).catch(() => {});
+          }
         } else {
           await setDoc(userRef, {
             realBalance:    increment(-amt),
@@ -1031,6 +1046,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await updateDoc(doc(db, "users", currentUser.id), {
       realBalance: increment(gain),
     });
+  };
+
+  /* ── Tournament trade actions ────────────────────────────────────────── */
+  const placeTournamentTrade = async (amount: number): Promise<boolean> => {
+    if (!currentUser) return false;
+    const currentTourBal = currentUser.tournamentBalance ?? 100;
+    if (currentTourBal < amount) return false;
+
+    setCurrentUser(prev => prev ? { ...prev, tournamentBalance: Math.max(0, (prev.tournamentBalance ?? 100) - amount) } : null);
+
+    try {
+      await updateDoc(doc(db, "users", currentUser.id), {
+        tournamentBalance: increment(-amount),
+      });
+      return true;
+    } catch (err) {
+      setCurrentUser(prev => prev ? { ...prev, tournamentBalance: (prev.tournamentBalance ?? 0) + amount } : null);
+      return false;
+    }
+  };
+
+  const settleTournamentTrade = async (amount: number, won: boolean, payout: number) => {
+    if (!currentUser) return;
+    const gain = won ? amount + payout : 0;
+    if (gain === 0) return;
+    setCurrentUser(prev => prev ? { ...prev, tournamentBalance: (prev.tournamentBalance ?? 0) + gain } : null);
+    try {
+      await updateDoc(doc(db, "users", currentUser.id), {
+        tournamentBalance: increment(gain),
+      });
+    } catch {}
   };
 
   const submitKYC = async (data: {
@@ -1450,7 +1496,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       checkFirebaseEmailVerified, confirmEmailVerified,
       users, requests,
       addRequest, processRequest, addBalanceDirect,
-      placeRealTrade, settleRealTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
+      placeRealTrade, settleRealTrade, placeTournamentTrade, settleTournamentTrade, updateProfilePhoto, submitKYC, adminUpdateKYC,
       deleteUserPermanently,
       deleteRequest,
       isRejectionViewed, markRejectionsAsViewed,

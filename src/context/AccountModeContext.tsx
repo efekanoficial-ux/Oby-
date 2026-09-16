@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useAuth } from "./AuthContext";
 import { useDemoAccount } from "./DemoAccountContext";
 
-export type AccMode = "demo" | "real";
+export type AccMode = "demo" | "real" | "tournament";
 export type CurrencyCode = "TL" | "USD";
 
 interface AccountModeContextType {
@@ -10,8 +10,13 @@ interface AccountModeContextType {
   setMode:        (m: AccMode) => void;
   displayBalance: number;
   isReal:         boolean;
+  isTournament:   boolean;
+  hasJoinedTournament: boolean;
   currency:       CurrencyCode;
   currencySymbol: string;
+  tournamentBalance: number;
+  isBalanceHidden: boolean;
+  toggleBalanceHidden: () => void;
   setGuestCurrency: (c: CurrencyCode) => void;
   formatMoney:    (amount: number, options?: { showSymbol?: boolean; decimals?: number }) => string;
 }
@@ -30,9 +35,22 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
     return "TL";
   });
 
+  // Balance visibility hide/show state (Closed eye icon functionality)
+  // Sistem ilk açıldığında bakiye varsayılan olarak açık (görünür) gelir, kullanıcı isterse kapatır.
+  const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(false);
+
+  const toggleBalanceHidden = () => {
+    setIsBalanceHidden(prev => !prev);
+  };
+
   /* Active currency: prioritize user profile currency, fallback to guest selected currency */
   const currency: CurrencyCode = (currentUser?.currency as CurrencyCode) || guestCurrency;
-  const currencySymbol = currency === "TL" ? "₺" : "$";
+  
+  const hasJoinedTournament = Boolean(currentUser?.joinedTournaments && currentUser.joinedTournaments.length > 0);
+  // In tournament mode, symbol is ¥ (or tournament specific)
+  const isTournament = mode === "tournament" && !!currentUser && hasJoinedTournament;
+  const isReal = mode === "real" && !!currentUser;
+  const currencySymbol = isTournament ? "¥" : (currency === "TL" ? "₺" : "$");
 
   const setGuestCurrency = (c: CurrencyCode) => {
     setGuestCurrencyState(c);
@@ -47,24 +65,41 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
       setModeState("demo");
     } else {
       const saved = localStorage.getItem(`obyo_mode_${currentUser.id}`);
-      setModeState(saved === "real" ? "real" : "demo");
+      const userHasTournament = Boolean(currentUser.joinedTournaments && currentUser.joinedTournaments.length > 0);
+      if (saved === "tournament" && userHasTournament) {
+        setModeState("tournament");
+      } else if (saved === "real") {
+        setModeState("real");
+      } else {
+        setModeState("demo");
+      }
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.joinedTournaments]);
 
   const setMode = (m: AccMode) => {
-    if (m === "real" && !currentUser) return;
+    if ((m === "real" || m === "tournament") && !currentUser) return;
+    if (m === "tournament" && !hasJoinedTournament) return;
     setModeState(m);
     if (currentUser) localStorage.setItem(`obyo_mode_${currentUser.id}`, m);
   };
 
-  const realBalance    = currentUser?.realBalance ?? 0;
-  const isReal         = mode === "real" && !!currentUser;
-  const displayBalance = isReal ? realBalance : demoBalance;
+  const realBalance       = currentUser?.realBalance ?? 0;
+  // Herhangi bir turnuvaya katılmadan turnuva parası gelmez (0 ¥)
+  const tournamentBalance = hasJoinedTournament ? (currentUser?.tournamentBalance ?? 100) : 0;
+  
+  const displayBalance = isTournament
+    ? tournamentBalance
+    : (isReal ? realBalance : demoBalance);
 
   const formatMoney = (amount: number, options?: { showSymbol?: boolean; decimals?: number }): string => {
+    // If real balance is hidden and requested in real mode:
+    if (isReal && isBalanceHidden) {
+      return currency === "TL" ? "*****₺" : "*****$";
+    }
+
     const showSymbol = options?.showSymbol ?? true;
     const decimals = options?.decimals ?? 2;
-    const formatted = amount.toLocaleString(currency === "TL" ? "tr-TR" : "en-US", {
+    const formatted = amount.toLocaleString(isTournament ? "en-US" : (currency === "TL" ? "tr-TR" : "en-US"), {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
@@ -77,8 +112,13 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
       setMode,
       displayBalance,
       isReal,
+      isTournament,
+      hasJoinedTournament,
       currency,
       currencySymbol,
+      tournamentBalance,
+      isBalanceHidden,
+      toggleBalanceHidden,
       setGuestCurrency,
       formatMoney,
     }}>

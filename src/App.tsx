@@ -17,6 +17,7 @@ import Chart   from "@/pages/chart";
 import History from "@/pages/history";
 import Profile from "@/pages/profile";
 import LeaderboardPage from "@/pages/leaderboard";
+import BonusesPage from "@/pages/bonuses";
 import WalletPage from "@/pages/wallet";
 import BalancePage from "@/pages/balance";
 import Privacy from "@/pages/privacy";
@@ -83,6 +84,7 @@ function MainRoutes() {
           <Route path="/balance" component={BalancePage} />
           <Route path="/wallet"  component={WalletPage} />
           <Route path="/leaderboard" component={LeaderboardPage} />
+          <Route path="/bonuses" component={BonusesPage} />
           <Route path="/history" component={History} />
           <Route path="/profile" component={Profile} />
           <Route path="/chart"   component={Chart}   />
