@@ -59,10 +59,31 @@ export function Tutorial() {
 
   useEffect(() => {
     const seen = localStorage.getItem("hasSeenInteractiveTutorialv12");
-    if (!seen) {
-      const timer = setTimeout(() => setShow(true), 1500);
-      return () => clearTimeout(timer);
+    if (seen) return;
+
+    let timer: NodeJS.Timeout;
+    
+    const startTutorial = () => {
+      // Small delay after loading screen is gone
+      timer = setTimeout(() => setShow(true), 800);
+    };
+
+    if ((window as any).__APP_UI_READY__) {
+      startTutorial();
+    } else {
+      const handleAppLoaded = () => {
+        startTutorial();
+      };
+      window.addEventListener('app-ui-ready', handleAppLoaded);
+      return () => {
+        window.removeEventListener('app-ui-ready', handleAppLoaded);
+        if (timer) clearTimeout(timer);
+      };
     }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {

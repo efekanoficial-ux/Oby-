@@ -144,11 +144,14 @@ function AppContent() {
     if (ready && isAppReady) {
       const timer = setTimeout(() => {
         setShowApp(true);
+        (window as any).__APP_UI_READY__ = true;
+        window.dispatchEvent(new CustomEvent('app-ui-ready'));
       }, 500); // Küçük bir geçiş payı
       return () => clearTimeout(timer);
     } else if (!ready) {
       setShowApp(false);
       setIsAppReady(false);
+      (window as any).__APP_UI_READY__ = false;
     }
   }, [ready, isAppReady]);
 
