@@ -42,6 +42,25 @@ body {
   scrollbar-width: none !important;
 }
 
+/* ── PC Landing scrollbar (smooth modern scrollbar for desktop intro page) ── */
+.landing-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b #060813;
+}
+.landing-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.landing-scrollbar::-webkit-scrollbar-track {
+  background: #060813;
+}
+.landing-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+.landing-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #0066FF;
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
