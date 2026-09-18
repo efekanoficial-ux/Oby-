@@ -58,8 +58,18 @@ export function Tutorial() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    const handleStartTutorial = () => {
+      setShow(true);
+      setStep(0);
+    };
+    window.addEventListener('start-tutorial', handleStartTutorial);
+
     const seen = localStorage.getItem("hasSeenInteractiveTutorialv12");
-    if (seen) return;
+    if (seen) {
+      return () => {
+        window.removeEventListener('start-tutorial', handleStartTutorial);
+      };
+    }
 
     let timer: NodeJS.Timeout;
     
@@ -76,12 +86,14 @@ export function Tutorial() {
       };
       window.addEventListener('app-ui-ready', handleAppLoaded);
       return () => {
+        window.removeEventListener('start-tutorial', handleStartTutorial);
         window.removeEventListener('app-ui-ready', handleAppLoaded);
         if (timer) clearTimeout(timer);
       };
     }
 
     return () => {
+      window.removeEventListener('start-tutorial', handleStartTutorial);
       if (timer) clearTimeout(timer);
     };
   }, []);
@@ -176,14 +188,54 @@ export function Tutorial() {
     handleClose();
   };
 
+  const isDesktop = !isMobile;
   let tooltipStyle: React.CSSProperties = { maxWidth: 420, margin: "0 auto" };
+  let arrowDirection: "up" | "down" | "right" = "up";
+  let arrowPos = { left: 0, top: 0 };
+
   if (currentStep.position === "center") {
-    tooltipStyle = { top: "50%", left: 20, right: 20, transform: "translateY(-50%)", maxWidth: 420, margin: "0 auto" };
+    tooltipStyle = isDesktop
+      ? { top: "50%", left: "50%", transform: "translate(-50%, -50%)", maxWidth: 440, width: "100%" }
+      : { top: "50%", left: 20, right: 20, transform: "translateY(-50%)", maxWidth: 420, margin: "0 auto" };
   } else if (targetRect) {
-    if (currentStep.position === "bottom") {
-      tooltipStyle = { top: targetRect.bottom + 24, left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
+    if (isDesktop) {
+      const isRightSidebar = targetRect.x > window.innerWidth / 2;
+      if (isRightSidebar) {
+        const cardWidth = 380;
+        const leftPos = Math.max(20, targetRect.left - cardWidth - 28);
+        const topPos = Math.max(24, Math.min(window.innerHeight - 280, targetRect.top + (targetRect.height / 2) - 90));
+        tooltipStyle = { top: topPos, left: leftPos, maxWidth: cardWidth, width: "100%" };
+        arrowDirection = "right";
+        arrowPos = {
+          left: targetRect.left - 30,
+          top: targetRect.top + (targetRect.height / 2) - 12,
+        };
+      } else {
+        const topPos = targetRect.bottom + 20;
+        const leftPos = Math.max(24, Math.min(window.innerWidth - 440, targetRect.left));
+        tooltipStyle = { top: topPos, left: leftPos, maxWidth: 420, width: "100%" };
+        arrowDirection = "up";
+        arrowPos = {
+          left: targetRect.left + Math.min(100, targetRect.width / 2) - 12,
+          top: targetRect.bottom + 6,
+        };
+      }
     } else {
-      tooltipStyle = { bottom: Math.max(16, window.innerHeight - targetRect.top + 24), left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
+      if (currentStep.position === "bottom") {
+        tooltipStyle = { top: targetRect.bottom + 24, left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
+        arrowDirection = "up";
+        arrowPos = {
+          left: targetRect.x + targetRect.width / 2 - 12,
+          top: targetRect.bottom + 6,
+        };
+      } else {
+        tooltipStyle = { bottom: Math.max(16, window.innerHeight - targetRect.top + 24), left: 20, right: 20, maxWidth: 420, margin: "0 auto" };
+        arrowDirection = "down";
+        arrowPos = {
+          left: targetRect.x + targetRect.width / 2 - 12,
+          top: targetRect.top - 30,
+        };
+      }
     }
   }
 
@@ -242,18 +294,42 @@ export function Tutorial() {
         <motion.div
           initial={false}
           animate={{
-            left: targetRect.x + targetRect.width / 2 - 12,
-            top: currentStep.position === "bottom" ? targetRect.bottom + 6 : targetRect.top - 30,
+            left: arrowPos.left,
+            top: arrowPos.top,
           }}
           transition={{ type: "spring", stiffness: 350, damping: 30 }}
           className="fixed z-[10002] pointer-events-none flex items-center justify-center w-6 h-6"
         >
           <motion.div
-            animate={{ y: currentStep.position === "bottom" ? [0, -5, 0] : [0, 5, 0] }}
+            animate={
+              arrowDirection === "right"
+                ? { x: [0, 5, 0] }
+                : arrowDirection === "up"
+                ? { y: [0, -5, 0] }
+                : { y: [0, 5, 0] }
+            }
             transition={{ repeat: Infinity, duration: 1.0, ease: "easeInOut" }}
             className="flex items-center justify-center"
           >
-            {currentStep.position === "bottom" ? (
+            {arrowDirection === "right" ? (
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{
+                  filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5))",
+                }}
+              >
+                <path
+                  d="M21 12L12 3V8H3V16H12V21L21 12Z"
+                  fill="#FFFFFF"
+                  stroke="#18181B"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : arrowDirection === "up" ? (
               <svg
                 width="20"
                 height="20"
@@ -304,10 +380,11 @@ export function Tutorial() {
               key={step}
               initial={{ 
                 opacity: 0, 
+                x: arrowDirection === "right" ? -10 : 0,
                 y: currentStep.position === "bottom" ? -10 : (currentStep.position === "center" ? 0 : 10),
                 scale: currentStep.position === "center" ? 0.95 : 1 
               }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
               exit={{ opacity: 0 }}
               className="absolute bg-[#111] border border-white/10 rounded-[24px] p-6 shadow-2xl pointer-events-auto flex flex-col gap-4"
               style={tooltipStyle}

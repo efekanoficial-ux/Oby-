@@ -13,6 +13,7 @@ import { requestNotificationPermission } from "@/lib/notifications";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DesktopAuthGate } from "@/components/desktop-auth-gate";
+import { PCLanding } from "@/components/pc-landing";
 import Home    from "@/pages/home";
 import Chart   from "@/pages/chart";
 import History from "@/pages/history";
@@ -34,9 +35,9 @@ function MainRoutes() {
   const atHome = location === "/";
   const { currentUser, ready } = useAuth();
   const isMobile = useIsMobile();
-  const [guestEntered, setGuestEntered] = useState(() => {
+  const [pcStarted, setPcStarted] = useState(() => {
     try {
-      return sessionStorage.getItem("obyo_guest_pc_entered") === "true";
+      return sessionStorage.getItem("obyo_pc_landing_started") === "true";
     } catch {
       return false;
     }
@@ -47,28 +48,46 @@ function MainRoutes() {
     localStorage.getItem("obyo_tutorial_done") === "1"
   );
 
-  // İlk tutorial'dan sonra giriş zorunlu olsun
+  const isShowingPcLanding = !isMobile && !currentUser && atHome && !pcStarted;
+
+  // İlk tutorial'dan sonra giriş zorunlu olsun (Tüm hook'lar erken dönüşlerden önce çalıştırılmalıdır)
   useEffect(() => {
-    if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
+    if (ready && !currentUser && hasSeenTutorial && location !== "/auth" && !isShowingPcLanding) {
       setLocation("/auth");
     }
-  }, [ready, currentUser, hasSeenTutorial, location, setLocation]);
+  }, [ready, currentUser, hasSeenTutorial, location, setLocation, isShowingPcLanding]);
+
+  // PC için tutorial'dan önceki giriş/tanıtım ekranı
+  if (isShowingPcLanding) {
+    return (
+      <PCLanding
+        onStart={() => {
+          try {
+            sessionStorage.setItem("obyo_pc_landing_started", "true");
+          } catch {}
+          setPcStarted(true);
+        }}
+        onOpenAuth={() => setLocation("/auth")}
+      />
+    );
+  }
 
   if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
     return null;
   }
 
-  // Only show on PC (!isMobile) when NOT logged in (!currentUser) and visitor hasn't entered demo yet
-  const showDesktopAuth = !isMobile && !currentUser && atHome && !guestEntered;
+  // Only show on PC (!isMobile) when NOT logged in (!currentUser) and visitor already completed tutorial
+  const showDesktopAuth = !isMobile && !currentUser && atHome && hasSeenTutorial;
 
   if (showDesktopAuth) {
     return (
       <DesktopAuthGate
-        onEnterDemo={() => {
+        onBackToLanding={() => {
           try {
-            sessionStorage.setItem("obyo_guest_pc_entered", "true");
+            sessionStorage.removeItem("obyo_pc_landing_started");
           } catch {}
-          setGuestEntered(true);
+          setPcStarted(false);
+          setLocation("/");
         }}
       />
     );

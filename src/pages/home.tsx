@@ -2116,7 +2116,7 @@ export default function Home() {
           
           {/* Pro Desktop Header (Mobile-like but wider) */}
           <div className="flex h-14 shrink-0 items-center justify-between px-6 bg-black border-b border-white/5">
-             <div className="flex items-center gap-4">
+             <div className="flex items-center gap-4" data-tour="step-1">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1c1c1c] border border-white/10">
                    <img src="/logo.jpg" alt="Logo" className="h-6 w-6 rounded-md object-cover" />
                 </div>
@@ -2182,7 +2182,7 @@ export default function Home() {
                 </div>
 
                 {/* Amount */}
-                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4" data-tour="step-2">
                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Yatırım Tutarı</span>
                    <div className="flex items-center gap-2 mt-1">
                       <button onClick={() => setAmountPersist(a => Math.max(minAmount, a - step))} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"><Minus size={16} /></button>
@@ -2207,7 +2207,7 @@ export default function Home() {
                 </div>
 
                 {/* Expiry */}
-                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] border border-white/5 p-4" data-tour="step-3">
                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">İşlem Süresi</span>
                    <div className="grid grid-cols-3 gap-2 mt-1">
                       {TIMEFRAMES.slice(0, 6).map(t => (
@@ -2217,7 +2217,7 @@ export default function Home() {
                 </div>
 
                 {/* Trade Actions */}
-                <div className="flex flex-col gap-2 mt-auto">
+                <div className="flex flex-col gap-2 mt-auto" data-tour="step-4">
                    <div className="flex justify-between px-1 mb-1">
                       <span className="text-[11px] font-bold text-white/30">Net Kazanç:</span>
                       <span className="text-sm font-black text-[#1aa369]">+{sym}{(amount * (asset.payout / 100)).toFixed(2)}</span>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Eye, EyeOff, Mail, Lock, User, Calendar, ChevronRight, Tag, IdCard } from "lucide-react";
 import { t } from "@/i18n";
 
@@ -9,6 +10,7 @@ type Mode = "login" | "register" | "complete-google";
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const { login, loginWithGoogle, register, logout, currentUser, isAdmin, ready } = useAuth();
   const [mode, setMode]     = useState<Mode>("login");
 
@@ -310,14 +312,14 @@ export default function AuthPage() {
 
         {/* Footer */}
         {mode === "complete-google" ? (
-          <div className="px-6 pb-6 text-center">
+          <div className="px-6 pb-6 text-center border-t border-[#111] pt-4">
             <button type="button" onClick={() => { setMode("login"); setForm({ email: "", password: "", name: "", surname: "", tcKimlik: "", birthDate: "", photoUrl: "", referralCode: "" }); }}
               className="text-xs font-bold text-white/30 hover:text-[#FF6B00] transition-colors cursor-pointer">
               ← Geri Dön / İptal Et
             </button>
           </div>
         ) : (
-          <div className="px-6 pb-6 text-center">
+          <div className="px-6 pb-6 text-center border-t border-[#111] pt-4">
             <p className="text-xs text-white/20">
               {mode === "login" ? t.noAccount : t.alreadyMember}
               <button onClick={() => switchMode(mode === "login" ? "register" : "login")}
@@ -325,6 +327,22 @@ export default function AuthPage() {
                 {mode === "login" ? t.signUp : t.signIn}
               </button>
             </p>
+            {!isMobile && (
+              <div className="mt-3 pt-3 border-t border-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      sessionStorage.removeItem("obyo_pc_landing_started");
+                    } catch {}
+                    navigate("/");
+                  }}
+                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer"
+                >
+                  ← Tanıtım Sayfasına Dön
+                </button>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
