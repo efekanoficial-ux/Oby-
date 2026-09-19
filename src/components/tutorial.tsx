@@ -64,7 +64,7 @@ export function Tutorial() {
     };
     window.addEventListener('start-tutorial', handleStartTutorial);
 
-    const seen = localStorage.getItem("hasSeenInteractiveTutorialv12");
+    const seen = localStorage.getItem("hasSeenInteractiveTutorialv12") === "true" || localStorage.getItem("obyo_tutorial_done") === "1";
     if (seen) {
       return () => {
         window.removeEventListener('start-tutorial', handleStartTutorial);
@@ -181,7 +181,8 @@ export function Tutorial() {
   const handleClose = () => {
     setShow(false);
     localStorage.setItem("hasSeenInteractiveTutorialv12", "true");
-    setLocation("/auth");
+    localStorage.setItem("obyo_tutorial_done", "1");
+    setLocation("/auth?mode=register");
   };
 
   const handleCloseAndRegister = () => {

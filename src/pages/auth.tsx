@@ -12,7 +12,13 @@ export default function AuthPage() {
   const [, navigate] = useLocation();
   const isMobile = useIsMobile();
   const { login, loginWithGoogle, register, logout, currentUser, isAdmin, ready } = useAuth();
-  const [mode, setMode]     = useState<Mode>("login");
+  const [mode, setMode]     = useState<Mode>(() => {
+    try {
+      const searchMode = new URLSearchParams(window.location.search).get("mode");
+      if (searchMode === "register") return "register";
+    } catch {}
+    return "login";
+  });
 
   const [err, setErr]       = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -327,22 +333,6 @@ export default function AuthPage() {
                 {mode === "login" ? t.signUp : t.signIn}
               </button>
             </p>
-            {!isMobile && (
-              <div className="mt-3 pt-3 border-t border-white/[0.04]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      sessionStorage.removeItem("obyo_pc_landing_started");
-                    } catch {}
-                    navigate("/");
-                  }}
-                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer"
-                >
-                  ← Tanıtım Sayfasına Dön
-                </button>
-              </div>
-            )}
           </div>
         )}
       </motion.div>

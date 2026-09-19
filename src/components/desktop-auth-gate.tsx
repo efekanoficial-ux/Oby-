@@ -8,12 +8,19 @@ type Mode = "login" | "register" | "complete-google";
 
 interface DesktopAuthGateProps {
   onEnterDemo?: () => void;
-  onBackToLanding?: () => void;
+  initialMode?: Mode;
 }
 
-export function DesktopAuthGate({ onEnterDemo: _onEnterDemo, onBackToLanding }: DesktopAuthGateProps) {
+export function DesktopAuthGate({ onEnterDemo: _onEnterDemo, initialMode = "register" }: DesktopAuthGateProps) {
   const { login, loginWithGoogle, register } = useAuth();
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(() => {
+    try {
+      const searchMode = new URLSearchParams(window.location.search).get("mode");
+      if (searchMode === "login") return "login";
+      if (searchMode === "register") return "register";
+    } catch {}
+    return initialMode;
+  });
 
   const [err, setErr] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -412,17 +419,6 @@ export function DesktopAuthGate({ onEnterDemo: _onEnterDemo, onBackToLanding }: 
                   {mode === "login" ? t.signUp : t.signIn}
                 </button>
               </p>
-              {onBackToLanding && (
-                <div className="mt-3 pt-3 border-t border-white/[0.04]">
-                  <button
-                    type="button"
-                    onClick={onBackToLanding}
-                    className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer"
-                  >
-                    ← Tanıtım Sayfasına Dön
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </motion.div>

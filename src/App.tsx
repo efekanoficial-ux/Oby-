@@ -13,7 +13,6 @@ import { requestNotificationPermission } from "@/lib/notifications";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DesktopAuthGate } from "@/components/desktop-auth-gate";
-import { PCLanding } from "@/components/pc-landing";
 import Home    from "@/pages/home";
 import Chart   from "@/pages/chart";
 import History from "@/pages/history";
@@ -35,61 +34,31 @@ function MainRoutes() {
   const atHome = location === "/";
   const { currentUser, ready } = useAuth();
   const isMobile = useIsMobile();
-  const [pcStarted, setPcStarted] = useState(() => {
-    try {
-      return sessionStorage.getItem("obyo_pc_landing_started") === "true";
-    } catch {
-      return false;
-    }
-  });
 
   const hasSeenTutorial = typeof window !== "undefined" && (
     localStorage.getItem("hasSeenInteractiveTutorialv12") === "true" ||
     localStorage.getItem("obyo_tutorial_done") === "1"
   );
 
-  const isShowingPcLanding = !isMobile && !currentUser && atHome && !pcStarted;
-
-  // İlk tutorial'dan sonra giriş zorunlu olsun (Tüm hook'lar erken dönüşlerden önce çalıştırılmalıdır)
+  // İlk tutorial'dan sonra hem PC'de hem mobilde kayıt/giriş zorunlu
   useEffect(() => {
-    if (ready && !currentUser && hasSeenTutorial && location !== "/auth" && !isShowingPcLanding) {
-      setLocation("/auth");
+    if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
+      if (isMobile || !atHome) {
+        setLocation("/auth?mode=register");
+      }
     }
-  }, [ready, currentUser, hasSeenTutorial, location, setLocation, isShowingPcLanding]);
+  }, [ready, isMobile, currentUser, hasSeenTutorial, location, setLocation, atHome]);
 
-  // PC için tutorial'dan önceki giriş/tanıtım ekranı
-  if (isShowingPcLanding) {
-    return (
-      <PCLanding
-        onStart={() => {
-          try {
-            sessionStorage.setItem("obyo_pc_landing_started", "true");
-          } catch {}
-          setPcStarted(true);
-        }}
-        onOpenAuth={() => setLocation("/auth")}
-      />
-    );
-  }
-
-  if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
+  // Mobilde tutorial bittiğinde auth'a yönlendirilirken boş render
+  if (ready && isMobile && !currentUser && hasSeenTutorial && location !== "/auth") {
     return null;
   }
 
-  // Only show on PC (!isMobile) when NOT logged in (!currentUser) and visitor already completed tutorial
+  // PC'de tutorial tamamlandıktan sonra anasayfada kayıt/giriş kapısı zorunlu olsun
   const showDesktopAuth = !isMobile && !currentUser && atHome && hasSeenTutorial;
-
   if (showDesktopAuth) {
     return (
-      <DesktopAuthGate
-        onBackToLanding={() => {
-          try {
-            sessionStorage.removeItem("obyo_pc_landing_started");
-          } catch {}
-          setPcStarted(false);
-          setLocation("/");
-        }}
-      />
+      <DesktopAuthGate initialMode="register" />
     );
   }
 

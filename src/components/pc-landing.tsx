@@ -74,14 +74,7 @@ export function PCLanding({ onStart, onOpenAuth }: PCLandingProps) {
   };
 
   const handleStart = () => {
-    try {
-      localStorage.removeItem("hasSeenInteractiveTutorialv12");
-      localStorage.removeItem("obyo_tutorial_done");
-    } catch {}
     onStart();
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("start-tutorial"));
-    }, 400);
   };
 
   const handleAuthOpen = () => {
@@ -717,7 +710,7 @@ export function PCLanding({ onStart, onOpenAuth }: PCLandingProps) {
               {[
                 {
                   q: "Platformda nasıl işlem yapmaya başlayabilirim?",
-                  a: "Hemen Başla butonuna tıklayarak etkileşimli tutorial ile alıştırma yapabilir, ardından ücretsiz hesabınızı oluşturarak gerçek veya demo bakiye ile işleme başlayabilirsiniz."
+                  a: "Hemen Başla butonuna tıklayarak doğrudan platforma erişebilir, ardından ücretsiz hesabınızı oluşturarak gerçek veya demo bakiye ile işleme başlayabilirsiniz."
                 },
                 {
                   q: "İşlem süreleri ve getiri oranları nelerdir?",
