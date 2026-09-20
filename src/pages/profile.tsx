@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 import {
   User, Settings, Bell, Shield, ChevronRight,
   HelpCircle, LogOut, X, Hash, Wallet, Camera, Trophy, ShieldCheck, CheckCircle2,
-  Gift,
+  Gift, Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LeaderboardModal } from "@/components/leaderboard-modal";
@@ -18,13 +20,16 @@ import { Bonus, UserBonusClaim, listenBonuses, listenUserClaims, getUnclaimedBon
 
 export default function Profile() {
   const [, navigate]   = useLocation();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, deleteUserPermanently } = useAuth();
+  const { toast } = useToast();
   const { language, t } = useLanguage();
   const [showAbout, setShowAbout]             = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showPhotoModal, setShowPhotoModal]   = useState(false);
   const [showLangModal, setShowLangModal]     = useState(false);
   const [showKycModal, setShowKycModal]       = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting]           = useState(false);
   const [notifState, setNotifState]           = useState(true);
   const [bonuses, setBonuses]                 = useState<Bonus[]>([]);
   const [claims, setClaims]                   = useState<UserBonusClaim[]>([]);
@@ -57,6 +62,38 @@ export default function Profile() {
   const unclaimedBonusCount = getUnclaimedBonusCount(bonuses, claims, currentUser);
 
   const handleLogout = () => { logout(); navigate("/auth"); };
+
+  const handleDeleteAccount = async () => {
+    if (!currentUser || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteUserPermanently(currentUser.id, currentUser.email);
+      if (auth.currentUser) {
+        await auth.currentUser.delete().catch((err) => {
+          console.warn("Firebase auth user delete error:", err);
+        });
+      }
+      localStorage.removeItem("obyo_cached_name");
+      localStorage.removeItem("obyo_custom_user_id");
+      localStorage.removeItem("obyo_token");
+      await logout();
+      toast({
+        title: t.accountDeleted,
+        description: t.deleteAccount,
+      });
+      setShowDeleteModal(false);
+      navigate("/auth");
+    } catch (err: any) {
+      console.error("Account deletion failed:", err);
+      toast({
+        title: "Hata",
+        description: err?.message || "Hesap silinemedi.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const isVerified = currentUser?.kycStatus === "verified";
 
@@ -260,6 +297,24 @@ export default function Profile() {
                 </span>
               </motion.button>
             </div>
+
+            {/* Delete Account */}
+            {currentUser && (
+              <div className="mt-2.5 overflow-hidden rounded-2xl" style={{ backgroundColor: "#111111", border: "1px solid #1e1e1e" }}>
+                <motion.button
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left group transition hover:bg-red-500/5 cursor-pointer"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: "rgba(239,68,68,0.08)" }}>
+                    <Trash2 size={15} className="text-red-500/80 group-hover:text-red-500 transition-colors" />
+                  </div>
+                  <span className="text-sm font-semibold text-red-500/80 group-hover:text-red-500 transition-colors">
+                    {t.deleteAccount}
+                  </span>
+                </motion.button>
+              </div>
+            )}
           </div>
 
           <p className="mt-6 text-center text-[10px]" style={{ color: "#2a2a2a" }}>
@@ -296,6 +351,66 @@ export default function Profile() {
               <button onClick={() => setShowAbout(false)} className="mt-5 w-full rounded-xl py-3 text-sm font-black text-black cursor-pointer" style={{ background: "#FF6B00" }}>
                 {t.aboutOk}
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete account confirmation modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)" }}
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-3xl p-6 relative border border-red-500/20"
+              style={{ background: "#111111" }}
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/20">
+                <Trash2 className="h-7 w-7 text-red-500" />
+              </div>
+
+              <h3 className="text-center text-lg font-bold text-white mb-2">
+                {t.deleteAccount}
+              </h3>
+              <p className="text-center text-xs text-white/60 leading-relaxed mb-6">
+                {t.deleteAccountDesc}
+              </p>
+
+              <div className="flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteAccount}
+                  className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-red-900/30"
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                  <span>{isDeleting ? "..." : t.deleteAccountConfirm}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteModal(false)}
+                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 transition cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

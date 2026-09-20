@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { getTranslations, getLanguageCode, LanguageCode, translationsMap } from "@/i18n";
+import { getTranslations, getLanguageCode, detectCountryLanguage, LanguageCode, translationsMap } from "@/i18n";
 
 interface LanguageContextType {
   language: string;
@@ -12,7 +12,7 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<string>(() => {
-    return localStorage.getItem("obyo_lang") || "Türkçe";
+    return localStorage.getItem("obyo_lang") || detectCountryLanguage();
   });
 
   const langCode = getLanguageCode(language);

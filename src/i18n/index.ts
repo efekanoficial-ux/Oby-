@@ -169,6 +169,15 @@ const tr = {
   // Loading & Wallet
   hello: "Merhaba",
   loadingStatus: "Grafikler ve piyasa verileri hazırlanıyor...",
+  noInternetTitle: "İnternet Bağlantısı Yok",
+  noInternetDesc: "Lütfen internet bağlantınızı kontrol edin.",
+  tryAgain: "Tekrar Dene",
+  checkingConnection: "Bağlantı kontrol ediliyor...",
+  deleteAccount: "Hesabı Sil",
+  deleteAccountDesc: "Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinir.",
+  deleteAccountConfirm: "Evet, Hesabımı Sil",
+  cancel: "Vazgeç",
+  accountDeleted: "Hesabınız başarıyla silindi.",
   walletTitle: "Cüzdan",
   needLogin: "Oturum Açmanız Gerekiyor",
   needLoginDesc: "Para yatırma, para çekme ve transfer geçmişinizi takip edebilmek için hesabınıza giriş yapın.",
@@ -412,6 +421,15 @@ const en: typeof tr = {
 
   hello: "Hello",
   loadingStatus: "Preparing charts and market data...",
+  noInternetTitle: "No Internet Connection",
+  noInternetDesc: "Please check your internet connection.",
+  tryAgain: "Try Again",
+  checkingConnection: "Checking connection...",
+  deleteAccount: "Delete Account",
+  deleteAccountDesc: "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
+  deleteAccountConfirm: "Yes, Delete Account",
+  cancel: "Cancel",
+  accountDeleted: "Your account has been deleted.",
   walletTitle: "Wallet",
   needLogin: "Sign In Required",
   needLoginDesc: "Please sign in to track deposits, withdrawals and transfer history.",
@@ -655,6 +673,15 @@ const de: typeof tr = {
 
   hello: "Hallo",
   loadingStatus: "Diagramme und Marktdaten werden vorbereitet...",
+  noInternetTitle: "Keine Internetverbindung",
+  noInternetDesc: "Bitte überprüfen Sie Ihre Internetverbindung.",
+  tryAgain: "Erneut versuchen",
+  checkingConnection: "Verbindung wird überprüft...",
+  deleteAccount: "Konto löschen",
+  deleteAccountDesc: "Sind Sie sicher, dass Sie Ihr Konto löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden und alle Daten werden gelöscht.",
+  deleteAccountConfirm: "Ja, Konto löschen",
+  cancel: "Abbrechen",
+  accountDeleted: "Ihr Konto wurde gelöscht.",
   walletTitle: "Brieftasche",
   needLogin: "Anmeldung erforderlich",
   needLoginDesc: "Bitte melden Sie sich an, um Einzahlungen, Auszahlungen und den Überweisungsverlauf zu verfolgen.",
@@ -744,18 +771,59 @@ const ar: typeof tr = { ...en, navHistory: "السجل", navTrade: "تداول",
 
 export const translationsMap = { tr, en, de, es, ru, ar };
 
+export function detectCountryLanguage(): string {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return "English";
+  }
+  try {
+    const navLangs = navigator.languages && navigator.languages.length > 0
+      ? navigator.languages
+      : [navigator.language || ""];
+    
+    for (const lang of navLangs) {
+      const l = (lang || "").toLowerCase();
+      if (l.startsWith("tr")) return "Türkçe";
+      if (l.startsWith("de")) return "Deutsch";
+      if (l.startsWith("es")) return "Español";
+      if (l.startsWith("ru")) return "Русский";
+      if (l.startsWith("ar")) return "العربية";
+      if (l.startsWith("en")) return "English";
+    }
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.toLowerCase();
+    if (tz.includes("istanbul") || tz.includes("turkey") || tz.includes("ankara")) {
+      return "Türkçe";
+    }
+    if (tz.includes("berlin") || tz.includes("vienna") || tz.includes("zurich")) {
+      return "Deutsch";
+    }
+    if (tz.includes("madrid") || tz.includes("buenos_aires") || tz.includes("bogota") || tz.includes("mexico") || tz.includes("santiago")) {
+      return "Español";
+    }
+    if (tz.includes("moscow") || tz.includes("krasnoyarsk") || tz.includes("ekaterinburg")) {
+      return "Русский";
+    }
+    if (tz.includes("riyadh") || tz.includes("dubai") || tz.includes("cairo") || tz.includes("baghdad")) {
+      return "العربية";
+    }
+  } catch (e) {
+    console.warn("Language detection error:", e);
+  }
+  return "English";
+}
+
 export function getLanguageCode(langStr?: string): LanguageCode {
   if (!langStr && typeof localStorage !== "undefined") {
-    langStr = localStorage.getItem("obyo_lang") || "Türkçe";
+    langStr = localStorage.getItem("obyo_lang") || detectCountryLanguage();
   }
   const l = (langStr || "").toLowerCase();
-  if (l.includes("tur") || l === "tr" || l === "") return "tr";
+  if (l.includes("tur") || l === "tr") return "tr";
   if (l.includes("deu") || l.includes("ger") || l === "de") return "de";
   if (l.includes("esp") || l.includes("spa") || l === "es") return "es";
   if (l.includes("rus") || l === "ru") return "ru";
   if (l.includes("ara") || l === "ar") return "ar";
   if (l.includes("eng") || l === "en") return "en";
-  return "tr";
+  return "en";
 }
 
 export function getTranslations(code?: LanguageCode) {
