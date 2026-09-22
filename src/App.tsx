@@ -31,29 +31,15 @@ import { RejectionAlert } from "@/components/RejectionAlert";
 const queryClient = new QueryClient();
 
 function MainRoutes() {
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const atHome = location === "/";
-  const { currentUser, ready } = useAuth();
+  const { currentUser } = useAuth();
   const isMobile = useIsMobile();
 
   const hasSeenTutorial = typeof window !== "undefined" && (
     localStorage.getItem("hasSeenInteractiveTutorialv12") === "true" ||
     localStorage.getItem("obyo_tutorial_done") === "1"
   );
-
-  // İlk tutorial'dan sonra hem PC'de hem mobilde kayıt/giriş zorunlu
-  useEffect(() => {
-    if (ready && !currentUser && hasSeenTutorial && location !== "/auth") {
-      if (isMobile || !atHome) {
-        setLocation("/auth?mode=register");
-      }
-    }
-  }, [ready, isMobile, currentUser, hasSeenTutorial, location, setLocation, atHome]);
-
-  // Mobilde tutorial bittiğinde auth'a yönlendirilirken boş render
-  if (ready && isMobile && !currentUser && hasSeenTutorial && location !== "/auth") {
-    return null;
-  }
 
   // PC'de tutorial tamamlandıktan sonra anasayfada kayıt/giriş kapısı zorunlu olsun
   const showDesktopAuth = !isMobile && !currentUser && atHome && hasSeenTutorial;
@@ -102,7 +88,7 @@ const probeConnection = async (): Promise<boolean> => {
   }
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(`/api/health?_t=${Date.now()}`, {
       method: "GET",
       cache: "no-store",
@@ -111,22 +97,11 @@ const probeConnection = async (): Promise<boolean> => {
     clearTimeout(timer);
     return res.ok;
   } catch {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      return false;
-    }
-    try {
-      const controller2 = new AbortController();
-      const timer2 = setTimeout(() => controller2.abort(), 2500);
-      await fetch(`/?_ping=${Date.now()}`, {
-        method: "HEAD",
-        cache: "no-store",
-        signal: controller2.signal,
-      });
-      clearTimeout(timer2);
+    // Mobil ağlarda (iOS Safari vb.) navigator.onLine true ise gereksiz offline kilidine sokma
+    if (typeof navigator !== "undefined" && navigator.onLine) {
       return true;
-    } catch {
-      return false;
     }
+    return false;
   }
 };
 
@@ -165,18 +140,14 @@ function AppContent() {
   useEffect(() => {
     let isMounted = true;
 
-    // İlk başta normal loading göster ("önce loading olsun sonra...")
+    // İlk başta sadece cihaz gerçekten offline ise kontrol et
     const timer = setTimeout(async () => {
-      const online = await probeConnection();
       if (!isMounted) return;
-      if (!online) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
         setIsOnline(false);
         setOfflineConfirmed(true);
-      } else {
-        setIsOnline(true);
-        setOfflineConfirmed(false);
       }
-    }, 1800);
+    }, 1500);
 
     const handleOnline = async () => {
       setIsCheckingConnection(true);
@@ -211,20 +182,18 @@ function AppContent() {
 
   useEffect(() => {
     const handleReady = () => {
-      console.log("App ready event received");
       if (isOnline && !offlineConfirmed) {
         setIsAppReady(true);
       }
     };
     window.addEventListener('app-ready', handleReady);
     
-    // Safety timeout: 10 saniye sonra zorla hazırla, ancak bağlantı yoksa açma
+    // Güvenlik zamanlayıcısı: max 1.8 saniye sonra yükleme ekranını nazikçe sonlandır
     const safetyTimer = setTimeout(() => {
       if (!isAppReady && isOnline && !offlineConfirmed) {
-        console.log("Safety timeout reached, forcing app ready");
         setIsAppReady(true);
       }
-    }, 10000);
+    }, 1800);
 
     return () => {
       window.removeEventListener('app-ready', handleReady);
@@ -233,19 +202,21 @@ function AppContent() {
   }, [isAppReady, isOnline, offlineConfirmed]);
 
   useEffect(() => {
-    if (currentUser && Notification.permission !== 'granted') {
+    if (
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      currentUser &&
+      window.Notification.permission !== 'granted'
+    ) {
       requestNotificationPermission();
     }
   }, [currentUser]);
 
   useEffect(() => {
     if (ready && isAppReady && isOnline && !offlineConfirmed) {
-      const timer = setTimeout(() => {
-        setShowApp(true);
-        (window as any).__APP_UI_READY__ = true;
-        window.dispatchEvent(new CustomEvent('app-ui-ready'));
-      }, 500); // Küçük bir geçiş payı
-      return () => clearTimeout(timer);
+      setShowApp(true);
+      (window as any).__APP_UI_READY__ = true;
+      window.dispatchEvent(new CustomEvent('app-ui-ready'));
     } else if (!ready || !isOnline || offlineConfirmed) {
       setShowApp(false);
       (window as any).__APP_UI_READY__ = false;

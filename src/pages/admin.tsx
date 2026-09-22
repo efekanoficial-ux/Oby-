@@ -1729,6 +1729,42 @@ export default function Admin() {
                       Kullanıcılar havale/EFT ile para yatırırken bu açıklama kodunu banka transferine yazar. Dilediğiniz zaman buradan güncelleyebilirsiniz.
                     </p>
                   </div>
+
+                  {/* Dekont Zorunluluğu Aç/Kapat Ayarı */}
+                  <div className="sm:col-span-2 pt-2 border-t border-white/5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#0ecb81]/10 border border-[#0ecb81]/25 shrink-0 mt-0.5 sm:mt-0">
+                          <FileText size={15} className="text-[#0ecb81]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h5 className="text-xs font-bold text-white">Havale / EFT Dekont Zorunluluğu</h5>
+                            {formSettings.ibanReceiptRequired !== false ? (
+                              <span className="text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2 py-0.5 rounded-full">
+                                Zorunlu
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                İsteğe Bağlı
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-white/40 mt-0.5">
+                            {formSettings.ibanReceiptRequired !== false
+                              ? "Açıkken: Kullanıcılar IBAN ile para yatırırken transfer dekontu görseli yüklemek zorundadır."
+                              : "Kapalıyken: Kullanıcılar dekont yüklemeden de para yatırma bildiriminde bulunabilir."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <ToggleSwitch
+                          checked={formSettings.ibanReceiptRequired !== false}
+                          onChange={(v) => setFormSettings(prev => ({ ...prev, ibanReceiptRequired: v }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -98,6 +98,7 @@ export interface CustomPaymentMethod {
 
 export interface PaymentSettings {
   ibanEnabled?:     boolean;
+  ibanReceiptRequired?: boolean;
   ibanBank:         string;
   ibanHolder:       string;
   ibanNumber:       string;
@@ -127,6 +128,7 @@ export interface PaymentSettings {
 
 export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   ibanEnabled:     true,
+  ibanReceiptRequired: true,
   ibanBank:        "Garanti BBVA",
   ibanHolder:      "Obyo Financial Technologies Ltd.",
   ibanNumber:      "TR88 0006 2000 8765 4321 0099 73",
@@ -359,6 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...DEFAULT_PAYMENT_SETTINGS,
           ...data,
           ibanEnabled: data.ibanEnabled !== undefined ? Boolean(data.ibanEnabled) : true,
+          ibanReceiptRequired: data.ibanReceiptRequired !== undefined ? Boolean(data.ibanReceiptRequired) : true,
           trc20Enabled: data.trc20Enabled !== undefined ? Boolean(data.trc20Enabled) : true,
           erc20Enabled: data.erc20Enabled !== undefined ? Boolean(data.erc20Enabled) : true,
           customMethods: Array.isArray(data.customMethods) ? data.customMethods : [],
@@ -597,11 +600,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, e, password);
+      const cred = await signInWithEmailAndPassword(auth, e, password);
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
       localStorage.setItem("obyo_active_email", e);
       localStorage.setItem("obyo_active_uid", e);
+      localStorage.setItem("obyo_tutorial_done", "1");
+
+      // Hemen kullanıcı profilini çekip state'i güncelle (iPhone/Safari gecikmelerini ve siyah ekranları önler)
+      try {
+        const uDoc = await getDoc(doc(db, "users", e));
+        if (uDoc.exists()) {
+          const uData = uDoc.data() as ObyoUser;
+          setCurrentUser({ id: e, ...uData });
+          if (uData.name) localStorage.setItem("obyo_cached_name", uData.name);
+        } else if (cred.user?.uid) {
+          const uidDoc = await getDoc(doc(db, "users", cred.user.uid));
+          if (uidDoc.exists()) {
+            const uData = uidDoc.data() as ObyoUser;
+            setCurrentUser({ id: e, ...uData });
+            if (uData.name) localStorage.setItem("obyo_cached_name", uData.name);
+          }
+        }
+      } catch (eDoc) {
+        console.warn("Immediate user fetch in login:", eDoc);
+      }
+
       return { success: true };
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
