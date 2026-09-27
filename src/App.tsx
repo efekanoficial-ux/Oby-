@@ -52,7 +52,7 @@ function MainRoutes() {
   return (
     <Layout>
       {/* Home is always mounted — keeps chart + WS alive across navigation */}
-      <div className={atHome ? "flex flex-col flex-1 min-h-0 overflow-hidden" : "hidden"}>
+      <div className={atHome ? "flex flex-col flex-1 h-full w-full min-h-0 min-w-0 overflow-hidden" : "hidden"}>
         <Home />
       </div>
       {!atHome && (

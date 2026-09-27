@@ -675,9 +675,14 @@ export function CandleChart({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
-      width:  containerRef.current.offsetWidth,
-      height: containerRef.current.offsetHeight,
+    const el = containerRef.current;
+    const rect = el.getBoundingClientRect();
+    const initialWidth = Math.max(100, Math.floor(rect.width || el.clientWidth || el.offsetWidth || 800));
+    const initialHeight = Math.max(100, Math.floor(rect.height || el.clientHeight || el.offsetHeight || 500));
+
+    const chart = createChart(el, {
+      width:  initialWidth,
+      height: initialHeight,
       layout: {
         background: { type: ColorType.Solid, color: "#000000" },
         textColor: "#71717a",
@@ -826,11 +831,47 @@ export function CandleChart({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      chartRef.current?.applyOptions({ width: el.offsetWidth, height: el.offsetHeight });
+
+    const updateChartSize = () => {
+      if (!chartRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const w = Math.floor(rect.width || containerRef.current.clientWidth || containerRef.current.offsetWidth);
+      const h = Math.floor(rect.height || containerRef.current.clientHeight || containerRef.current.offsetHeight);
+      if (w > 20 && h > 20) {
+        chartRef.current.applyOptions({ width: w, height: h });
+        scheduleOverlayUpdate();
+      }
+    };
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const cr = entry.contentRect;
+        const w = Math.floor(cr.width || entry.target.clientWidth);
+        const h = Math.floor(cr.height || entry.target.clientHeight);
+        if (w > 20 && h > 20 && chartRef.current) {
+          chartRef.current.applyOptions({ width: w, height: h });
+          scheduleOverlayUpdate();
+        }
+      }
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", updateChartSize);
+
+    // Run resize across multiple layout passes
+    requestAnimationFrame(updateChartSize);
+    const t1 = setTimeout(updateChartSize, 40);
+    const t2 = setTimeout(updateChartSize, 150);
+    const t3 = setTimeout(updateChartSize, 400);
+    const t4 = setTimeout(updateChartSize, 800);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      window.removeEventListener("resize", updateChartSize);
+      ro.disconnect();
+    };
   }, []);
 
   /* ── MARKET WEBSOCKET ────────────────────────────────────────────────── */
@@ -844,6 +885,11 @@ export function CandleChart({
     seriesRef.current?.setData([]);
 
     if (!symbol) return;
+
+    // Safety fallback: dismiss loading screen after 3 seconds in case history lags
+    const safetyTimer = setTimeout(() => {
+      notifyLoading(false);
+    }, 3000);
 
     let closed = false;
 
@@ -868,11 +914,13 @@ export function CandleChart({
         if (msg.asset !== symbol) return;
 
         if (msg.type === "history" && Array.isArray(msg.candles)) {
+          clearTimeout(safetyTimer);
           baseCandlesRef.current = msg.candles.slice(-BASE_MAX);
           rebuildDisplay(true);
           setReal(true);
           notifyLoading(false);
         } else if (msg.type === "update" && msg.candle) {
+          notifyLoading(false);
           ingest(msg.candle);
         }
       };
@@ -890,6 +938,7 @@ export function CandleChart({
 
     return () => {
       closed = true;
+      clearTimeout(safetyTimer);
       if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
       try { wsRef.current?.close(); } catch { /* noop */ }
       wsRef.current = null;
@@ -1143,12 +1192,17 @@ export function CandleChart({
 
   return (
     <div
-      className="relative w-full h-full"
+      className="relative w-full h-full flex-1 flex flex-col min-h-0 min-w-0"
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      style={{ width: "100%", height: "100%" }}
     >
-      <div ref={containerRef} className="w-full h-full" style={{ touchAction: "none" }} />
+      <div
+        ref={containerRef}
+        className="w-full h-full flex-1 min-h-0 min-w-0"
+        style={{ touchAction: "none", width: "100%", height: "100%", position: "relative" }}
+      />
 
       {/* ── Chart overlay: drawings + price dot + trade lines ───────────── */}
       {overlay && !isLoading && (

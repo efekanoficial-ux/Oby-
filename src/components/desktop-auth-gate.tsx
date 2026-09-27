@@ -113,22 +113,21 @@ export function DesktopAuthGate({ onEnterDemo: _onEnterDemo, initialMode = "regi
   return (
     <div className="min-h-[100dvh] w-full bg-black text-white flex flex-col items-center justify-center overflow-y-auto overscroll-y-contain px-4 py-6 sm:py-10">
       <div className="w-full max-w-sm flex flex-col items-center my-auto pb-6">
-        {/* Logo */}
+        {/* Header - No logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center mb-4 sm:mb-7 shrink-0"
+          className="flex flex-col items-center mb-4 sm:mb-6 shrink-0"
         >
-          <img
-            src="/logo.png"
-            alt="Obyo Option"
-            className="h-12 w-12 sm:h-14 sm:w-14 object-contain mb-1.5 sm:mb-2 drop-shadow-[0_4px_16px_rgba(255,107,0,0.3)]"
-          />
-          <p className="text-xl font-black text-white">
-            Obyo <span className="text-[#FF6B00]">Option</span>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-2 w-2 rounded-full bg-[#FF6B00] animate-pulse" />
+            <span className="text-xs font-bold uppercase tracking-widest text-[#FF6B00]">İşlem Masası</span>
+          </div>
+          <p className="text-2xl font-black text-white tracking-tight">
+            Hesabınıza Giriş Yapın
           </p>
-          <p className="text-xs text-white/50 font-medium mt-0.5">
-            Profesyonel Opsiyon Trading
+          <p className="text-xs text-white/50 font-medium mt-1 text-center">
+            İşlem yapmaya devam etmek için lütfen giriş yapın veya kayıt olun
           </p>
         </motion.div>
 

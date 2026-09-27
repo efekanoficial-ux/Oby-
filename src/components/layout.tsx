@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift } from "lucide-react";
+import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift, ChevronLeft, ChevronRight, PanelLeft } from "lucide-react";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
@@ -11,7 +11,7 @@ import { LanguageModal } from "@/components/language-modal";
 import { AnimatedBalance } from "@/components/animated-balance";
 import { useLanguage } from "@/context/LanguageContext";
 
-function initials(name?: string, surname?: string) {
+export function initials(name?: string, surname?: string) {
   if (!name && !surname) return "OB";
   return `${name?.charAt(0) ?? ""}${surname?.charAt(0) ?? ""}`.toUpperCase();
 }
@@ -221,7 +221,7 @@ function BlueDiamond3D({ size = 36, className = "" }: { size?: number; className
 }
 
 /* ── Account Mode Switcher ───────────────────────────────────────────────── */
-function AccountSwitcher({
+export function AccountSwitcher({
   show, onClose, mode, onSelect, demoBalance, realBalance, tournamentBalance = 0, hasRealAccount, hasJoinedTournament = false, align = "left", onRealClick, onTournamentJoinClick, currency = "TL"
 }: {
   show: boolean; onClose: () => void;
@@ -347,40 +347,45 @@ function DesktopSidebar({
   const [location] = useLocation();
 
   const navItems = [
-    { path: "/",        icon: BarChart2, label: t.navTrade    },
-    { path: "/history", icon: Clock,    label: t.navHistory  },
-    { path: "/wallet",  icon: Wallet,   label: t.navBalance  },
-    { path: "/bonuses", icon: Gift,     label: "Bonuslar"    },
-    { path: "/profile", icon: Gem,      label: t.navVip      },
+    { path: "/",            icon: BarChart2, label: t.navTrade    },
+    { path: "/history",     icon: Clock,     label: t.navHistory  },
+    { path: "/wallet",      icon: Wallet,    label: t.navBalance  },
+    { path: "/leaderboard", icon: Trophy,    label: "Liderler"    },
+    { path: "/bonuses",     icon: Gift,      label: "Bonuslar"    },
+    { path: "/profile",     icon: Gem,       label: t.navVip      },
   ];
 
   return (
     <aside
-      className="flex shrink-0 flex-col border-r border-white/5 bg-black h-full transition-all duration-200"
-      style={{ width: collapsed ? 56 : 224 }}
+      className="flex shrink-0 flex-col border-r border-white/5 bg-[#07080a] h-full transition-all duration-200 z-20"
+      style={{ width: collapsed ? 56 : 220 }}
     >
-      {/* Logo / toggle */}
-      <button
-        onClick={onToggle}
-        className="flex h-16 shrink-0 items-center border-b border-white/5 w-full hover:bg-white/3 transition-colors overflow-hidden cursor-pointer"
-        style={{ paddingLeft: collapsed ? 0 : 20, justifyContent: collapsed ? "center" : "flex-start", gap: collapsed ? 0 : 10 }}
-        title="Obyo Option"
-      >
-        <img
-          src="/logo.png"
-          alt="Obyo Option"
-          className="h-8 w-8 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(255,107,0,0.25)]"
-        />
-        {!collapsed && (
-          <div className="flex items-center gap-1.5 min-w-0 text-left">
-            <span className="text-base font-black text-white tracking-tight leading-none">Obyo</span>
-            <span className="text-base font-black text-[#FF6B00] tracking-tight leading-none">Option</span>
+      {/* Sidebar toggle - NO LOGO */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-3">
+        {!collapsed ? (
+          <div className="flex items-center justify-between w-full px-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">Terminal</span>
+            <button
+              onClick={onToggle}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              title="Menüyü Daralt"
+            >
+              <ChevronLeft size={16} />
+            </button>
           </div>
+        ) : (
+          <button
+            onClick={onToggle}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer mx-auto"
+            title="Menüyü Genişlet"
+          >
+            <PanelLeft size={16} />
+          </button>
         )}
-      </button>
+      </div>
 
       {/* Nav */}
-      <nav className="flex flex-col gap-1 px-2 mt-4 flex-1">
+      <nav className="flex flex-col gap-1 px-2 mt-3 flex-1">
         {navItems.map((item) => {
           const active = item.path === "/" ? location === "/" : location.startsWith(item.path);
           const Icon = item.icon;
@@ -389,13 +394,13 @@ function DesktopSidebar({
               <div
                 className={`flex items-center rounded-xl transition-all cursor-pointer ${
                   collapsed ? "justify-center py-3 px-0" : "gap-3 px-3 py-2.5"
-                } ${active ? "bg-[#FF6B00]/12 border border-[#FF6B00]/20" : "hover:bg-white/4 border border-transparent"}`}
+                } ${active ? "bg-[#FF6B00]/12 border border-[#FF6B00]/25 text-white" : "hover:bg-white/5 text-white/50 hover:text-white border border-transparent"}`}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon size={15} className={active ? "text-[#FF6B00]" : "text-white/30"} strokeWidth={active ? 2.2 : 1.7} />
+                <Icon size={16} className={active ? "text-[#FF6B00]" : "text-white/40"} strokeWidth={active ? 2.2 : 1.7} />
                 {!collapsed && (
                   <>
-                    <span className={`text-sm font-bold ${active ? "text-[#FF6B00]" : "text-white/40"}`}>{item.label}</span>
+                    <span className={`text-xs font-bold ${active ? "text-white" : "text-white/60"}`}>{item.label}</span>
                     {active && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#FF6B00]" />}
                   </>
                 )}
@@ -405,11 +410,11 @@ function DesktopSidebar({
         })}
       </nav>
 
-      {/* Bottom badges (hidden when collapsed) */}
+      {/* Bottom links */}
       {!collapsed && (
-        <div className="px-3 pb-5 flex flex-col gap-2">
+        <div className="px-3 pb-4 flex flex-col gap-1 border-t border-white/5 pt-3">
           <Link href="/privacy">
-            <span className="block text-center text-[10px] text-white/20 hover:text-white/40 transition-colors py-1 font-semibold">
+            <span className="block text-center text-[10px] text-white/30 hover:text-white/60 transition-colors py-1 font-semibold">
               {t.privacyPolicy}
             </span>
           </Link>
@@ -419,7 +424,7 @@ function DesktopSidebar({
   );
 }
 
-function CallRequestMenu({ buttonClass, iconSize = 15, align = "right" }: { buttonClass: string, iconSize?: number, align?: "left" | "right" }) {
+export function CallRequestMenu({ buttonClass, iconSize = 15, align = "right" }: { buttonClass: string, iconSize?: number, align?: "left" | "right" }) {
   const [open, setOpen] = useState(false);
   const [requested, setRequested] = useState(false);
   const { currentUser } = useAuth();
@@ -531,8 +536,14 @@ function DesktopHeader({
   const modeLabel = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-black px-6">
-      <div />
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-[#07080a] px-5">
+      <Link href="/">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition-all text-xs font-bold cursor-pointer">
+          <ChevronLeft size={14} />
+          <BarChart2 size={14} className="text-[#FF6B00]" />
+          <span>İşlem Masasına Dön</span>
+        </div>
+      </Link>
       <div className="flex items-center gap-2.5">
         {/* Müşteri Hizmetleri / Telefon Butonu */}
         <CallRequestMenu buttonClass="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all cursor-pointer shrink-0" iconSize={15} align="right" />
@@ -850,20 +861,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   /* ── Desktop layout ────────────────────────────────────────────────────── */
   return (
-    <div className="flex h-screen w-full bg-black text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-[#07080a] text-white overflow-hidden">
       <DesktopSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(v => !v)}
       />
 
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        <DesktopHeader
-          onWallet={() => navigate("/wallet")}
-          onNotif={() => setShowNotifModal(v => !v)}
-          onSettings={() => setShowLangModal(true)}
-        />
+      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        {location !== "/" && (
+          <DesktopHeader
+            onWallet={() => navigate("/wallet")}
+            onNotif={() => setShowNotifModal(v => !v)}
+            onSettings={() => setShowLangModal(true)}
+          />
+        )}
 
-        <main className="flex-1 min-h-0 overflow-hidden bg-black">
+        <main className="flex-1 flex flex-col min-h-0 h-full overflow-hidden bg-black">
           {children}
         </main>
       </div>
