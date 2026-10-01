@@ -1,4 +1,4 @@
-name: Build Android AAB
+name: Build and Sign Android AAB
 
 on:
   push:
@@ -23,11 +23,16 @@ jobs:
         run: chmod +x gradlew
         continue-on-error: true
 
-      - name: Build AAB
+      - name: Build Unsigned AAB
         run: ./gradlew bundleRelease
 
-      - name: Upload AAB Artifact
+      - name: Create Keystore & Sign AAB
+        run: |
+          keytool -genkeypair -v -keystore release.keystore -alias mykeyalias -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, OU=Dev, O=Obyo, L=City, S=State, C=TR" -storepass mysecretpassword -keypass mysecretpassword
+          jarsigner -keystore release.keystore -storepass mysecretpassword -keypass mysecretpassword app/build/outputs/bundle/release/app-release.aab mykeyalias
+
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
+          name: app-release-signed-aab
           path: app/build/outputs/bundle/release/*.aab
