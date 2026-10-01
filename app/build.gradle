@@ -51,6 +51,33 @@ def twaManifest = [
 ]
 
 android {
+   
+    ...
+    defaultConfig {
+        applicationId "com.obyotrade.app" // senin paket adın
+        minSdkVersion 24  // Google Play'in istediği güncel SDK sürümü
+        targetSdkVersion 34
+        ...
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../../signing.keystore") // Keystore dosya yolun
+            storePassword "mTZ9w0oYnL31"
+            keyAlias "my-key-alias"
+            keyPassword "mTZ9w0oYnL31"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+
     compileSdkVersion 36
     namespace "com.obyotrade.app"
     defaultConfig {
