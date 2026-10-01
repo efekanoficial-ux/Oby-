@@ -41,8 +41,15 @@ function MainRoutes() {
     localStorage.getItem("obyo_tutorial_done") === "1"
   );
 
-  // PC'de tutorial tamamlandıktan sonra anasayfada kayıt/giriş kapısı zorunlu olsun
-  const showDesktopAuth = !isMobile && !currentUser && atHome && hasSeenTutorial;
+  const hasActiveSession = typeof window !== "undefined" && Boolean(
+    currentUser?.id ||
+    localStorage.getItem("obyo_active_email") ||
+    localStorage.getItem("obyo_cached_user") ||
+    localStorage.getItem("obyo_active_uid")
+  );
+
+  // PC'de sadece oturumu olmayan misafir kullanıcılarda tutorial sonrası kayıt/giriş kapısı zorunlu olsun
+  const showDesktopAuth = !isMobile && !currentUser && !hasActiveSession && atHome && hasSeenTutorial;
   if (showDesktopAuth) {
     return (
       <DesktopAuthGate initialMode="register" />
@@ -188,12 +195,12 @@ function AppContent() {
     };
     window.addEventListener('app-ready', handleReady);
     
-    // Güvenlik zamanlayıcısı: max 1.8 saniye sonra yükleme ekranını nazikçe sonlandır
+    // Güvenlik zamanlayıcısı: max 4.5 saniye sonra yükleme ekranını nazikçe sonlandır
     const safetyTimer = setTimeout(() => {
       if (!isAppReady && isOnline && !offlineConfirmed) {
         setIsAppReady(true);
       }
-    }, 1800);
+    }, 4500);
 
     return () => {
       window.removeEventListener('app-ready', handleReady);
@@ -212,18 +219,32 @@ function AppContent() {
     }
   }, [currentUser]);
 
+  const hasUserSession = typeof window !== "undefined" && Boolean(
+    currentUser?.id ||
+    localStorage.getItem("obyo_active_email") ||
+    localStorage.getItem("obyo_cached_user") ||
+    localStorage.getItem("obyo_active_uid")
+  );
+
+  // PP bilgisi ve bakiye bilgisi (realBalance & demoBalance) tam gelmeden loading asla kapanmasın!
+  const isUserDataFullyReady = !hasUserSession || (
+    currentUser !== null &&
+    typeof currentUser.realBalance === "number" &&
+    typeof currentUser.demoBalance === "number"
+  );
+
   useEffect(() => {
-    if (ready && isAppReady && isOnline && !offlineConfirmed) {
+    if (ready && isAppReady && isUserDataFullyReady && isOnline && !offlineConfirmed) {
       setShowApp(true);
       (window as any).__APP_UI_READY__ = true;
       window.dispatchEvent(new CustomEvent('app-ui-ready'));
-    } else if (!ready || !isOnline || offlineConfirmed) {
+    } else if (!ready || !isUserDataFullyReady || !isOnline || offlineConfirmed) {
       setShowApp(false);
       (window as any).__APP_UI_READY__ = false;
     }
-  }, [ready, isAppReady, isOnline, offlineConfirmed]);
+  }, [ready, isAppReady, isUserDataFullyReady, isOnline, offlineConfirmed]);
 
-  const shouldShowSplash = !ready || !showApp || !isOnline || offlineConfirmed;
+  const shouldShowSplash = !ready || !showApp || !isUserDataFullyReady || !isOnline || offlineConfirmed;
 
   return (
     <DemoAccountProvider key={currentUser?.id ?? "guest"}>
