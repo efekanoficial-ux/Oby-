@@ -316,7 +316,7 @@ export function AccountSwitcher({
               </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="text-xs font-black" style={{ color: mode === "tournament" ? "#A855F7" : "#888" }}>
-                  Turnuva Hesabı
+                  {t.tournamentAccount || "Turnuva Hesabı"}
                 </p>
                 <AnimatedBalance value={tournamentBalance} currency="¥" symbol="¥" className="text-[10px] font-bold text-[#A855F7]" />
               </div>
@@ -533,7 +533,7 @@ function DesktopHeader({
   const realBalance = currentUser?.realBalance ?? 0;
   const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
   const modeColor = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
-  const modeLabel = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
+  const modeLabel = isTournament ? (t.tournamentTab || "Turnuva") : (isReal ? t.realAccount : t.demoAccount);
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-[#07080a] px-5">
@@ -695,7 +695,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
   const sym = currency === "TL" ? "₺" : "$";
   const modeColor   = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
-  const modeLabel   = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
+  const modeLabel   = isTournament ? (t.tournamentTab || "Turnuva") : (isReal ? t.realAccount : t.demoAccount);
 
   if (isMobile) {
     return (

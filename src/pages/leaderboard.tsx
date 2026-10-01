@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { useDemoAccount } from "@/context/DemoAccountContext";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   Tournament,
   DEFAULT_TOURNAMENTS,
@@ -17,6 +18,7 @@ import {
   joinTournament,
   isUserVip,
   getDeterministicTournamentLeaders,
+  getLocalizedTournament,
   TournamentLeader
 } from "@/lib/tournaments";
 import {
@@ -35,6 +37,7 @@ export default function LeaderboardPage() {
   const { currentUser } = useAuth();
   const { setMode } = useAccountMode();
   const { completedTrades } = useDemoAccount();
+  const { t, langCode } = useLanguage();
 
   const [mainTab, setMainTab] = useState<"daily" | "tournaments">(() => {
     try {
@@ -79,15 +82,16 @@ export default function LeaderboardPage() {
     return () => clearInterval(liveTimer);
   }, []);
 
-  // Selected tournament object
+  // Selected tournament object localized
   const selectedTour = useMemo(() => {
-    return tournaments.find((t) => t.id === selectedTourId) || tournaments[0] || DEFAULT_TOURNAMENTS[0];
-  }, [tournaments, selectedTourId]);
+    const base = tournaments.find((t) => t.id === selectedTourId) || tournaments[0] || DEFAULT_TOURNAMENTS[0];
+    return getLocalizedTournament(base, langCode);
+  }, [tournaments, selectedTourId, langCode]);
 
   // Tournament leaders for selected tournament
   const tournamentLeaders = useMemo(() => {
-    return getDeterministicTournamentLeaders(selectedTour.id, currentUser);
-  }, [selectedTour.id, currentUser, tick]);
+    return getDeterministicTournamentLeaders(selectedTour.id, currentUser, t.youTag);
+  }, [selectedTour.id, currentUser, tick, t.youTag]);
 
   // User currency checks
   const isTL = (currentUser?.currency || "USD") === "TL";
@@ -108,7 +112,7 @@ export default function LeaderboardPage() {
   }, [selectedTour.endsAt, tick]);
 
   // Handle joining tournament
-  const handleJoinTournament = async (t: Tournament) => {
+  const handleJoinTournament = async (tourObj: Tournament) => {
     if (!currentUser) {
       navigate("/auth");
       return;
@@ -117,7 +121,7 @@ export default function LeaderboardPage() {
     if (!isVip) {
       setNoticeMessage({
         type: "error",
-        text: "Turnuvaya katılım için VIP üyelik gereklidir. Lütfen cüzdanınızdan yatırım yaparak VIP statüsüne yükselin.",
+        text: t.tourErrorVipReq,
       });
       return;
     }
@@ -126,13 +130,13 @@ export default function LeaderboardPage() {
       const feeFormatted = isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`;
       setNoticeMessage({
         type: "error",
-        text: `Yetersiz bakiye! Katılım için gerçek bakiyenizden ${feeFormatted} tahsil edilecektir. Lütfen önce cüzdanınıza bakiye yükleyin.`,
+        text: t.tourErrorInsufficient.replace("{fee}", feeFormatted),
       });
       return;
     }
 
     setIsJoining(true);
-    const result = await joinTournament(t, currentUser);
+    const result = await joinTournament(tourObj, currentUser);
     setIsJoining(false);
 
     if (result.success) {
@@ -141,7 +145,7 @@ export default function LeaderboardPage() {
     } else {
       setNoticeMessage({
         type: "error",
-        text: result.error || "Turnuvaya katılırken bir hata oluştu.",
+        text: result.error || t.tourErrorGeneral,
       });
     }
   };
@@ -239,14 +243,14 @@ export default function LeaderboardPage() {
       mergedMap.set(`user-${r.userId}`, {
         ...r,
         isCurrentUser: isMe,
-        name: isMe ? `${r.name} (Siz)` : r.name,
+        name: isMe ? `${r.name} (${t.youTag})` : r.name,
       });
     }
 
     if (currentUser && userTodayStats.hasTraded && userTodayStats.profitUSD > 0) {
       const myKey = `user-${currentUser.id}`;
       const existing = mergedMap.get(myKey);
-      const myDisplayName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (Siz)`.trim();
+      const myDisplayName = `${currentUser.name} ${currentUser.surname?.charAt(0) || ""}. (${t.youTag})`.trim();
       if (!existing || existing.profitUSD < userTodayStats.profitUSD) {
         mergedMap.set(myKey, {
           id: `real-${currentUser.id}`,
@@ -308,7 +312,7 @@ export default function LeaderboardPage() {
           {mainTab === "daily" ? (
             <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-white tracking-wide">
               <Clock size={13} className="text-white/40" />
-              <span className="text-white/40 text-[11px] font-sans mr-0.5">Sıfırlanma (00:00):</span>
+              <span className="text-white/40 text-[11px] font-sans mr-0.5">{t.dailyResetLabel}</span>
               <span>{countdown.hours}</span>
               <span className="text-white/30">:</span>
               <span>{countdown.minutes}</span>
@@ -318,8 +322,8 @@ export default function LeaderboardPage() {
           ) : (
             <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-white tracking-wide">
               <Clock size={13} className="text-white/40" />
-              <span className="text-white/40 text-[11px] font-sans mr-0.5">Turnuva Süresi:</span>
-              <span>{tournamentTimeLeft.days}g {tournamentTimeLeft.hours}s {tournamentTimeLeft.mins}d</span>
+              <span className="text-white/40 text-[11px] font-sans mr-0.5">{t.tournamentTimeLabel}</span>
+              <span>{tournamentTimeLeft.days}{t.daysShort} {tournamentTimeLeft.hours}{t.hoursShort} {tournamentTimeLeft.mins}{t.minsShort}</span>
             </div>
           )}
 
@@ -336,7 +340,7 @@ export default function LeaderboardPage() {
                 : "text-white/40 hover:text-white"
             }`}
           >
-            <span>Günlük Sıralama</span>
+            <span>{t.dailyRankingTab}</span>
           </button>
 
           <button
@@ -347,7 +351,7 @@ export default function LeaderboardPage() {
                 : "text-white/40 hover:text-white"
             }`}
           >
-            <span>Turnuva</span>
+            <span>{t.tournamentTab}</span>
           </button>
         </div>
       </div>
@@ -390,9 +394,9 @@ export default function LeaderboardPage() {
           {/* Table Headers */}
           <div className="px-4 py-2 shrink-0 bg-black/60 border-b border-white/5">
             <div className="grid grid-cols-12 px-3 py-1 text-[10px] font-medium text-white/30 uppercase tracking-wider">
-              <div className="col-span-2">Sıra</div>
-              <div className="col-span-6">Yatırımcı</div>
-              <div className="col-span-4 text-right">Günlük Kâr</div>
+              <div className="col-span-2">{t.rankCol}</div>
+              <div className="col-span-6">{t.traderCol}</div>
+              <div className="col-span-4 text-right">{t.dailyProfitCol}</div>
             </div>
           </div>
 
@@ -446,11 +450,11 @@ export default function LeaderboardPage() {
                         </p>
                         {isUser && (
                           <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-white text-black shrink-0">
-                            SİZ
+                            {t.youTag}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-white/30 truncate">{trader.tradeCount} İşlem</p>
+                      <p className="text-[10px] text-white/30 truncate">{trader.tradeCount} {t.tradesCount}</p>
                     </div>
                   </div>
 
@@ -475,18 +479,18 @@ export default function LeaderboardPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">Bonuslar & Fırsatlar</span>
+                    <span className="text-xs font-black text-white">{t.bonusesTitle}</span>
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#FF6B00] text-black uppercase">
-                      Hediye
+                      {t.bonusesGiftBadge}
                     </span>
                   </div>
                   <p className="text-[11px] text-white/60 truncate">
-                    Yatırımsız nakit bakiye ve %50 yatırım bonuslarını etkinleştirin.
+                    {t.bonusesDesc}
                   </p>
                 </div>
               </div>
               <span className="text-xs font-bold text-[#FF6B00] flex items-center gap-0.5 shrink-0 group-hover:translate-x-0.5 transition-transform">
-                <span>Bonuslar</span>
+                <span>{t.bonusesBtn}</span>
                 <ChevronRight size={14} />
               </span>
             </div>
@@ -508,7 +512,7 @@ export default function LeaderboardPage() {
                     </span>
                   </div>
                   <p className="text-[9px] text-white/40">
-                    {userTodayStats.tradeCount} İşlem · {userTodayStats.isProfit ? "Kârda" : "Zararda"}
+                    {userTodayStats.tradeCount} {t.tradesCount} · {userTodayStats.isProfit ? t.inProfit : t.inLoss}
                   </p>
                 </div>
               </div>
@@ -517,7 +521,7 @@ export default function LeaderboardPage() {
                 <span className={`text-xs font-mono font-black block ${userTodayStats.profitUSD < 0 ? "text-red-400" : "text-white"}`}>
                   {userTodayStats.profitUSD >= 0 ? "+" : ""}${userTodayStats.profitUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9px] text-white/30 font-sans uppercase">USD Kazanç</span>
+                <span className="text-[9px] text-white/30 font-sans uppercase">{t.usdProfitFooter}</span>
               </div>
             </div>
           )}
@@ -533,14 +537,15 @@ export default function LeaderboardPage() {
           <div>
             <div className="flex items-center justify-between mb-2 px-0.5">
               <span className="text-[11px] font-bold text-white/60">
-                Turnuvalar (1 Hafta Süre)
+                {t.tournamentsListTitle}
               </span>
-              <span className="text-[10px] text-white/30 font-medium">Yana kaydırın →</span>
+              <span className="text-[10px] text-white/30 font-medium">{t.swipeRightHint}</span>
             </div>
 
             {/* Carousel */}
             <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none snap-x snap-mandatory">
-              {tournaments.slice(0, 5).map((tour) => {
+              {tournaments.slice(0, 5).map((rawTour) => {
+                const tour = getLocalizedTournament(rawTour, langCode);
                 const isSelected = tour.id === selectedTour.id;
                 const isTourJoined = currentUser?.joinedTournaments?.includes(tour.id);
 
@@ -577,7 +582,7 @@ export default function LeaderboardPage() {
                       {isTourJoined && (
                         <div className="absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500 text-black text-[9px] font-bold">
                           <Check size={10} strokeWidth={3} />
-                          Katıldınız
+                          {t.tourJoinedBadge}
                         </div>
                       )}
                     </div>
@@ -588,7 +593,7 @@ export default function LeaderboardPage() {
                         {tour.title}
                       </h3>
                       <div className="flex items-center justify-between text-[10px] text-white/50">
-                        <span>Giriş: {isTL ? `${tour.entryFeeTL.toLocaleString("tr-TR")} ₺` : `$${tour.entryFeeUSD}`}</span>
+                        <span>{t.entryFeeLabel}: {isTL ? `${tour.entryFeeTL.toLocaleString("tr-TR")} ₺` : `$${tour.entryFeeUSD}`}</span>
                         <span className="font-mono text-white/70">100 ¥</span>
                       </div>
                     </div>
@@ -611,7 +616,7 @@ export default function LeaderboardPage() {
 
               <div className="absolute top-3 left-3 flex items-center gap-1.5">
                 <span className="px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-white text-[10px] font-bold border border-white/15">
-                  VIP Şartı
+                  {t.vipReqBadge}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-white text-[10px] font-bold border border-white/15">
                   {selectedTour.prizePool}
@@ -621,7 +626,7 @@ export default function LeaderboardPage() {
               {/* 1-Week Remaining Countdown */}
               <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-sm border border-white/10 text-[11px] font-mono text-white">
                 <Clock size={12} className="text-white/60" />
-                <span>Kalan: {tournamentTimeLeft.days}g {tournamentTimeLeft.hours}s {tournamentTimeLeft.mins}d</span>
+                <span>{t.remainingLabel} {tournamentTimeLeft.days}{t.daysShort} {tournamentTimeLeft.hours}{t.hoursShort} {tournamentTimeLeft.mins}{t.minsShort}</span>
               </div>
             </div>
 
@@ -639,27 +644,27 @@ export default function LeaderboardPage() {
               {/* Minimal Specs */}
               <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-center">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[9px] text-white/40 uppercase font-medium">Katılım</span>
+                  <span className="text-[9px] text-white/40 uppercase font-medium">{t.participationLabel}</span>
                   <span className="text-xs font-bold text-white">
                     {isTL ? `${selectedTour.entryFeeTL.toLocaleString("tr-TR")} ₺` : `$${selectedTour.entryFeeUSD}`}
                   </span>
-                  <span className="text-[9px] text-white/30">VIP + Bakiye</span>
+                  <span className="text-[9px] text-white/30">{t.vipPlusBalLabel}</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5 border-x border-white/5">
-                  <span className="text-[9px] text-white/40 uppercase font-medium">Turnuva Parası</span>
+                  <span className="text-[9px] text-white/40 uppercase font-medium">{t.tourCurrencyLabel}</span>
                   <span className="text-xs font-bold text-white">
                     {selectedTour.startingBalance} ¥
                   </span>
-                  <span className="text-[9px] text-white/30">Başlangıç</span>
+                  <span className="text-[9px] text-white/30">{t.startingLabel}</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[9px] text-white/40 uppercase font-medium">Süre</span>
+                  <span className="text-[9px] text-white/40 uppercase font-medium">{t.durationLabel}</span>
                   <span className="text-xs font-bold text-white">
-                    1 Hafta
+                    {selectedTour.duration || t.oneWeek}
                   </span>
-                  <span className="text-[9px] text-white/30">{selectedTour.participantsCount} Katılımcı</span>
+                  <span className="text-[9px] text-white/30">{selectedTour.participantsCount} {t.participantsCountLabel}</span>
                 </div>
               </div>
 
@@ -670,14 +675,14 @@ export default function LeaderboardPage() {
                     onClick={() => navigate("/auth")}
                     className="w-full py-3 rounded-xl font-bold text-xs text-black bg-white hover:bg-white/90 transition-all cursor-pointer"
                   >
-                    Giriş Yap ve Turnuvaya Katıl
+                    {t.signInToJoinTour}
                   </button>
                 ) : hasJoined ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
                       <div>
-                        <p className="text-xs font-bold text-white">Turnuvaya Katıldınız</p>
-                        <p className="text-[10px] text-white/40">1 Hafta sonunda en çok ¥ yapan kazanır</p>
+                        <p className="text-xs font-bold text-white">{t.tourJoinedTitle}</p>
+                        <p className="text-[10px] text-white/40">{t.tourJoinedSub}</p>
                       </div>
                       <span className="text-xs font-mono font-bold text-white">
                         {(currentUser.tournamentBalance ?? 100).toFixed(2)} ¥
@@ -692,31 +697,33 @@ export default function LeaderboardPage() {
                       className="w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 text-black bg-white hover:bg-white/90 transition-all cursor-pointer"
                     >
                       <Trophy size={14} />
-                      Turnuvada İşlem Yap (100 ¥ İle Başla)
+                      {t.tradeInTourBtn}
                     </button>
                   </div>
                 ) : !isVip ? (
                   <div className="flex flex-col gap-2">
                     <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-                      Turnuvaya katılım VIP üyelere açıktır. VIP olmak için hesabınıza en az {isTL ? "500 ₺" : "10 $"} yatırınız.
+                      {t.vipReqWarning.replace("{amount}", isTL ? "500 ₺" : "10 $")}
                     </div>
                     <button
                       onClick={() => navigate("/wallet?tab=deposit")}
                       className="w-full py-3 rounded-xl font-bold text-xs text-black bg-amber-400 hover:bg-amber-300 transition-all cursor-pointer"
                     >
-                      VIP Olmak İçin Para Yatır
+                      {t.depositForVipBtn}
                     </button>
                   </div>
                 ) : !hasEnoughBal ? (
                   <div className="flex flex-col gap-2">
                     <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300">
-                      Yetersiz bakiye. Katılım ücreti {isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`} gerçek bakiyenizden tahsil edilecektir. (Mevcut: {isTL ? `${userRealBal.toLocaleString("tr-TR")} ₺` : `$${userRealBal.toFixed(2)}`}).
+                      {t.insufficientBalWarning
+                        .replace("{fee}", isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`)
+                        .replace("{curr}", isTL ? `${userRealBal.toLocaleString("tr-TR")} ₺` : `$${userRealBal.toFixed(2)}`)}
                     </div>
                     <button
                       onClick={() => navigate("/wallet?tab=deposit")}
                       className="w-full py-3 rounded-xl font-bold text-xs text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-all cursor-pointer"
                     >
-                      Cüzdana Bakiye Ekle
+                      {t.addFundsBtn}
                     </button>
                   </div>
                 ) : (
@@ -730,7 +737,7 @@ export default function LeaderboardPage() {
                     ) : (
                       <>
                         <Trophy size={14} />
-                        Turnuvaya Katıl ({isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`} Bakiyeden Çekilir)
+                        {t.joinTournamentBtn.replace("{fee}", isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`)}
                       </>
                     )}
                   </button>
@@ -747,9 +754,9 @@ export default function LeaderboardPage() {
                 <Lock size={18} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Turnuva Sıralaması Gizli</h3>
+                <h3 className="text-sm font-bold text-white">{t.tourRankHiddenTitle}</h3>
                 <p className="text-xs text-white/50 max-w-sm mx-auto mt-1 leading-relaxed">
-                  Katılımcı sıralamasını ve liderleri görmek için turnuvaya katılmanız gerekmektedir. Katıldığınızda 100 ¥ başlangıç bakiyesi hesabınıza tanımlanır.
+                  {t.tourRankHiddenDesc}
                 </p>
               </div>
 
@@ -760,21 +767,21 @@ export default function LeaderboardPage() {
                     onClick={() => navigate("/auth")}
                     className="px-5 py-2.5 rounded-xl text-xs font-bold text-black bg-white hover:bg-white/90 transition-all cursor-pointer"
                   >
-                    Giriş Yap
+                    {t.signIn}
                   </button>
                 ) : !isVip ? (
                   <button
                     onClick={() => navigate("/wallet?tab=deposit")}
                     className="px-5 py-2.5 rounded-xl text-xs font-bold text-black bg-amber-400 hover:bg-amber-300 transition-all cursor-pointer"
                   >
-                    VIP Olmak İçin Para Yatır
+                    {t.depositForVipBtn}
                   </button>
                 ) : !hasEnoughBal ? (
                   <button
                     onClick={() => navigate("/wallet?tab=deposit")}
                     className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-all cursor-pointer"
                   >
-                    Cüzdana Bakiye Ekle
+                    {t.addFundsBtn}
                   </button>
                 ) : (
                   <button
@@ -782,7 +789,7 @@ export default function LeaderboardPage() {
                     disabled={isJoining}
                     className="px-5 py-2.5 rounded-xl text-xs font-bold text-black bg-white hover:bg-white/90 transition-all cursor-pointer"
                   >
-                    {isJoining ? "İşleniyor..." : `Turnuvaya Katıl (${isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`})`}
+                    {isJoining ? t.processing : t.joinTournamentBtn.replace("{fee}", isTL ? `${entryFee.toLocaleString("tr-TR")} ₺` : `$${entryFee}`)}
                   </button>
                 )}
               </div>
@@ -794,11 +801,11 @@ export default function LeaderboardPage() {
                 <div className="flex items-center gap-2">
                   <Trophy size={14} className="text-white/60" />
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                    Turnuva Sıralaması (1 Hafta)
+                    {t.tourRankUnlockedTitle}
                   </h3>
                 </div>
                 <span className="text-[10px] text-white/50 font-mono font-medium">
-                  100 ¥ Başlangıç
+                  {t.tourStartingBalNote}
                 </span>
               </div>
 
@@ -839,11 +846,11 @@ export default function LeaderboardPage() {
                             </span>
                             {isUser && (
                               <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-white text-black shrink-0">
-                                SİZ
+                                {t.youTag}
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] text-white/30">{ldr.tradeCount} İşlem</span>
+                          <span className="text-[10px] text-white/30">{ldr.tradeCount} {t.tradesCount}</span>
                         </div>
                       </div>
 

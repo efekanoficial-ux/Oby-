@@ -2134,7 +2134,7 @@ export default function Home() {
   const realBalance = currentUser?.realBalance ?? 0;
   const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
   const modeColor = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
-  const modeLabel = isTournament ? "Turnuva" : (isReal ? t.realAccount : t.demoAccount);
+  const modeLabel = isTournament ? (t.tournamentTab || "Turnuva") : (isReal ? t.realAccount : t.demoAccount);
 
   return (
     <>
