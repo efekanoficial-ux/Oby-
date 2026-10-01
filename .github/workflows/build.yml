@@ -1,4 +1,4 @@
-name: Build and Sign Android AAB
+name: Build Signed Android AAB
 
 on:
   push:
@@ -23,16 +23,8 @@ jobs:
         run: chmod +x gradlew
         continue-on-error: true
 
-      - name: Build Unsigned AAB
+      - name: Build Signed AAB
         run: ./gradlew bundleRelease
-
-      - name: Sign AAB with Keystore
-        run: |
-          KEYFILE=$(find . -name "signing.keystore" | head -n 1)
-          AABFILE=$(find . -name "*.aab" | head -n 1)
-          echo "Found Keystore: $KEYFILE"
-          echo "Found AAB: $AABFILE"
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYFILE" -storepass "mTZ9w0oYnL31" -keypass "mTZ9w0oYnL31" "$AABFILE" my-key-alias
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
