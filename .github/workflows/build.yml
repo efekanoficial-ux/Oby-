@@ -26,10 +26,14 @@ jobs:
       - name: Build Unsigned AAB
         run: ./gradlew bundleRelease
 
-      - name: Create Keystore & Sign AAB
-        run: |
-          keytool -genkeypair -v -keystore release.keystore -alias mykeyalias -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, OU=Dev, O=Obyo, L=City, S=State, C=TR" -storepass mysecretpassword -keypass mysecretpassword
-          jarsigner -keystore release.keystore -storepass mysecretpassword -keypass mysecretpassword app/build/outputs/bundle/release/app-release.aab mykeyalias
+      - name: Sign AAB with Upload Key
+        uses: r2da/aab-signer-action@v1.0.0
+        with:
+          aabFile: app/build/outputs/bundle/release/app-release.aab
+          keystoreFile: signing.keystore
+          keystorePassword: password
+          keyAlias: key0
+          keyPassword: password
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
