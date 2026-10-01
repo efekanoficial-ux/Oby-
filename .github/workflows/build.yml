@@ -1,4 +1,4 @@
-name: Build Signed Android AAB
+name: Build and Sign Android AAB
 
 on:
   push:
@@ -23,11 +23,19 @@ jobs:
         run: chmod +x gradlew
         continue-on-error: true
 
-      - name: Build Signed AAB
+      - name: Build AAB
         run: ./gradlew bundleRelease
+
+      - name: Sign AAB File
+        run: |
+          KEYPATH=$(find . -name "signing.keystore" | head -n 1)
+          AABPATH=$(find . -name "app-release.aab" -o -name "*.aab" | head -n 1)
+          echo "Keystore dosyasi bulundu: $KEYPATH"
+          echo "AAB dosyasi bulundu: $AABPATH"
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYPATH" -storepass "mTZ9w0oYnL31" -keypass "mTZ9w0oYnL31" "$AABPATH" my-key-alias
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-signed-aab
-          path: app/build/outputs/bundle/release/*.aab
+          path: "**/outputs/bundle/release/*.aab"
