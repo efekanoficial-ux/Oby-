@@ -1,4 +1,4 @@
-name: Build and Sign Android AAB
+name: Build Fresh Signed AAB
 
 on:
   push:
@@ -13,29 +13,55 @@ jobs:
       - name: Code Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Make Gradlew Executable
-        run: chmod +x gradlew
-        continue-on-error: true
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
 
-      - name: Build AAB
-        run: ./gradlew bundleRelease
-
-      - name: Sign AAB File
+      - name: Create twa-manifest.json
         run: |
-          KEYPATH=$(find . -name "signing.keystore" | head -n 1)
-          AABPATH=$(find . -name "app-release.aab" -o -name "*.aab" | head -n 1)
-          echo "Keystore dosyasi bulundu: $KEYPATH"
-          echo "AAB dosyasi bulundu: $AABPATH"
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYPATH" -storepass "mTZ9w0oYnL31" -keypass "mTZ9w0oYnL31" "$AABPATH" my-key-alias
+          cat <<EOF > twa-manifest.json
+          {
+            "packageId": "com.obyotrade.app",
+            "host": "obyo.trade",
+            "name": "Obyo Trade",
+            "launcherName": "Obyo Trade",
+            "display": "standalone",
+            "themeColor": "#000000",
+            "navigationColor": "#000000",
+            "backgroundColor": "#000000",
+            "enableNotifications": true,
+            "startUrl": "/",
+            "iconUrl": "https://obyo.trade/icon.png",
+            "maskableIconUrl": "https://obyo.trade/icon.png",
+            "appVersionName": "1.0.1",
+            "appVersionCode": 2,
+            "minSdkVersion": 24
+          }
+          EOF
+
+      - name: Generate Fresh Keystore
+        run: |
+          keytool -genkeypair -v -keystore fresh-signing.keystore -alias freshkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, O=Obyo, C=TR" -storepass "ObyoTradePass2026" -keypass "ObyoTradePass2026"
+
+      - name: Initialize Android Project
+        run: bubblewrap init --manifest=twa-manifest.json
+
+      - name: Build and Sign AAB
+        run: |
+          bubblewrap build --signingKeyPath=./fresh-signing.keystore --signingKeyAlias=freshkey --keypass="ObyoTradePass2026" --storepass="ObyoTradePass2026"
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-signed-aab
-          path: "**/outputs/bundle/release/*.aab"
+          name: fresh-signed-aab
+          path: "*.aab"
