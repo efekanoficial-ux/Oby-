@@ -1,3 +1,4 @@
+
 name: Build Fresh Signed AAB
 
 on:
@@ -45,7 +46,11 @@ jobs:
             "maskableIconUrl": "https://obyo.trade/icon.png",
             "appVersionName": "1.0.1",
             "appVersionCode": 2,
-            "minSdkVersion": 24
+            "minSdkVersion": 24,
+            "signingKey": {
+              "path": "./fresh-signing.keystore",
+              "alias": "freshkey"
+            }
           }
           EOF
 
@@ -53,12 +58,10 @@ jobs:
         run: |
           keytool -genkeypair -v -keystore fresh-signing.keystore -alias freshkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, O=Obyo, C=TR" -storepass "ObyoTradePass2026" -keypass "ObyoTradePass2026"
 
-      - name: Initialize Android Project
-        run: bubblewrap init --manifest=twa-manifest.json
-
-      - name: Build and Sign AAB
+      - name: Build TWA Project
         run: |
-          bubblewrap build --signingKeyPath=./fresh-signing.keystore --signingKeyAlias=freshkey --keypass="ObyoTradePass2026" --storepass="ObyoTradePass2026"
+          bubblewrap mergeManifest --manifest=twa-manifest.json || true
+          bubblewrap build --signingKeyPath=./fresh-signing.keystore --signingKeyAlias=freshkey --keypass="ObyoTradePass2026" --storepass="ObyoTradePass2026" --skipDevTools
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
