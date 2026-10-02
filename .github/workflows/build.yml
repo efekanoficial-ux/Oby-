@@ -1,4 +1,3 @@
-
 name: Build Fresh Signed AAB
 
 on:
@@ -28,7 +27,7 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Create twa-manifest.json
+      - name: Create Manifest
         run: |
           cat <<EOF > twa-manifest.json
           {
@@ -46,11 +45,7 @@ jobs:
             "maskableIconUrl": "https://obyo.trade/icon.png",
             "appVersionName": "1.0.1",
             "appVersionCode": 2,
-            "minSdkVersion": 24,
-            "signingKey": {
-              "path": "./fresh-signing.keystore",
-              "alias": "freshkey"
-            }
+            "minSdkVersion": 24
           }
           EOF
 
@@ -58,10 +53,13 @@ jobs:
         run: |
           keytool -genkeypair -v -keystore fresh-signing.keystore -alias freshkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, O=Obyo, C=TR" -storepass "ObyoTradePass2026" -keypass "ObyoTradePass2026"
 
-      - name: Build TWA Project
+      - name: Generate Android Project
         run: |
-          bubblewrap mergeManifest --manifest=twa-manifest.json || true
-          bubblewrap build --signingKeyPath=./fresh-signing.keystore --signingKeyAlias=freshkey --keypass="ObyoTradePass2026" --storepass="ObyoTradePass2026" --skipDevTools
+          npx @bubblewrap/cli init --manifest=twa-manifest.json --skipDevTools --manifest-only
+
+      - name: Build and Sign AAB via Gradle
+        run: |
+          bubblewrap build --signingKeyPath=./fresh-signing.keystore --signingKeyAlias=freshkey --keypass="ObyoTradePass2026" --storepass="ObyoTradePass2026" --skipDevTools < /dev/null
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
