@@ -1,4 +1,3 @@
-
 name: Build Fresh Signed AAB
 
 on:
@@ -20,40 +19,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create twa-manifest.json
-        run: |
-          cat <<EOF > twa-manifest.json
-          {
-            "packageId": "com.obyotrade.app",
-            "host": "obyo.trade",
-            "name": "Obyo Trade",
-            "launcherName": "Obyo Trade",
-            "display": "standalone",
-            "themeColor": "#000000",
-            "navigationColor": "#000000",
-            "backgroundColor": "#000000",
-            "enableNotifications": true,
-            "startUrl": "/",
-            "iconUrl": "https://obyo.trade/icon.png",
-            "maskableIconUrl": "https://obyo.trade/icon.png",
-            "appVersionName": "1.0.1",
-            "appVersionCode": 2,
-            "minSdkVersion": 24
-          }
-          EOF
-
-      - name: Generate Fresh Keystore
+      - name: Create Fresh Keystore
         run: |
           keytool -genkeypair -v -keystore fresh-signing.keystore -alias freshkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ObyoTrade, O=Obyo, C=TR" -storepass "ObyoTradePass2026" -keypass "ObyoTradePass2026"
 
-      - name: Build TWA Project
-        uses: GoogleChromeLabs/twa-manifest-action@v1
-        with:
-          twaManifestPath: './twa-manifest.json'
+      - name: Make Gradlew Executable
+        run: chmod +x gradlew
+        continue-on-error: true
+
+      - name: Build Unsigned AAB via Gradle
+        run: ./gradlew bundleRelease
 
       - name: Sign AAB File
         run: |
           AABFILE=$(find . -name "*.aab" | head -n 1)
+          echo "Bulunan AAB: $AABFILE"
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore fresh-signing.keystore -storepass "ObyoTradePass2026" -keypass "ObyoTradePass2026" "$AABFILE" freshkey
 
       - name: Upload Signed AAB
