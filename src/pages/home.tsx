@@ -1550,8 +1550,7 @@ export default function Home() {
           : finalPrice <= re.entryPrice;
         const payoutAmt = parseFloat((re.amount * (re.payoutRate / 100)).toFixed(2));
         settleRealTrade(re.amount, won, payoutAmt);
-        const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-        const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
         if (currentUid) {
           addDoc(collection(db, "trades"), {
             userId: currentUid, asset: re.assetLabel, direction: re.direction,
@@ -1589,8 +1588,7 @@ export default function Home() {
           : finalPrice <= te.entryPrice;
         const payoutAmt = parseFloat((te.amount * (te.payoutRate / 100)).toFixed(2));
         settleTournamentTrade(te.amount, won, payoutAmt);
-        const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-        const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
         if (currentUid) {
           addDoc(collection(db, "trades"), {
             userId: currentUid, asset: te.assetLabel, direction: te.direction,
@@ -1669,8 +1667,7 @@ export default function Home() {
      collection gets added back to realEntries (restart settlement timer)
      and to chartEntries (re-draw overlay lines). */
   useEffect(() => {
-    const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-    const uid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+    const uid = currentUser?.id ?? auth.currentUser?.uid;
     if (!uid) return;
     const q = query(collection(db, "realActiveTrades"), where("userId", "==", uid));
     const unsub = onSnapshot(q, (snap) => {
@@ -1720,8 +1717,7 @@ export default function Home() {
 
   /* Restore tournament active trades from Firestore when the user logs in */
   useEffect(() => {
-    const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-    const uid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+    const uid = currentUser?.id ?? auth.currentUser?.uid;
     if (!uid) return;
     const q = query(collection(db, "tournamentActiveTrades"), where("userId", "==", uid));
     const unsub = onSnapshot(q, (snap) => {
@@ -1891,8 +1887,7 @@ export default function Home() {
         setTournamentEntries(prev => [...prev, te]);
         setChartEntries(prev => [...prev, { ...te, isTournament: true } as any]);
         /* Save to Firestore immediately so trade persists */
-        const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-        const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
         if (currentUid) {
           addDoc(collection(db, "tournamentActiveTrades"), {
             userId: currentUid, tradeId: id, id, asset: asset.label, direction: dir,
@@ -1907,8 +1902,7 @@ export default function Home() {
         setRealEntries(prev => [...prev, re]);
         setChartEntries(prev => [...prev, { ...re, isReal: true }]);
         /* Save to Firestore immediately so trade persists across sessions */
-        const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
-        const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
+        const currentUid = currentUser?.id ?? auth.currentUser?.uid;
         if (currentUid) {
           addDoc(collection(db, "realActiveTrades"), {
             userId: currentUid, tradeId: id, id, asset: asset.label, direction: dir,

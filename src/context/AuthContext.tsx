@@ -328,28 +328,15 @@ function isProfileComplete(data: any): boolean {
   if (!data) return false;
   const hasName = data.name && data.name.trim() !== "" && data.name.trim().toLowerCase() !== "kullanıcı";
   const hasSurname = data.surname && data.surname.trim() !== "";
-  const hasBirthDate = Boolean(data.birthDate && data.birthDate.trim() !== "");
+  const hasBirthDate = data.birthDate && data.birthDate !== "2000-01-01";
+  const hasPassword = data.password && data.password.trim() !== "";
   const hasCurrency = data.currency && (data.currency === "USD" || data.currency === "TL");
-  return Boolean(hasName && hasSurname && hasBirthDate && hasCurrency);
+  return !!(hasName && hasSurname && hasBirthDate && hasPassword && hasCurrency);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready,       setReady]       = useState(false);
-  // Restore cached user immediately on mount so session and balance are never blank
-  const [currentUser, setCurrentUser] = useState<ObyoUser | null>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("obyo_cached_user");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && (parsed.email || parsed.id)) {
-            return parsed as ObyoUser;
-          }
-        }
-      }
-    } catch {}
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState<ObyoUser | null>(null);
   const [isAdmin,     setIsAdmin]     = useState(false);
   const [users,       setUsers]       = useState<ObyoUser[]>([]);
   const [requests,    setRequests]    = useState<ObyoRequest[]>([]);
@@ -358,64 +345,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userUnsubRef  = useRef<(() => void) | null>(null);
   const adminUnsubs   = useRef<(() => void)[]>([]);
   const realBalanceRef = useRef<number>(0);
-
-  // Helper to persist user state and localStorage caches
-  const saveUserToStateAndCache = (rawUser: any): ObyoUser => {
-    const email = (rawUser.email || rawUser.id || "").trim().toLowerCase();
-    const cleanUser: ObyoUser = {
-      ...rawUser,
-      id: rawUser.id || email,
-      email: email,
-      name: rawUser.name || "Kullanıcı",
-      surname: rawUser.surname || "",
-      birthDate: rawUser.birthDate || "2000-01-01",
-      currency: rawUser.currency || "USD",
-      demoBalance: typeof rawUser.demoBalance === "number" ? rawUser.demoBalance : 10000,
-      realBalance: typeof rawUser.realBalance === "number" ? rawUser.realBalance : 0,
-      totalDeposited: typeof rawUser.totalDeposited === "number" ? rawUser.totalDeposited : 0,
-      totalWithdrawn: typeof rawUser.totalWithdrawn === "number" ? rawUser.totalWithdrawn : 0,
-      createdAt: rawUser.createdAt || Date.now(),
-      emailVerified: rawUser.emailVerified ?? true,
-      photoURL: rawUser.photoURL || rawUser.photoUrl || undefined,
-      photoUrl: rawUser.photoURL || rawUser.photoUrl || undefined,
-    };
-
-    setCurrentUser(cleanUser);
-
-    try {
-      localStorage.setItem("obyo_cached_user", JSON.stringify(cleanUser));
-      localStorage.setItem("obyo_active_email", email);
-      localStorage.setItem("obyo_active_uid", email);
-      if (cleanUser.name) localStorage.setItem("obyo_cached_name", cleanUser.name);
-      if (cleanUser.photoURL) localStorage.setItem("obyo_cached_pp", cleanUser.photoURL);
-      localStorage.setItem("obyo_cached_real_bal", String(cleanUser.realBalance));
-      localStorage.setItem("obyo_cached_demo_bal", String(cleanUser.demoBalance));
-    } catch {}
-
-    return cleanUser;
-  };
-
-  // Helper: ensures PP image is preloaded into memory before setting ready
-  const markAppUserReady = (userData: ObyoUser) => {
-    const ppUrl = userData.photoURL || userData.photoUrl;
-    if (ppUrl && typeof Image !== "undefined" && ppUrl.trim() !== "") {
-      const img = new Image();
-      let finished = false;
-      const done = () => {
-        if (!finished) {
-          finished = true;
-          setReady(true);
-        }
-      };
-      img.onload = done;
-      img.onerror = done;
-      img.src = ppUrl;
-      // Max 1.2s timeout so slow avatar download doesn't hold loading forever
-      setTimeout(done, 1200);
-    } else {
-      setReady(true);
-    }
-  };
 
   useEffect(() => {
     if (currentUser?.realBalance !== undefined) {
@@ -455,7 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Safety fallback timer so loading screen never hangs if Firestore connection is delayed
     const fallbackTimer = setTimeout(() => {
       setReady(true);
-    }, 5000);
+    }, 4000);
 
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (localStorage.getItem(LS_IS_ADMIN) === "1") {
@@ -470,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userUnsubRef.current = null;
       }
 
-      // Determine unified email identifier from Firebase Auth, localStorage, or cached user
+      // Determine unified email identifier
       let email = firebaseUser?.email?.trim().toLowerCase() ||
                   localStorage.getItem("obyo_active_email")?.trim().toLowerCase();
 
@@ -481,18 +410,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (!email) {
-        try {
-          const cached = localStorage.getItem("obyo_cached_user");
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (parsed?.email && parsed.email.includes("@")) {
-              email = parsed.email.trim().toLowerCase();
-            }
-          }
-        } catch {}
-      }
-
       if (email && email.includes("@")) {
         localStorage.setItem("obyo_active_email", email);
         localStorage.setItem("obyo_active_uid", email);
@@ -500,53 +417,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem(LS_CUSTOM_UID);
         }
 
+        // Auto-migration check: Make sure user document exists under unified email path
+        try {
+          const emailDocRef = doc(db, "users", email);
+          const emailSnap = await getDoc(emailDocRef).catch(() => null);
+          let finalUserDoc: any = null;
+
+          if (!emailSnap || !emailSnap.exists()) {
+            let foundData: any = null;
+            let foundOldId: string | null = null;
+
+            // Search by email field in query
+            const q = query(collection(db, "users"), where("email", "==", email));
+            const qSnap = await getDocs(q).catch(() => null);
+            if (qSnap && !qSnap.empty) {
+              foundOldId = qSnap.docs[0].id;
+              foundData = qSnap.docs[0].data();
+            }
+
+            // Also check under firebaseUser.uid
+            if (!foundData && firebaseUser?.uid) {
+              const uidSnap = await getDoc(doc(db, "users", firebaseUser.uid)).catch(() => null);
+              if (uidSnap && uidSnap.exists()) {
+                foundOldId = firebaseUser.uid;
+                foundData = uidSnap.data();
+              }
+            }
+
+            if (foundData) {
+              console.log(`Auto-migrating user doc from old ID ${foundOldId} to unified email: ${email}`);
+              const migratedData = {
+                ...foundData,
+                id: email,
+              };
+              await setDoc(emailDocRef, cleanForFirestore(migratedData), { merge: true }).catch(() => {});
+
+              if (foundOldId && foundOldId !== email) {
+                await deleteDoc(doc(db, "users", foundOldId)).catch(() => {});
+              }
+              finalUserDoc = migratedData;
+            } else if (emailSnap && emailSnap.exists()) {
+              finalUserDoc = emailSnap.data();
+            } else {
+              console.log("Firestore offline or user doc not found. Initializing local session state.");
+              finalUserDoc = {
+                id: email,
+                email: email,
+                name: firebaseUser?.displayName?.split(" ")[0] || "Kullanıcı",
+                surname: firebaseUser?.displayName?.split(" ").slice(1).join(" ") || "",
+                currency: "TL",
+                demoBalance: 10000,
+                realBalance: 0,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                createdAt: Date.now(),
+              };
+            }
+          } else {
+            finalUserDoc = emailSnap.data();
+            if (finalUserDoc && finalUserDoc.id !== email) {
+              await setDoc(emailDocRef, cleanForFirestore({ id: email }), { merge: true }).catch(() => {});
+            }
+          }
+
+          // Enforce profile completeness check
+          if (finalUserDoc && !isProfileComplete(finalUserDoc)) {
+            console.log("User profile is incomplete. Waiting for completion.");
+            setCurrentUser(null);
+            setReady(true);
+            clearTimeout(fallbackTimer);
+            return;
+          }
+        } catch (migErr) {
+          console.warn("User document migration/setup handled gracefully (offline mode):", migErr);
+        }
+
         userUnsubRef.current = onSnapshot(
           doc(db, "users", email),
           (snap) => {
             if (snap.exists()) {
-              const userData = saveUserToStateAndCache({ id: snap.id, ...snap.data() });
-              markAppUserReady(userData);
-            } else {
-              // Check if we have cached user for this email before wiping
-              const cached = localStorage.getItem("obyo_cached_user");
-              if (cached) {
-                try {
-                  const parsed = JSON.parse(cached);
-                  if (parsed && parsed.email === email) {
-                    const u = saveUserToStateAndCache(parsed);
-                    markAppUserReady(u);
-                    clearTimeout(fallbackTimer);
-                    return;
-                  }
-                } catch {}
+              const userData = { id: snap.id, ...snap.data() } as ObyoUser;
+              if (userData.emailVerified !== true) {
+                console.log("Email not verified yet.");
+                // User is in DB but not verified.
+                // Depending on requirements, we might want to sign them out or set a 'pending' state.
+                // For now, let's keep it null in currentUser
+                setCurrentUser(null);
+              } else {
+                setCurrentUser(userData);
+                // Cache name for loading screen
+                if (userData.name) {
+                  localStorage.setItem("obyo_cached_name", userData.name);
+                }
               }
-              // Truly not found in DB
+            } else {
               setCurrentUser(null);
-              setReady(true);
             }
+            setReady(true);
             clearTimeout(fallbackTimer);
           },
           (err) => {
             if (err.code !== "permission-denied") console.error("Firestore user snapshot error:", err);
-            // Offline/Network fallback: use cached user if available
-            const cached = localStorage.getItem("obyo_cached_user");
-            if (cached) {
-              try {
-                const parsed = JSON.parse(cached);
-                if (parsed) {
-                  const u = saveUserToStateAndCache(parsed);
-                  markAppUserReady(u);
-                  clearTimeout(fallbackTimer);
-                  return;
-                }
-              } catch {}
-            }
             setReady(true);
             clearTimeout(fallbackTimer);
           }
         );
       } else {
-        // No saved user and no active session
         setCurrentUser(null);
         setReady(true);
         clearTimeout(fallbackTimer);
@@ -635,11 +611,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const uDoc = await getDoc(doc(db, "users", e));
         if (uDoc.exists()) {
-          saveUserToStateAndCache({ id: e, ...uDoc.data() });
+          const uData = uDoc.data() as ObyoUser;
+          setCurrentUser({ id: e, ...uData });
+          if (uData.name) localStorage.setItem("obyo_cached_name", uData.name);
         } else if (cred.user?.uid) {
           const uidDoc = await getDoc(doc(db, "users", cred.user.uid));
           if (uidDoc.exists()) {
-            saveUserToStateAndCache({ id: e, ...uidDoc.data() });
+            const uData = uidDoc.data() as ObyoUser;
+            setCurrentUser({ id: e, ...uData });
+            if (uData.name) localStorage.setItem("obyo_cached_name", uData.name);
           }
         }
       } catch (eDoc) {
@@ -662,7 +642,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return { success: false, error: "Şifre hatalı." };
             }
             localStorage.removeItem(LS_IS_ADMIN);
-            saveUserToStateAndCache({ id: e, ...uData });
+            localStorage.setItem(LS_CUSTOM_UID, e);
+            localStorage.setItem("obyo_active_email", e);
+            localStorage.setItem("obyo_active_uid", e);
+            setCurrentUser({ id: e, ...uData } as ObyoUser);
             return { success: true };
           }
         } catch (dbErr) {
@@ -749,8 +732,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       localStorage.removeItem(LS_IS_ADMIN);
       localStorage.removeItem(LS_CUSTOM_UID);
+      localStorage.setItem("obyo_active_email", email);
+      localStorage.setItem("obyo_active_uid", email);
       localStorage.setItem("obyo_tutorial_done", "1");
-      saveUserToStateAndCache(matchedUserObj);
+      setCurrentUser(matchedUserObj);
       return { success: true };
     } catch (err: any) {
       console.error("Google sign in error:", err);
@@ -858,13 +843,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.removeItem(LS_IS_ADMIN);
     localStorage.setItem("obyo_tutorial_done", "1");
+    localStorage.setItem(LS_CUSTOM_UID, e);
+    localStorage.setItem("obyo_active_email", e);
+    localStorage.setItem("obyo_active_uid", e);
     if (isTrade2026Bonus) {
       try {
         localStorage.setItem(`obyo_mode_${e}`, "real");
       } catch {}
     }
     
-    saveUserToStateAndCache(userData);
+    setCurrentUser(userData);
 
     // Send Telegram notification for new user registration
     try {
@@ -932,12 +920,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_CUSTOM_UID);
     localStorage.removeItem("obyo_active_uid");
     localStorage.removeItem("obyo_active_email");
-    localStorage.removeItem("obyo_cached_user");
-    localStorage.removeItem("obyo_cached_name");
-    localStorage.removeItem("obyo_cached_pp");
-    localStorage.removeItem("obyo_cached_real_bal");
-    localStorage.removeItem("obyo_cached_demo_bal");
-    if (auth.currentUser) await signOut(auth).catch(() => {});
+    if (auth.currentUser) await signOut(auth);
     setCurrentUser(null);
     setIsAdmin(false);
   };
@@ -1295,7 +1278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userRef = doc(db, "users", currentUser.id);
       await setDoc(userRef, { photoURL: photoUrl, photoUrl: photoUrl }, { merge: true });
-      saveUserToStateAndCache({ ...currentUser, photoURL: photoUrl, photoUrl: photoUrl });
+      setCurrentUser(prev => prev ? { ...prev, photoURL: photoUrl, photoUrl: photoUrl } : null);
       return { success: true };
     } catch (err: any) {
       console.error("updateProfilePhoto error:", err);
