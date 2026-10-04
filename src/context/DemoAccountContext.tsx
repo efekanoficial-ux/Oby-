@@ -83,7 +83,8 @@ async function fsRemoveActiveTrade(firestoreId: string) {
 /* ─── Provider ─────────────────────────────────────────────────────────────── */
 export function DemoAccountProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
-  const uid     = currentUser?.id ?? auth.currentUser?.uid ?? "guest";
+  const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
+  const uid     = activeEmail ? activeEmail.trim().toLowerCase() : "guest";
   const isGuest = uid === "guest";
 
   const [balance,         setBalance]         = useState<number>(isGuest ? loadGuestBalance() : INITIAL_BALANCE);
