@@ -1,14 +1,22 @@
 [
-    {
-        "relation": [
-            "delegate_permission/common.handle_all_urls"
-        ],
-        "target": {
-            "namespace": "android_app",
-            "package_name": "com.obyotrade.app",
-            "sha256_cert_fingerprints": [
-                "8B:C3:6C:62:6F:DC:28:A7:4A:95:E6:A6:C0:8E:17:AB:F8:84:CD:EE:CC:FD:79:45:57:4C:73:75:78:0F:D8:BF"
-            ]
-        }
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.obyotrade.app",
+      "sha256_cert_fingerprints": [
+        "9B:2A:F3:59:98:43:9A:B4:11:28:F3:6C:59:01:42:76:F4:0A:68:02:66:9B:7D:B0:8A:18:2F:3F:A1:FF:00:4B"
+      ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.obyotrade.app",
+      "sha256_cert_fingerprints": [
+        "8B:C3:6C:62:6F:DC:28:A7:4A:95:E6:A6:C0:8E:17:AB:F8:84:CD:EE:CC:FD:79:45:57:4C:73:75:78:0F:D8:BF"
+      ]
+    }
+  }
 ]
