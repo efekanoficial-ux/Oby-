@@ -32,6 +32,13 @@ body {
 @custom-variant dark (&:is(.dark *));
 
 /* ── Hide scrollbars completely ── */
+#tv-attr-logo {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;

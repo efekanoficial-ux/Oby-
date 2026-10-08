@@ -627,9 +627,9 @@ function TradeControls({
           <motion.div
             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             className="flex items-center gap-2 rounded-xl px-3 py-2"
-            style={{ background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}>
-            <X size={12} className="text-[#f6465d] shrink-0" />
-            <span className="text-xs font-bold text-[#f6465d]">Yetersiz bakiye — tutarı azaltın</span>
+            style={{ background: "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(255, 255, 255, 0.15)" }}>
+            <X size={12} className="text-white shrink-0" />
+            <span className="text-xs font-bold text-white">Yetersiz bakiye — tutarı azaltın</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1183,10 +1183,10 @@ function MobileTradePanel({
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
             style={{ margin: "0 12px 6px", overflow: "hidden", display: "flex", alignItems: "center", gap: 6,
-              borderRadius: 10, padding: "6px 10px", background: "rgba(246,70,93,0.10)", border: "1px solid rgba(246,70,93,0.25)" }}
+              borderRadius: 10, padding: "6px 10px", background: "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(255, 255, 255, 0.15)" }}
           >
-            <X size={11} color="#f6465d" />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#f6465d" }}>Yetersiz bakiye — tutarı azaltın</span>
+            <X size={11} color="#ffffff" />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#ffffff" }}>Yetersiz bakiye — tutarı azaltın</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1283,6 +1283,79 @@ function MobileTradePanel({
   );
 }
 
+/* ─── Active Trades Live HUD (TradingView logosu yerine sol altta) ────────── */
+function ChartActiveTradesHUD({
+  currentActiveTrades,
+  totalActiveInvested,
+  incomingPayout,
+  isTradesComingIn,
+  sym,
+}: {
+  currentActiveTrades: any[];
+  totalActiveInvested: number;
+  incomingPayout: number;
+  isTradesComingIn: boolean;
+  sym: string;
+}) {
+  if (currentActiveTrades.length === 0) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        style={{
+          position: "absolute",
+          left: 10,
+          bottom: 35,
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          gap: "1.5px",
+          pointerEvents: "none",
+          userSelect: "none",
+          lineHeight: 1,
+        }}
+      >
+        {/* Üstte: işlem açtığım tutar toplamı (ince yazıyla) */}
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 300,
+            color: "rgba(255, 255, 255, 0.45)",
+            letterSpacing: "0.03em",
+            fontFamily: "inherit",
+            whiteSpace: "nowrap",
+            lineHeight: 1,
+          }}
+        >
+          {sym}{totalActiveInvested.toFixed(2)}
+        </span>
+
+        {/* Altta: gelen işlemlerin kârlı halinin toplamı, gelmiyorsa soluk 0 */}
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+            fontFamily: "inherit",
+            whiteSpace: "nowrap",
+            lineHeight: 1,
+            color: isTradesComingIn ? "#0ecb81" : "rgba(255, 255, 255, 0.22)",
+            transition: "color 0.2s ease",
+          }}
+        >
+          {isTradesComingIn ? `${sym}${incomingPayout.toFixed(2)}` : "0"}
+        </span>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 /* ─── Home Page ──────────────────────────────────────────────────────────── */
 export default function Home() {
   const { t } = useLanguage();
@@ -1320,6 +1393,7 @@ export default function Home() {
   const minAmount = isTournament ? 1 : (currency === "TL" ? 34 : 1);
   const sym = currencySymbol;
   const [, navigate] = useLocation();
+  const chartAreaRef = useRef<HTMLDivElement | null>(null);
 
   const [openAssets,     setOpenAssets]     = useState<(typeof ASSETS)[0][]>(() => {
     try {
@@ -1849,6 +1923,32 @@ export default function Home() {
   const currentActiveCount = isTournament ? liveTournamentCount : (isReal ? liveRealCount : liveTradeCount);
   const tradeBlocked = currentActiveCount >= 5;
 
+  /* Live active trades calculations for thin text HUD */
+  const currentActiveTrades = isTournament
+    ? tournamentEntries.filter(t => t.expiryTime > now - 800)
+    : isReal
+    ? realEntries.filter(t => t.expiryTime > now - 800)
+    : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
+
+  const totalActiveInvested = currentActiveTrades.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+  const incomingPayout = currentActiveTrades.reduce((acc, t) => {
+    const assetName = (t as any).assetLabel || (t as any).asset || asset.label;
+    const curP = assetName === asset.label ? price : (livePriceRegistry[assetName] ?? price);
+    const entryP = typeof (t as any).entryPrice === "number"
+      ? (t as any).entryPrice
+      : (typeof (t as any).startPrice === "number" ? (t as any).startPrice : curP);
+    const isWin = t.direction === "UP" ? curP >= entryP : curP <= entryP;
+    if (!isWin) return acc;
+    const pRate = typeof (t as any).payoutRate === "number"
+      ? (t as any).payoutRate
+      : (ASSETS.find(a => a.label === assetName)?.payout ?? asset.payout ?? 85);
+    const amt = Number(t.amount) || 0;
+    return acc + amt * (1 + pRate / 100);
+  }, 0);
+
+  const isTradesComingIn = incomingPayout > 0;
+
   const isTradingRef = useRef(false);
 
   const handleTrade = async (dir: "UP" | "DOWN") => {
@@ -1931,7 +2031,7 @@ export default function Home() {
 
   /* ── Shared chart area ──────────────────────────────────────────────────── */
   const chartArea = (
-    <div className="relative flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden">
+    <div ref={chartAreaRef} className="relative flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden">
       <CandleChart
         basePrice={asset.base}
         symbol={asset.label}
@@ -1957,6 +2057,14 @@ export default function Home() {
         onDeleteDrawing={handleDeleteDrawing}
       />
       <ChartNotification notif={chartToast} />
+      {/* ── Active Trades Live HUD (TradingView logosunun yerine yerleştirildi) ── */}
+      <ChartActiveTradesHUD
+        currentActiveTrades={currentActiveTrades}
+        totalActiveInvested={totalActiveInvested}
+        incomingPayout={incomingPayout}
+        isTradesComingIn={isTradesComingIn}
+        sym={sym}
+      />
       <AnimatePresence>
         {isPanned && (
           <motion.button
@@ -2017,38 +2125,6 @@ export default function Home() {
 
           {/* Chart — takes all remaining space */}
           {chartArea}
-
-          {/* Active trades bar */}
-          <AnimatePresence>
-            {((isTournament ? tournamentEntries.filter(t => t.expiryTime > now - 800) : isReal ? realEntries.filter(t => t.expiryTime > now - 800) : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800)).length > 0) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                className="shrink-0 flex items-center gap-2 px-3 overflow-hidden"
-                style={{ background: "rgba(255,107,0,0.06)" }}
-              >
-                {(() => {
-                  const items = isTournament
-                    ? tournamentEntries.filter(t => t.expiryTime > now - 800)
-                    : isReal
-                    ? realEntries.filter(t => t.expiryTime > now - 800)
-                    : activeTrades.filter(t => t.startTime + t.duration * 1000 > now - 800);
-                  return (
-                    <div className="py-1.5 flex items-center gap-2 flex-1">
-                      <span className="text-[10px] font-semibold text-[#FF9500]">● {items.length} AKTİF İŞLEM</span>
-                      <div className="flex gap-1">
-                        {items.slice(0, 6).map(t => (
-                          <span key={t.id} className={`text-[9px] font-bold rounded px-1 ${t.direction === "UP" ? "text-[#0ecb81] bg-[#0ecb81]/10" : "text-[#f6465d] bg-[#f6465d]/10"}`}>
-                            {t.direction === "UP" ? "▲" : "▼"}
-                          </span>
-                        ))}
-                        {items.length > 6 && <span className="text-[9px] text-white/25">+{items.length - 6}</span>}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* RSI panel */}
           <AnimatePresence>

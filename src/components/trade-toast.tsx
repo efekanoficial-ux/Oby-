@@ -36,15 +36,13 @@ export function TradeToast({ toast }: Props) {
           className="fixed top-3 left-3 right-3 z-[999] overflow-hidden"
           style={{ pointerEvents: "none" }}
         >
-          {/* Glass card */}
+          {/* White Card */}
           <div
             className="relative flex items-center gap-3 rounded-2xl px-4 py-3"
             style={{
-              background: "rgba(12,12,12,0.82)",
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              boxShadow: `0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px ${accent}22`,
+              background: "#ffffff",
+              border: "1px solid rgba(0,0,0,0.08)",
+              boxShadow: `0 12px 40px rgba(0,0,0,0.25), 0 0 0 1px ${accent}33`,
             }}
           >
             {/* Colored left stripe */}
@@ -72,7 +70,7 @@ export function TradeToast({ toast }: Props) {
             {/* Text */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-[13px] font-black text-white leading-tight">
+                <span className="text-[13px] font-black text-slate-900 leading-tight">
                   {isOpen
                     ? `İşlem Açıldı`
                     : won ? "Kazandınız! 🎉" : "İşlem Kapandı"}
@@ -87,16 +85,16 @@ export function TradeToast({ toast }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[11px] text-white/40">{toast.asset}</span>
-                <span className="text-white/15">·</span>
+                <span className="text-[11px] text-slate-500">{toast.asset}</span>
+                <span className="text-slate-300">·</span>
                 <span
                   className="text-[11px] font-bold"
                   style={{ color: accent }}
                 >
                   {isUp ? "▲ YUKARI" : "▼ AŞAĞI"}
                 </span>
-                <span className="text-white/15">·</span>
-                <span className="text-[11px] text-white/40">${toast.amount}</span>
+                <span className="text-slate-300">·</span>
+                <span className="text-[11px] text-slate-500">${toast.amount}</span>
               </div>
             </div>
 

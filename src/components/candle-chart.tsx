@@ -688,6 +688,7 @@ export function CandleChart({
         textColor: "#71717a",
         fontSize: 10,
         fontFamily: "'Inter', 'SF Mono', monospace",
+        attributionLogo: false,
       },
       grid: {
         vertLines: {
