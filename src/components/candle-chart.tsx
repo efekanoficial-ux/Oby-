@@ -23,6 +23,7 @@ export interface ActiveEntry {
   expiryTime: number;
   direction: "UP" | "DOWN";
   amount?: number;
+  symbol: string; // <-- Added this
 }
 
 interface Props {
@@ -374,12 +375,10 @@ export function CandleChart({
   const bucketSecsRef     = useRef(bucketSecsFor(chartInterval));
 
   /* zoom-driven timeframe switching */
-  const zoomLockRef       = useRef(false);
 
   /* stable callback refs */
   const onPriceRef      = useRef(onPriceChange);
   const onPanRef        = useRef(onPanChange);
-  const onZoomRef       = useRef(onZoomChange);
   const onCandlesRef    = useRef(onCandlesChange);
   const onRealDataRef   = useRef(onRealDataChange);
   const onLoadingRef    = useRef(onLoadingChange);
@@ -389,7 +388,6 @@ export function CandleChart({
 
   useEffect(() => { onPriceRef.current    = onPriceChange;    }, [onPriceChange]);
   useEffect(() => { onPanRef.current      = onPanChange;      }, [onPanChange]);
-  useEffect(() => { onZoomRef.current     = onZoomChange;     }, [onZoomChange]);
   useEffect(() => { onCandlesRef.current  = onCandlesChange;  }, [onCandlesChange]);
   useEffect(() => { onRealDataRef.current = onRealDataChange; }, [onRealDataChange]);
   useEffect(() => { onLoadingRef.current  = onLoadingChange;  }, [onLoadingChange]);
@@ -750,6 +748,7 @@ export function CandleChart({
         autoScale: true,
         entireTextOnly: true,
         ticksVisible: false,
+        backgroundColor: "#000000",
       },
       localization: {
         timeFormatter: (ts: number) => {
@@ -835,21 +834,6 @@ export function CandleChart({
       const total = chartBarsRef.current;
       const atLive = range.to >= total - 1.5;
       onPanRef.current?.(!atLive);
-
-      /* Drill into a finer timeframe when zoomed in hard, climb to a coarser
-         one when zoomed out far. A lock prevents repeat fires while the new
-         data loads and the view re-centers. */
-      if (zoomLockRef.current) return;
-      const visibleBars = range.to - range.from;
-      if (visibleBars > 0 && visibleBars < 6) {
-        zoomLockRef.current = true;
-        onZoomRef.current?.("in");
-        setTimeout(() => { zoomLockRef.current = false; }, 1100);
-      } else if (visibleBars > 150) {
-        zoomLockRef.current = true;
-        onZoomRef.current?.("out");
-        setTimeout(() => { zoomLockRef.current = false; }, 1100);
-      }
     });
 
     return () => {
@@ -1244,7 +1228,7 @@ export function CandleChart({
 
       {/* ── Chart overlay: drawings + price dot + trade lines ───────────── */}
       {overlay && !isLoading && (
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 3 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, right: 60, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
 
           {/* SVG Drawings Layer */}
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", pointerEvents: "none" }}>
@@ -1462,8 +1446,8 @@ export function CandleChart({
               <div style={{
                 position: "absolute",
                 left: entry.expiryX,
-                top: 0, bottom: 0, width: 0,
-                borderLeft: "1.5px solid #f6465d",
+                top: 0, bottom: 0, width: 1.5,
+                background: "#f6465d",
                 boxShadow: "0 0 6px rgba(246, 70, 93, 0.35)",
               }} />
 
@@ -1521,7 +1505,6 @@ export function CandleChart({
             borderRadius: "50%",
             background: "#fff",
             border: "2px solid rgba(0,0,0,0.7)",
-            boxShadow: "0 0 6px rgba(255,255,255,0.6)",
           }} />
         </div>
       )}

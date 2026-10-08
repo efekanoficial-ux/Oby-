@@ -1734,6 +1734,7 @@ export default function Home() {
           id: t.id, entryTime: t.startTime, entryPrice: t.startPrice,
           expiryTime: t.startTime + t.duration * 1000,
           direction: t.direction, amount: t.amount, isReal: false as const,
+          symbol: t.asset,
         }));
       if (toAdd.length === 0 && kept.length === prev.length) return prev;
       return [...kept, ...toAdd];
@@ -1785,6 +1786,7 @@ export default function Home() {
           amount:     data.amount     as number,
           payoutRate: (data.payoutRate as number | undefined) ?? 85,
           assetLabel: data.asset      as string,
+          symbol:     data.asset      as string, // Added symbol
         };
         realEntryFsIdMapRef.current.set(tradeId, change.doc.id);
         setRealEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, re]);
@@ -1839,7 +1841,7 @@ export default function Home() {
         };
         tournamentEntryFsIdMapRef.current.set(tradeId, change.doc.id);
         setTournamentEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, te]);
-        setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...te, isTournament: true } as any]);
+        setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...te, isTournament: true, symbol: asset.label } as any]);
       });
     }, () => {/* ignore permission errors */});
     return () => unsub();
@@ -1991,7 +1993,7 @@ export default function Home() {
         if (!ok) return;
         const te = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
         setTournamentEntries(prev => [...prev, te]);
-        setChartEntries(prev => [...prev, { ...te, isTournament: true } as any]);
+        setChartEntries(prev => [...prev, { ...te, isTournament: true, symbol: asset.label } as any]);
         /* Save to Firestore immediately so trade persists */
         const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
         const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
@@ -2007,7 +2009,7 @@ export default function Home() {
         if (!ok) return;
         const re = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
         setRealEntries(prev => [...prev, re]);
-        setChartEntries(prev => [...prev, { ...re, isReal: true }]);
+        setChartEntries(prev => [...prev, { ...re, isReal: true, symbol: asset.label }]);
         /* Save to Firestore immediately so trade persists across sessions */
         const activeEmail = currentUser?.email || auth.currentUser?.email || localStorage.getItem("obyo_active_email");
         const currentUid = activeEmail ? activeEmail.trim().toLowerCase() : null;
@@ -2024,7 +2026,7 @@ export default function Home() {
         const tradeId = placeTrade(asset.label, dir, tradeAmount, tf.secs, price, id);
         if (!tradeId) return;
         const entry = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, isReal: false };
-        setChartEntries(prev => [...prev, entry]);
+        setChartEntries(prev => [...prev, { ...entry, symbol: asset.label }]);
       }
     } finally {
       isTradingRef.current = false;
@@ -2041,7 +2043,7 @@ export default function Home() {
         chartInterval={CHART_INTERVALS[chartIntervalIdx].value}
         onPriceChange={handlePrice}
         currencySymbol={sym}
-        activeEntries={chartEntries.filter(e => isTournament ? !!(e as any).isTournament : (isReal ? !!e.isReal : !e.isReal && !(e as any).isTournament))}
+        activeEntries={chartEntries.filter(e => e.symbol === asset.label && (isTournament ? !!(e as any).isTournament : (isReal ? !!e.isReal : !e.isReal && !(e as any).isTournament)))}
         onPanChange={setIsPanned}
         onZoomChange={handleZoom}
         showBollinger={showBollinger}

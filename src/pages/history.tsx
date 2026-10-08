@@ -1,4 +1,4 @@
-import { useDemoAccount, type CompletedTrade } from "@/context/DemoAccountContext";
+import { useDemoAccount, type CompletedTrade, livePriceRegistry } from "@/context/DemoAccountContext";
 import { useAccountMode } from "@/context/AccountModeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -8,6 +8,16 @@ import { db } from "@/lib/firebase";
 import { TrendingUp, Clock, BarChart2, Zap, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { AssetIcon } from "@/lib/asset-icons";
+
+function getLiveProfit(trade: any, isReal: boolean) {
+  const startPrice = isReal ? trade.entryPrice : trade.startPrice;
+  const currentPrice = livePriceRegistry[trade.asset] ?? startPrice;
+  const isUp = trade.direction === "UP";
+  const isWin = isUp ? currentPrice >= startPrice : currentPrice <= startPrice;
+  // If trade just started or price is same, profit is 0
+  if (Math.abs(currentPrice - startPrice) < 0.000001) return 0;
+  return isWin ? (trade.amount * 0.85) : -trade.amount;
+}
 
 type Filter = "ALL" | "WIN" | "LOSE";
 
@@ -108,11 +118,10 @@ export default function History() {
         <div className="shrink-0 px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-white/60">
-              <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: accent }} />
               {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
             </p>
           </div>
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-row gap-2.5 overflow-x-auto snap-x snap-mandatory w-full no-scrollbar">
             {visibleActive.map(tr => {
               const isUp   = tr.direction === "UP";
               const expiry = viewIsReal
@@ -126,35 +135,42 @@ export default function History() {
               const dirAccent = isUp ? "#10b981" : "#ef4444";
 
               return (
-                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-[#121217] border border-white/[0.06] flex items-center justify-between relative overflow-hidden">
+                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-[#121217] border border-white/[0.06] flex items-center justify-between relative overflow-hidden shrink-0 min-w-full snap-start">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: isUp ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)" }}>
-                      {isUp ? <ArrowUp size={16} style={{ color: dirAccent }} strokeWidth={2.5} /> : <ArrowDown size={16} style={{ color: dirAccent }} strokeWidth={2.5} />}
-                    </div>
+                    {renderAssetIcon(tr.asset)}
                     <div>
                       <p className="text-xs font-bold text-white/90 leading-none">{tr.asset}</p>
-                      <p className="text-[10px] text-white/40 mt-1 font-medium">
+                      <p className="text-[10px] text-white/40 mt-1 font-medium flex items-center gap-1.5">
                         {isUp ? t.upBtn : t.downBtn} · {sym}{tr.amount}
+                        <span className="text-white/20">|</span>
+                        <span className="font-mono text-white/60">{fmtCountdown(rem)}</span>
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-white/90 font-mono font-bold text-xs">
-                        <Clock size={11} className="text-white/40" />
-                        <span>{fmtCountdown(rem)}</span>
-                      </div>
-                      <span className="text-[9px] text-white/35 font-mono block mt-0.5">
-                        {fmtTime(expiry)}
-                      </span>
+                    <div className="text-right pt-2">
+                      {(() => {
+                        const profit = getLiveProfit(tr, viewIsReal);
+                        return (
+                          <div className="flex flex-col items-center">
+                            <p className="text-xs font-bold font-mono text-white/90">{sym}{tr.amount}</p>
+                            {profit <= 0 ? (
+                               <p className="text-[10px] font-bold font-mono text-white/30">0</p>
+                            ) : (
+                               <p className="text-[10px] font-bold font-mono text-emerald-400">
+                                 {sym}{(tr.amount + profit).toFixed(2)}
+                               </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
                   {/* Bottom progress bar */}
                   <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.04]">
-                    <div className="h-full transition-all duration-1000" style={{ width: `${prog * 100}%`, background: dirAccent }} />
+                    <div className="h-full transition-all duration-1000" style={{ width: `${prog * 100}%`, background: "#F59E0B" }} />
                   </div>
                 </div>
               );
