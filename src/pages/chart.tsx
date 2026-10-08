@@ -6,7 +6,7 @@ import { AssetIcon } from "@/lib/asset-icons";
 
 const ASSETS = [
   { label: "Crypto IDX", base: 6850.25 },
-  { label: "AUD/CAD", base: 0.9080 },
+  { label: "AUD/CAD", base: 0.9900 },
   { label: "AUD/CHF", base: 0.5520 },
   { label: "AUD/DKK", base: 4.4200 },
   { label: "AUD/HUF", base: 233.50 },

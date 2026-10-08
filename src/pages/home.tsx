@@ -29,8 +29,8 @@ import { AssetIcon } from "@/lib/asset-icons";
 
 /* ─── Assets ─────────────────────────────────────────────────────────────── */
 const ASSETS = [
-  { label: "Crypto IDX",         icon: "/assets/crypto-idx.png", flag: "₿",      payout: 90, base: 6850.25, color: "#F7931A", desc: "Kripto Bileşik Endeksi",      digits: 2 },
-  { label: "AUD/CAD",            icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9080,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
+  { label: "Crypto IDX",           icon: "/assets/crypto-idx.png", flag: "₿",      payout: 90, base: 6850.25, color: "#F7931A", desc: "Kripto Bileşik Endeksi",      digits: 2 },
+  { label: "AUD/CAD",            icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9900,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
   { label: "AUD/CHF",            icon: "/assets/aud-chf.png",    flag: "🇦🇺🇨🇭", payout: 85, base: 0.5520,  color: "#E84142", desc: "Avustralya / İsviçre",       digits: 5 },
   { label: "AUD/DKK",            icon: "/assets/aud-dkk.png",    flag: "🇦🇺🇩🇰", payout: 84, base: 4.4200,  color: "#C8102E", desc: "Avustralya / Danimarka",     digits: 4 },
   { label: "AUD/HUF",            icon: "/assets/aud-huf.png",    flag: "🇦🇺🇭🇺", payout: 84, base: 233.50,  color: "#477050", desc: "Avustralya / Macaristan",    digits: 3 },
@@ -1400,7 +1400,8 @@ export default function Home() {
       const saved = localStorage.getItem("obyo_open_assets");
       if (saved) {
         const labels: string[] = JSON.parse(saved);
-        const found = labels.map(l => ASSETS.find(a => a.label === l)).filter(Boolean) as (typeof ASSETS)[0][];
+        const matchAsset = (l: string) => ASSETS.find(a => a.label === l);
+        const found = labels.map(matchAsset).filter(Boolean) as (typeof ASSETS)[0][];
         if (found.length > 0) return found.slice(0, 2);
       }
     } catch {}
@@ -1411,7 +1412,8 @@ export default function Home() {
     try {
       const savedLabel = localStorage.getItem("obyo_active_asset");
       if (savedLabel) {
-        const found = ASSETS.find(a => a.label === savedLabel);
+        const matchAsset = (l: string) => ASSETS.find(a => a.label === l);
+        const found = matchAsset(savedLabel);
         if (found) return found;
       }
     } catch {}

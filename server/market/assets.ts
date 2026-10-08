@@ -14,15 +14,16 @@ export interface AssetConfig {
    * Only set for assets that have a genuine live feed (crypto).
    */
   binance?: string;
+  /** Whether this instrument tracks live real-world market feeds (forex/ticks) */
+  isRealFeed?: boolean;
 }
 
 /**
- * The only 13 instruments the platform trades. All pairs run on the OTC
- * random-walk engine anchored to realistic market rates and continuous history.
+ * The only 13 instruments the platform trades.
  */
 export const ASSETS: AssetConfig[] = [
   { symbol: "Crypto IDX",         base: 6850.25, vol: 0.00030, revert: 0.0008, digits: 2 },
-  { symbol: "AUD/CAD",            base: 0.9080,  vol: 0.00010, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/CAD",            base: 0.9900,  vol: 0.00010, revert: 0.0010, digits: 5, isRealFeed: true },
   { symbol: "AUD/CHF",            base: 0.5520,  vol: 0.00011, revert: 0.0010, digits: 5 },
   { symbol: "AUD/DKK",            base: 4.4200,  vol: 0.00009, revert: 0.0010, digits: 4 },
   { symbol: "AUD/HUF",            base: 233.50,  vol: 0.00011, revert: 0.0010, digits: 3 },

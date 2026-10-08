@@ -138,10 +138,12 @@ function marketWsUrl(): string {
 
 /** Group base candles into fixed second-buckets (OHLC merge). `time` in sec. */
 function aggregate(candles: Candle[], bucketSecs: number): Candle[] {
-  if (bucketSecs <= 5) return candles;
+  if (!candles || candles.length === 0) return [];
+  const bs = Math.max(1, bucketSecs);
   const map = new Map<number, Candle>();
   for (const c of candles) {
-    const t = Math.floor(c.time / bucketSecs) * bucketSecs;
+    if (!c || typeof c.time !== "number" || !Number.isFinite(c.time)) continue;
+    const t = Math.floor(c.time / bs) * bs;
     const ex = map.get(t);
     if (!ex) {
       map.set(t, { time: t, open: c.open, high: c.high, low: c.low, close: c.close });
@@ -151,7 +153,7 @@ function aggregate(candles: Candle[], bucketSecs: number): Candle[] {
       ex.close = c.close;
     }
   }
-  return [...map.values()].sort((a, b) => a.time - b.time);
+  return Array.from(map.values()).sort((a, b) => a.time - b.time);
 }
 
 /** lightweight-charts expects seconds; our candles already store seconds. */
@@ -540,47 +542,57 @@ export function CandleChart({
   /* ── MA series update ────────────────────────────────────────────────── */
   const updateMA = () => {
     if (!maRef.current) return;
-    const pts = calcEMA(candlesRef.current)
-      .filter((x): x is { time: number; value: number } => x !== null)
-      .map(x => ({ time: toSec(x.time), value: x.value }));
-    maRef.current.setData(pts);
+    try {
+      const pts = calcEMA(candlesRef.current)
+        .filter((x): x is { time: number; value: number } => x !== null)
+        .map(x => ({ time: toSec(x.time), value: x.value }));
+      maRef.current.setData(pts);
+    } catch { /* noop */ }
   };
 
   const updateSAR = () => {
     if (!sarRef.current) return;
-    const pts = calcSAR(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
-    sarRef.current.setData(pts);
+    try {
+      const pts = calcSAR(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
+      sarRef.current.setData(pts);
+    } catch { /* noop */ }
   };
 
   const updateFractals = () => {
     if (!fracRef.current) return;
-    const pts = calcFractals(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
-    fracRef.current.setData(pts);
+    try {
+      const pts = calcFractals(candlesRef.current).map(x => ({ time: toSec(x.time), value: x.value }));
+      fracRef.current.setData(pts);
+    } catch { /* noop */ }
   };
 
   const updateAlligator = () => {
     if (!aligJawRef.current || !aligTeethRef.current || !aligLipsRef.current) return;
-    const { jaw, teeth, lips } = calcAlligator(candlesRef.current);
-    aligJawRef.current.setData(jaw.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
-    aligTeethRef.current.setData(teeth.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
-    aligLipsRef.current.setData(lips.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+    try {
+      const { jaw, teeth, lips } = calcAlligator(candlesRef.current);
+      aligJawRef.current.setData(jaw.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+      aligTeethRef.current.setData(teeth.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+      aligLipsRef.current.setData(lips.filter((x): x is { time: number; value: number } => x !== null).map(x => ({ time: toSec(x.time), value: x.value })));
+    } catch { /* noop */ }
   };
   const updateBB = () => {
     if (!bbUpRef.current || !bbDnRef.current || !bbMidRef.current) return;
-    const bb = calcBB(candlesRef.current);
-    const up: { time: Time; value: number }[] = [];
-    const dn: { time: Time; value: number }[] = [];
-    const mid: { time: Time; value: number }[] = [];
-    bb.forEach(b => {
-      if (!b) return;
-      const t = toSec(b.time);
-      up.push({ time: t, value: b.upper });
-      dn.push({ time: t, value: b.lower });
-      mid.push({ time: t, value: b.middle });
-    });
-    bbUpRef.current.setData(up);
-    bbDnRef.current.setData(dn);
-    bbMidRef.current.setData(mid);
+    try {
+      const bb = calcBB(candlesRef.current);
+      const up: { time: Time; value: number }[] = [];
+      const dn: { time: Time; value: number }[] = [];
+      const mid: { time: Time; value: number }[] = [];
+      bb.forEach(b => {
+        if (!b) return;
+        const t = toSec(b.time);
+        up.push({ time: t, value: b.upper });
+        dn.push({ time: t, value: b.lower });
+        mid.push({ time: t, value: b.middle });
+      });
+      bbUpRef.current.setData(up);
+      bbDnRef.current.setData(dn);
+      bbMidRef.current.setData(mid);
+    } catch { /* noop */ }
   };
 
   /* ── Display helpers ─────────────────────────────────────────────────── */
@@ -597,7 +609,20 @@ export function CandleChart({
 
   /** Rebuild the visible series from raw 5s candles at the current bucket. */
   const rebuildDisplay = (resetView: boolean) => {
-    const agg = aggregate(baseCandlesRef.current, bucketSecsRef.current);
+    const rawAgg = aggregate(baseCandlesRef.current, bucketSecsRef.current);
+    if (rawAgg.length === 0) return;
+    // Guarantee strictly monotonic times without duplicates
+    const agg: Candle[] = [];
+    for (const c of rawAgg) {
+      const prev = agg[agg.length - 1];
+      if (!prev || c.time > prev.time) {
+        agg.push(c);
+      } else if (c.time === prev.time) {
+        prev.high = Math.max(prev.high, c.high);
+        prev.low = Math.min(prev.low, c.low);
+        prev.close = c.close;
+      }
+    }
     if (agg.length === 0) return;
     const confirmed = agg.slice(0, -1);
     const live = agg[agg.length - 1];
@@ -605,8 +630,12 @@ export function CandleChart({
     liveBucketRef.current = { ...live };
     chartBarsRef.current = agg.length;
     finalizedRef.current = 0;
-    seriesRef.current?.setData(agg.map(toBar));
-    areaRef.current?.setData(agg.map(toLine));
+    try {
+      seriesRef.current?.setData(agg.map(toBar));
+      areaRef.current?.setData(agg.map(toLine));
+    } catch {
+      // Safe fallback if series was detached or reinitializing
+    }
     if (showBBRef.current) updateBB();
     if (showMARef.current) updateMA();
     if (showSARRef.current) updateSAR();
@@ -620,6 +649,7 @@ export function CandleChart({
 
   /** Fold one server 5s candle into the raw store + current display bucket. */
   const ingest = (c: Candle) => {
+    if (!c || typeof c.time !== "number" || !Number.isFinite(c.time)) return;
     const base = baseCandlesRef.current;
     const lastB = base[base.length - 1];
     if (lastB && c.time === lastB.time) base[base.length - 1] = c;
@@ -655,8 +685,12 @@ export function CandleChart({
     } else return;
     liveBucketRef.current = live;
 
-    seriesRef.current?.update(toBar(live));
-    areaRef.current?.update(toLine(live));
+    try {
+      seriesRef.current?.update(toBar(live));
+      areaRef.current?.update(toLine(live));
+    } catch {
+      rebuildDisplay(false);
+    }
     if (live) {
       const isUp = live.close >= live.open;
       const col = isUp ? "#0ecb81" : "#f6465d";
@@ -916,11 +950,14 @@ export function CandleChart({
 
         if (msg.type === "history" && Array.isArray(msg.candles)) {
           clearTimeout(safetyTimer);
-          baseCandlesRef.current = msg.candles.slice(-BASE_MAX);
+          const validCandles = msg.candles.filter(
+            (c): c is Candle => Boolean(c && typeof c.time === "number" && Number.isFinite(c.time))
+          );
+          baseCandlesRef.current = validCandles.slice(-BASE_MAX);
           rebuildDisplay(true);
           setReal(true);
           notifyLoading(false);
-        } else if (msg.type === "update" && msg.candle) {
+        } else if (msg.type === "update" && msg.candle && typeof msg.candle.time === "number") {
           notifyLoading(false);
           ingest(msg.candle);
         }

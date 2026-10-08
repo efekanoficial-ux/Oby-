@@ -126,36 +126,34 @@ export default function History() {
               const dirAccent = isUp ? "#10b981" : "#ef4444";
 
               return (
-                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-white text-slate-900 border border-slate-200/90 shadow-md flex items-center justify-between relative overflow-hidden">
+                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-[#121217] border border-white/[0.06] flex items-center justify-between relative overflow-hidden">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: isUp ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)" }}>
-                      {isUp ? <ArrowUp size={16} className="text-emerald-600" strokeWidth={2.5} /> : <ArrowDown size={16} className="text-rose-600" strokeWidth={2.5} />}
+                      style={{ background: isUp ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)" }}>
+                      {isUp ? <ArrowUp size={16} style={{ color: dirAccent }} strokeWidth={2.5} /> : <ArrowDown size={16} style={{ color: dirAccent }} strokeWidth={2.5} />}
                     </div>
                     <div>
-                      <p className="text-xs font-black text-slate-900 leading-none">{tr.asset}</p>
-                      <p className="text-[10px] text-slate-500 mt-1 font-semibold">
-                        <span className={isUp ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
-                          {isUp ? t.upBtn : t.downBtn}
-                        </span> · {sym}{tr.amount}
+                      <p className="text-xs font-bold text-white/90 leading-none">{tr.asset}</p>
+                      <p className="text-[10px] text-white/40 mt-1 font-medium">
+                        {isUp ? t.upBtn : t.downBtn} · {sym}{tr.amount}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <div className="flex items-center gap-1 text-slate-900 font-mono font-bold text-xs">
-                        <Clock size={11} className="text-slate-400" />
+                      <div className="flex items-center gap-1 text-white/90 font-mono font-bold text-xs">
+                        <Clock size={11} className="text-white/40" />
                         <span>{fmtCountdown(rem)}</span>
                       </div>
-                      <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                      <span className="text-[9px] text-white/35 font-mono block mt-0.5">
                         {fmtTime(expiry)}
                       </span>
                     </div>
                   </div>
 
                   {/* Bottom progress bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-slate-100">
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.04]">
                     <div className="h-full transition-all duration-1000" style={{ width: `${prog * 100}%`, background: dirAccent }} />
                   </div>
                 </div>
@@ -166,8 +164,8 @@ export default function History() {
       )}
 
       {/* ── Filter Pills ──────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-between px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2">
+      <div className="shrink-0 flex items-center justify-center px-4 pt-4 pb-3">
+        <div className="flex items-center justify-center gap-2">
           {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => {
             const isActive = filter === f;
             const label = f === "ALL" ? t.all : f === "WIN" ? t.winners : t.losers;
@@ -193,10 +191,6 @@ export default function History() {
             );
           })}
         </div>
-
-        <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">
-          {filtered.length} {t.tradesRecords}
-        </span>
       </div>
 
       {/* ── Trade List (Soft Cards) ────────────────────────────────────── */}
