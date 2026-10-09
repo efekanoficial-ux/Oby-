@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { initializeFirestore, getFirestore, doc, getDocFromServer } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 import firebaseConfig from "../../firebase-applet-config.json";
@@ -16,9 +16,17 @@ if (typeof window !== "undefined") {
   });
 }
 
-export const db = (firebaseConfig as any).firestoreDatabaseId
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore with experimentalForceLongPolling: true to resolve WebChannel streaming timeouts in web & iframe environments
+export const db = (() => {
+  const dbId = (firebaseConfig as any).firestoreDatabaseId;
+  try {
+    return dbId
+      ? initializeFirestore(app, { experimentalForceLongPolling: true }, dbId)
+      : initializeFirestore(app, { experimentalForceLongPolling: true });
+  } catch {
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+  }
+})();
 
 export let messaging: ReturnType<typeof getMessaging> | null = null;
 if (typeof window !== "undefined") {

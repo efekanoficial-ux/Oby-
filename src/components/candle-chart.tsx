@@ -108,8 +108,8 @@ function ExpiryCountdownBadge({ expiryTime, x, color }: { expiryTime: number; x:
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
-const BASE_MAX = 69_120;     // raw 5s candles kept client-side (~96h)
-const INDICATOR_MAX = 5_000;  // confirmed display bars kept for indicators
+const BASE_MAX = 17_500;     // raw 5s candles kept client-side (~24h)
+const INDICATOR_MAX = 1_500; // confirmed display bars kept for indicators
 const REBUILD_EVERY = 120;   // finalized buckets before a full series rebuild
 
 /**
@@ -154,17 +154,6 @@ function aggregate(candles: Candle[], bucketSecs: number): Candle[] {
       ex.close = c.close;
     }
   }
-
-  // For forex instruments, sanitize any extreme outlier wicks from low-liquidity tick anomalies
-  for (const bar of map.values()) {
-    if (bar.open < 2) {
-      const body = Math.abs(bar.close - bar.open);
-      const maxWick = Math.max(0.00022, body * 2.2);
-      bar.high = Math.min(bar.high, Math.max(bar.open, bar.close) + maxWick);
-      bar.low = Math.max(bar.low, Math.min(bar.open, bar.close) - maxWick);
-    }
-  }
-
   return Array.from(map.values()).sort((a, b) => a.time - b.time);
 }
 
@@ -759,7 +748,6 @@ export function CandleChart({
         autoScale: true,
         entireTextOnly: true,
         ticksVisible: false,
-        backgroundColor: "#000000",
       },
       localization: {
         timeFormatter: (ts: number) => {

@@ -173,6 +173,167 @@ const CHART_INTERVALS = [
   { label: "30dk", value: "30m", desc: "30 Dakika" },
 ];
 
+/* ─── Compact Chart Interval Picker (Pure Glass Blur Scrollable Strip) ─── */
+function CompactChartIntervalPicker({
+  visible,
+  onClose,
+  chartIntervalIdx,
+  onSelectInterval,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  chartIntervalIdx: number;
+  onSelectInterval: (idx: number) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (visible && scrollRef.current) {
+      const activeEl = scrollRef.current.querySelector<HTMLElement>('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [visible, chartIntervalIdx]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <>
+          {/* Subtle click-outside backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 480, damping: 32 }}
+            className="absolute bottom-[calc(100%+8px)] left-2 right-2 md:fixed md:bottom-auto md:top-14 md:left-24 md:right-auto z-50 max-w-[390px] mx-auto rounded-2xl bg-black/55 backdrop-blur-2xl border border-white/10 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.85)]"
+          >
+            {/* Pure Horizontal Swipeable / Scrollable Track */}
+            <div
+              ref={scrollRef}
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5 touch-pan-x w-full select-none"
+            >
+              {CHART_INTERVALS.map((ci, idx) => {
+                const isActive = chartIntervalIdx === idx;
+                return (
+                  <button
+                    key={ci.value}
+                    data-active={isActive ? "true" : undefined}
+                    onClick={() => {
+                      onSelectInterval(idx);
+                      onClose();
+                    }}
+                    className={`flex flex-col items-center justify-center shrink-0 min-w-[54px] px-2.5 py-1.5 rounded-xl transition-all cursor-pointer select-none ${
+                      isActive
+                        ? "bg-white text-black font-black shadow-[0_2px_14px_rgba(255,255,255,0.4)] scale-[1.03]"
+                        : "bg-white/[0.05] hover:bg-white/[0.1] text-white/70 hover:text-white border border-white/5"
+                    }`}
+                  >
+                    <span className={`text-[12px] font-black tracking-tight ${isActive ? "text-black" : "text-white"}`}>{ci.label}</span>
+                    <span className={`text-[8px] font-semibold leading-none mt-0.5 ${isActive ? "text-black/70" : "text-white/35"}`}>
+                      {ci.desc || ci.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ─── Compact Trade Duration Picker (Pure Glass Blur Scrollable Strip, White Active) ─── */
+function CompactDurationPicker({
+  visible,
+  onClose,
+  tf,
+  setTf,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  tf: typeof TIMEFRAMES[0];
+  setTf: (t: typeof TIMEFRAMES[0]) => void;
+  expiryStr?: string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (visible && scrollRef.current) {
+      const activeEl = scrollRef.current.querySelector<HTMLElement>('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [visible, tf.label]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <>
+          {/* Subtle click-outside backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 480, damping: 32 }}
+            className="absolute bottom-[calc(100%+8px)] left-2 right-2 md:fixed md:bottom-auto md:top-14 md:left-auto md:right-auto z-50 max-w-[390px] mx-auto rounded-2xl bg-black/55 backdrop-blur-2xl border border-white/10 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.85)]"
+          >
+            {/* Pure Horizontal Swipeable / Scrollable Track (White active) */}
+            <div
+              ref={scrollRef}
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5 touch-pan-x w-full select-none"
+            >
+              {TIMEFRAMES.map((t) => {
+                const isActive = t.label === tf.label;
+                return (
+                  <button
+                    key={t.label}
+                    data-active={isActive ? "true" : undefined}
+                    onClick={() => {
+                      setTf(t);
+                      onClose();
+                    }}
+                    className={`flex flex-col items-center justify-center shrink-0 min-w-[58px] px-2.5 py-1.5 rounded-xl transition-all cursor-pointer select-none ${
+                      isActive
+                        ? "bg-white text-black font-black shadow-[0_2px_14px_rgba(255,255,255,0.4)] scale-[1.03]"
+                        : "bg-white/[0.05] hover:bg-white/[0.1] text-white/70 hover:text-white border border-white/5"
+                    }`}
+                  >
+                    <span className={`text-[12px] font-black tracking-tight ${isActive ? "text-black" : "text-white"}`}>
+                      {t.label}
+                    </span>
+                    <span className={`text-[8px] font-semibold leading-none mt-0.5 ${isActive ? "text-black/70" : "text-white/35"}`}>
+                      {tfSubLabel(t.secs)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function calcRSI(candles: Candle[], period = 14): (number | null)[] {
   if (candles.length < period + 1) return candles.map(() => null);
   let ag = 0, al = 0;
@@ -511,7 +672,7 @@ function TradeControls({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="relative flex flex-col gap-2">
       {/* Amount + Duration */}
       <div className="flex gap-1.5">
         {/* Editable amount */}
@@ -549,77 +710,27 @@ function TradeControls({
 
         {/* Duration picker button */}
         <button
-          onClick={() => setShowDuration(true)}
+          onClick={() => setShowDuration(v => !v)}
           className="flex flex-1 flex-col rounded-xl px-2.5 py-1.5 border text-left transition-colors active:scale-[0.97]"
           style={{ background: cardBg, borderColor: cardBorder }}
           data-tour="step-3-old"
         >
           <span className="text-[8.5px] font-bold text-white/35 uppercase tracking-widest mb-0.5">Süre</span>
           <div className="flex items-center justify-center gap-1">
-            <Clock size={10} className="text-[#FF9500]" />
+            <Clock size={10} className="text-white/80" />
             <span className="text-[13.5px] font-semibold text-white">{tf.label}</span>
             <ChevronDown size={8.5} className="text-white/40" />
           </div>
         </button>
       </div>
 
-      {/* Duration picker modal */}
-      <AnimatePresence>
-        {showDuration && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50"
-              style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-              onClick={() => setShowDuration(false)}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 420, damping: 38 }}
-              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl"
-              style={{ background: "#090909", border: "1px solid rgba(255,255,255,0.08)" }}
-            >
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-9 h-1 rounded-full bg-white/15" />
-              </div>
-              <div className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <h2 className="text-sm font-bold text-white">İşlem Süresi</h2>
-                  <p className="text-[11px] text-white/30 mt-0.5">Vade süresini seçin</p>
-                </div>
-                <button onClick={() => setShowDuration(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full"
-                  style={{ background: "rgba(255,255,255,0.06)" }}>
-                  <X size={13} className="text-white/50" />
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2 px-4 pb-8 pt-1">
-                {TIMEFRAMES.map((t) => {
-                  const isActive = t.label === tf.label;
-                  return (
-                    <motion.button
-                      key={t.label}
-                      whileTap={{ scale: 0.94 }}
-                      onClick={() => { setTf(t); setShowDuration(false); }}
-                      className="flex flex-col items-center justify-center rounded-2xl py-3.5 gap-0.5 transition-all"
-                      style={{
-                        background: isActive ? "linear-gradient(135deg,#FF6B00,#FF9500)" : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${isActive ? "transparent" : "rgba(255,255,255,0.08)"}`,
-                        boxShadow: isActive ? "0 4px 18px rgba(255,107,0,0.35)" : "none",
-                      }}
-                    >
-                      <span className={`text-base font-bold ${isActive ? "text-black" : "text-white"}`}>{t.label}</span>
-                      <span className={`text-[9px] font-semibold ${isActive ? "text-black/60" : "text-white/30"}`}>
-                        {tfSubLabel(t.secs)}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Compact Duration picker */}
+      <CompactDurationPicker
+        visible={showDuration}
+        onClose={() => setShowDuration(false)}
+        tf={tf}
+        setTf={setTf}
+      />
 
       {/* Insufficient balance warning */}
       <AnimatePresence>
@@ -889,88 +1000,8 @@ function IndicatorsModal({
   );
 }
 
-/* ─── Chart Interval Modal (Shared Mobile Sheet & Desktop Dialog) ─────────── */
-function ChartIntervalModal({
-  visible,
-  onClose,
-  chartIntervalIdx,
-  onSelectInterval,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  chartIntervalIdx: number;
-  onSelectInterval: (idx: number) => void;
-}) {
-  return (
-    <AnimatePresence>
-      {visible && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50"
-            style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0 }}
-            transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md md:rounded-3xl z-50 rounded-t-3xl overflow-hidden shadow-2xl"
-            style={{ background: "#0e0e0e", border: "1px solid #222", maxHeight: "85vh", overflowY: "auto" }}
-          >
-            {/* Mobile drag handle */}
-            <div className="flex md:hidden justify-center pt-3 pb-1">
-              <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 10px" }}>
-              <div>
-                <h2 style={{ fontSize: 16, fontWeight: 900, color: "#fff", margin: 0 }}>Grafik Zamanı</h2>
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2, margin: 0 }}>Mum periyodunu seçin</p>
-              </div>
-              <button
-                onClick={onClose}
-                style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <X size={14} color="rgba(255,255,255,0.6)" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 px-4 pb-8 pt-2">
-              {CHART_INTERVALS.map((ci, idx) => {
-                const isActive = chartIntervalIdx === idx;
-                return (
-                  <motion.button
-                    key={ci.value}
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => {
-                      onSelectInterval(idx);
-                      onClose();
-                    }}
-                    className="flex flex-col items-center justify-center rounded-2xl py-3.5 gap-0.5"
-                    style={{
-                      background: isActive ? "linear-gradient(135deg,#2563eb,#3b82f6)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${isActive ? "transparent" : "rgba(255,255,255,0.08)"}`,
-                      boxShadow: isActive ? "0 4px 18px rgba(37,99,235,0.35)" : "none",
-                    }}
-                  >
-                    <span className={`text-base font-black ${isActive ? "text-white" : "text-white"}`}>{ci.label}</span>
-                    <span className={`text-[9px] font-semibold ${isActive ? "text-white/80" : "text-white/30"}`}>
-                      {ci.desc || ci.label}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
+/* ─── Chart Interval Modal (Aliased to CompactChartIntervalPicker) ─────────── */
+const ChartIntervalModal = CompactChartIntervalPicker;
 
 /* ─── Mobile Trade Panel (Binomo-style bottom overlay) ───────────────────── */
 function MobileTradePanel({
@@ -1037,14 +1068,14 @@ function MobileTradePanel({
   });
 
   return (
-    <>
+    <div className="relative">
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "4px 8px 2px" }}>
 
-        {/* Chart interval — tap to open selection sheet */}
+        {/* Chart interval — tap to open compact swipeable picker */}
         <button
-          onClick={() => setShowChartInterval(true)}
-          style={{ ...tbBtn(false), color: "#ffffff", fontSize: 11, fontWeight: 800, letterSpacing: "0.01em" }}
+          onClick={() => { setShowChartInterval(v => !v); setShowDuration(false); }}
+          style={{ ...tbBtn(showChartInterval, "#ffffff"), color: "#ffffff", fontSize: 11, fontWeight: 800, letterSpacing: "0.01em" }}
           title="Grafik Zaman Aralığı"
         >
           {CHART_INTERVALS[chartIntervalIdx]?.label || "5sn"}
@@ -1093,7 +1124,11 @@ function MobileTradePanel({
         </button>
 
         {/* Duration / Calendar */}
-        <button onClick={() => setShowDuration(true)} style={tbBtn(false)} title="Vade Süresi">
+        <button
+          onClick={() => { setShowDuration(v => !v); setShowChartInterval(false); }}
+          style={tbBtn(showDuration, "#ffffff")}
+          title="Vade Süresi"
+        >
           <Calendar size={14} color="#ffffff" />
         </button>
 
@@ -1123,12 +1158,20 @@ function MobileTradePanel({
         onToggleAlig={onToggleAlig}
       />
 
-      {/* ── Chart Interval Sheet ─────────────────────────────────────────── */}
-      <ChartIntervalModal
+      {/* ── Compact Chart Interval Popover (Kaydırarak Seç) ──────────────── */}
+      <CompactChartIntervalPicker
         visible={showChartInterval}
         onClose={() => setShowChartInterval(false)}
         chartIntervalIdx={chartIntervalIdx}
         onSelectInterval={onChartIntervalChange}
+      />
+
+      {/* ── Compact Duration Popover (Kaydırarak Seç) ────────────────────── */}
+      <CompactDurationPicker
+        visible={showDuration}
+        onClose={() => setShowDuration(false)}
+        tf={tf}
+        setTf={setTf}
       />
 
       {/* ── Tutar + Zaman ─────────────────────────────────────────────────── */}
@@ -1168,9 +1211,17 @@ function MobileTradePanel({
 
         {/* Zaman */}
         <button
-          onClick={() => setShowDuration(true)}
+          onClick={() => { setShowDuration(v => !v); setShowChartInterval(false); }}
           data-tour="step-3"
-          style={{ flex: 1, background: "#1c1c1c", borderRadius: 10, padding: "5px 8px", border: "1px solid #252525", textAlign: "left", cursor: "pointer" }}
+          style={{
+            flex: 1,
+            background: "#1c1c1c",
+            borderRadius: 10,
+            padding: "5px 8px",
+            border: showDuration ? "1px solid rgba(255,255,255,0.6)" : "1px solid #252525",
+            textAlign: "left",
+            cursor: "pointer",
+          }}
         >
           <p style={{ fontSize: 8.5, color: "rgba(255,255,255,0.35)", marginBottom: 1, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Zaman</p>
           <p style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", margin: 0 }}>{expiryStr}</p>
@@ -1222,64 +1273,7 @@ function MobileTradePanel({
           <span style={{ fontSize: 13, fontWeight: 500, color: "#fff", fontFamily: "inherit" }}>{cs}{totalReturn}</span>
         </motion.button>
       </div>
-
-      {/* ── Duration picker modal ─────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showDuration && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50"
-              style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
-              onClick={() => setShowDuration(false)}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 420, damping: 38 }}
-              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl"
-              style={{ background: "#0e0e0e", border: "1px solid #222" }}
-            >
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-9 h-1 rounded-full bg-white/15" />
-              </div>
-              <div className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <h2 className="text-sm font-black text-white">İşlem Süresi</h2>
-                  <p className="text-[11px] text-white/30 mt-0.5">Vade süresini seçin</p>
-                </div>
-                <button onClick={() => setShowDuration(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full"
-                  style={{ background: "rgba(255,255,255,0.06)" }}>
-                  <X size={13} className="text-white/50" />
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2 px-4 pb-8 pt-1">
-                {TIMEFRAMES.map((t) => {
-                  const isActive = t.label === tf.label;
-                  return (
-                    <motion.button
-                      key={t.label} whileTap={{ scale: 0.94 }}
-                      onClick={() => { setTf(t); setShowDuration(false); }}
-                      className="flex flex-col items-center justify-center rounded-2xl py-3.5 gap-0.5"
-                      style={{
-                        background: isActive ? "linear-gradient(135deg,#FF6B00,#FF9500)" : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${isActive ? "transparent" : "rgba(255,255,255,0.08)"}`,
-                        boxShadow: isActive ? "0 4px 18px rgba(255,107,0,0.35)" : "none",
-                      }}
-                    >
-                      <span className={`text-base font-black ${isActive ? "text-black" : "text-white"}`}>{t.label}</span>
-                      <span className={`text-[9px] font-semibold ${isActive ? "text-black/60" : "text-white/30"}`}>
-                        {tfSubLabel(t.secs)}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+    </div>
   );
 }
 
@@ -1831,6 +1825,7 @@ export default function Home() {
 
         const te = {
           id: tradeId,
+          symbol: data.asset as string,
           entryTime:  data.entryTime  as number,
           entryPrice: data.entryPrice as number,
           expiryTime,
@@ -1841,7 +1836,7 @@ export default function Home() {
         };
         tournamentEntryFsIdMapRef.current.set(tradeId, change.doc.id);
         setTournamentEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, te]);
-        setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...te, isTournament: true, symbol: asset.label } as any]);
+        setChartEntries(prev => prev.find(e => e.id === tradeId) ? prev : [...prev, { ...te, isTournament: true, symbol: data.asset as string } as any]);
       });
     }, () => {/* ignore permission errors */});
     return () => unsub();
@@ -1991,7 +1986,7 @@ export default function Home() {
       if (isTournament) {
         const ok = await placeTournamentTrade(tradeAmount);
         if (!ok) return;
-        const te = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
+        const te = { id, symbol: asset.label, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
         setTournamentEntries(prev => [...prev, te]);
         setChartEntries(prev => [...prev, { ...te, isTournament: true, symbol: asset.label } as any]);
         /* Save to Firestore immediately so trade persists */
@@ -2007,7 +2002,7 @@ export default function Home() {
       } else if (isReal) {
         const ok = await placeRealTrade(tradeAmount);
         if (!ok) return;
-        const re = { id, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
+        const re = { id, symbol: asset.label, entryTime: now, entryPrice: price, expiryTime: expiryMs, direction: dir, amount: tradeAmount, payoutRate: asset.payout, assetLabel: asset.label };
         setRealEntries(prev => [...prev, re]);
         setChartEntries(prev => [...prev, { ...re, isReal: true, symbol: asset.label }]);
         /* Save to Firestore immediately so trade persists across sessions */
@@ -2245,14 +2240,52 @@ export default function Home() {
             {/* Quick Chart Tools Toolbar */}
             <div className="hidden lg:flex items-center gap-1.5 shrink-0">
               {/* Interval / Timeframe Button */}
-              <button
-                onClick={() => setShowIntervalModal(true)}
-                className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-white/80 hover:text-white transition-all cursor-pointer shrink-0"
-                title="Mum Periyodu / Grafik Zaman Dilimi"
-              >
-                <Clock size={12} className="text-[#FF6B00]" />
-                <span>{CHART_INTERVALS[chartIntervalIdx]?.label || "5sn"}</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowIntervalModal(v => !v)}
+                  className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-white/80 hover:text-white transition-all cursor-pointer shrink-0"
+                  title="Mum Periyodu / Grafik Zaman Dilimi"
+                >
+                  <Clock size={12} className="text-white/80" />
+                  <span>{CHART_INTERVALS[chartIntervalIdx]?.label || "5sn"}</span>
+                  <ChevronDown size={10} className="text-white/40 ml-0.5" />
+                </button>
+
+                <AnimatePresence>
+                  {showIntervalModal && (
+                    <>
+                      <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setShowIntervalModal(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 mt-1.5 z-50 w-[360px] rounded-2xl bg-black/55 backdrop-blur-2xl border border-white/10 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.85)]"
+                      >
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5 touch-pan-x w-full">
+                          {CHART_INTERVALS.map((ci, idx) => {
+                            const isActive = chartIntervalIdx === idx;
+                            return (
+                              <button
+                                key={ci.value}
+                                onClick={() => { setChartIntervalIdx(idx); setShowIntervalModal(false); }}
+                                className={`shrink-0 flex flex-col items-center justify-center min-w-[54px] px-2.5 py-1.5 rounded-xl cursor-pointer transition-all ${
+                                  isActive
+                                    ? "bg-white text-black font-black shadow-[0_2px_14px_rgba(255,255,255,0.4)] scale-[1.03]"
+                                    : "bg-white/[0.05] hover:bg-white/[0.1] text-white/70 hover:text-white border border-white/5"
+                                }`}
+                              >
+                                <span className={`text-[12px] font-black ${isActive ? "text-black" : "text-white"}`}>{ci.label}</span>
+                                <span className={`text-[8.5px] mt-0.5 ${isActive ? "text-black/70 font-semibold" : "text-white/40"}`}>{ci.desc || ci.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Chart Type Toggle */}
               <button
@@ -2604,28 +2637,38 @@ export default function Home() {
                   <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
                     Vade Süresi
                   </span>
-                  <span className="text-[10px] font-bold text-[#FF6B00]">
-                    {tf.label}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold text-white">
+                      {tf.label}
+                    </span>
+                    <span className="text-[9px] text-white/40 font-medium">
+                      ({tfSubLabel(tf.secs)})
+                    </span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5 mt-0.5">
-                  {TIMEFRAMES.slice(0, 6).map(tFrame => {
-                    const isSelected = tf.label === tFrame.label;
-                    return (
-                      <button
-                        key={tFrame.label}
-                        onClick={() => setTf(tFrame)}
-                        className={`rounded-xl py-2 text-xs font-bold transition-all cursor-pointer border ${
-                          isSelected
-                            ? "bg-[#FF6B00] border-[#FF6B00] text-black font-black shadow-sm"
-                            : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        {tFrame.label}
-                      </button>
-                    );
-                  })}
+                <div className="relative flex items-center mt-0.5">
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 touch-pan-x w-full select-none">
+                    {TIMEFRAMES.map(tFrame => {
+                      const isSelected = tf.label === tFrame.label;
+                      return (
+                        <button
+                          key={tFrame.label}
+                          onClick={() => setTf(tFrame)}
+                          className={`shrink-0 flex flex-col items-center justify-center min-w-[54px] px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer border ${
+                            isSelected
+                              ? "bg-white border-white text-black font-black shadow-[0_2px_14px_rgba(255,255,255,0.4)] scale-[1.03]"
+                              : "bg-white/5 border-white/5 text-white/50 hover:bg-white/10 hover:text-white font-semibold"
+                          }`}
+                        >
+                          <span className={`text-xs font-black leading-none ${isSelected ? "text-black" : "text-white"}`}>{tFrame.label}</span>
+                          <span className={`text-[8.5px] mt-0.5 ${isSelected ? "text-black/70 font-semibold" : "text-white/30"}`}>
+                            {tfSubLabel(tFrame.secs)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -2745,12 +2788,6 @@ export default function Home() {
         visible={showSignalModal}
         onClose={() => setShowSignalModal(false)}
         assetLabel={asset.label}
-      />
-      <ChartIntervalModal 
-        visible={showIntervalModal} 
-        onClose={() => setShowIntervalModal(false)} 
-        chartIntervalIdx={chartIntervalIdx}
-        onSelectInterval={setChartIntervalIdx}
       />
       <IndicatorsModal
         visible={showIndicatorsModal}

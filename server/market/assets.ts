@@ -23,8 +23,8 @@ export interface AssetConfig {
  */
 export const ASSETS: AssetConfig[] = [
   { symbol: "Crypto IDX",         base: 6850.25, vol: 0.00030, revert: 0.0008, digits: 2 },
-  { symbol: "AUD/CAD",            base: 0.9900,  vol: 0.00004, revert: 0.0010, digits: 5, isRealFeed: true },
-  { symbol: "AUD/CHF",            base: 0.5520,  vol: 0.00011, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/CAD",            base: 0.9900,  vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/CHF",            base: 0.5520,  vol: 0.00003, revert: 0.0010, digits: 5 },
   { symbol: "AUD/DKK",            base: 4.4200,  vol: 0.00009, revert: 0.0010, digits: 4 },
   { symbol: "AUD/HUF",            base: 233.50,  vol: 0.00011, revert: 0.0010, digits: 3 },
   { symbol: "AUD/JPY",            base: 97.20,   vol: 0.00012, revert: 0.0010, digits: 3 },
