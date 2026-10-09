@@ -11,6 +11,7 @@ export interface Candle {
 }
 
 const CANDLE_SECS = 5;
+const HISTORY_96H_COUNT = 69120; // 96 hours of 5-second candles (96 * 3600 / 5)
 
 type Listener = (candle: Candle) => void;
 
@@ -115,19 +116,19 @@ export function getDeterministicPrice(symbol: string, timeMs: number): number {
   const frac = (tSec % 5) / 5;
   const smoothFrac = frac * frac * (3 - 2 * frac);
 
-  const n0 = (hashToFloat(hash32(sSeed ^ 0x3c6ef372, b0)) - 0.5) * 0.0016;
-  const n1 = (hashToFloat(hash32(sSeed ^ 0x3c6ef372, b0 + 1)) - 0.5) * 0.0016;
+  const volFactor = vol / 0.00010;
+  const n0 = (hashToFloat(hash32(sSeed ^ 0x3c6ef372, b0)) - 0.5) * (0.0005 * volFactor);
+  const n1 = (hashToFloat(hash32(sSeed ^ 0x3c6ef372, b0 + 1)) - 0.5) * (0.0005 * volFactor);
   const noiseInterp = n0 + (n1 - n0) * smoothFrac;
 
   // 3. Smooth micro tick jitter (moving every ~200ms)
   const subB = Math.floor(tSec / 0.2);
   const subFrac = (tSec % 0.2) / 0.2;
   const subSmooth = subFrac * subFrac * (3 - 2 * subFrac);
-  const j0 = (hashToFloat(hash32(sSeed ^ 0xbb67ae85, subB)) - 0.5) * 0.0003;
-  const j1 = (hashToFloat(hash32(sSeed ^ 0xbb67ae85, subB + 1)) - 0.5) * 0.0003;
+  const j0 = (hashToFloat(hash32(sSeed ^ 0xbb67ae85, subB)) - 0.5) * (0.00008 * volFactor);
+  const j1 = (hashToFloat(hash32(sSeed ^ 0xbb67ae85, subB + 1)) - 0.5) * (0.00008 * volFactor);
   const jitter = j0 + (j1 - j0) * subSmooth;
 
-  const volFactor = vol / 0.00010;
   const totalRelative = (octaveSum + noiseInterp + jitter) * volFactor;
 
   // Soft hyperbolic tangent compression to prevent extreme unbounded divergence
@@ -168,11 +169,11 @@ export function getDeterministicCandle(symbol: string, bucketSec: number): Candl
   };
 }
 
-/** Fallback generator for 24h history */
+/** Fallback generator for 96h history */
 function generateHistorySlow(symbol: string): Candle[] {
   const nowMs = Date.now();
   const currentBucketSec = Math.floor(nowMs / (CANDLE_SECS * 1000)) * CANDLE_SECS;
-  const count = 17280; // 24 hours of 5s candles
+  const count = HISTORY_96H_COUNT; // 96 hours of 5s candles
   const startBucketSec = currentBucketSec - count * CANDLE_SECS;
 
   const candles: Candle[] = new Array(count);
@@ -244,7 +245,7 @@ class AssetMarket {
     // If bucket changed, archive the finalized previous candle to history
     if (this.live && this.live.time < bucketSec) {
       this.history.push(this.live);
-      if (this.history.length > 17280) {
+      if (this.history.length > HISTORY_96H_COUNT) {
         this.history.shift();
       }
     }
@@ -326,14 +327,14 @@ function expand1mTo5sCandles(
   for (let i = 0; i < 12; i++) {
     const t = T + i * CANDLE_SECS;
     const open = i === 0 ? O : prices[i];
-    const close = i === 11 ? C : prices[i + 1] ?? prices[i];
+    const close = i === 11 ? C : (prices[i + 1] ?? prices[i]);
     let high = Math.max(open, close);
     let low = Math.min(open, close);
     if (i === 3) {
-      if (isUp) low = L; else high = H;
+      if (isUp) low = Math.min(low, L); else high = Math.max(high, H);
     }
     if (i === 8) {
-      if (isUp) high = H; else low = L;
+      if (isUp) high = Math.max(high, H); else low = Math.min(low, L);
     }
     sub5s.push({
       time: t,
@@ -399,10 +400,10 @@ class RealForexMarket {
     this.isFetchingHistory = true;
     try {
       const res = await fetch(
-        "https://query1.finance.yahoo.com/v8/finance/chart/AUDCAD=X?interval=1m&range=2d",
+        "https://query1.finance.yahoo.com/v8/finance/chart/AUDCAD=X?interval=1m&range=5d",
         {
           headers: { "User-Agent": "Mozilla/5.0" },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(8000),
         },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -412,7 +413,7 @@ class RealForexMarket {
       const quote = res0?.indicators?.quote?.[0];
       if (!timestamps.length || !quote) throw new Error("Empty history data");
 
-      // Group and align into clean 60-second minute boundaries
+      // Group and align into clean 60-second minute boundaries, clamping outlier phantom wicks
       const minuteMap = new Map<number, { time: number; open: number; high: number; low: number; close: number }>();
       for (let i = 0; i < timestamps.length; i++) {
         const rawT = timestamps[i];
@@ -423,19 +424,25 @@ class RealForexMarket {
         const c = quote.close?.[i];
         if (typeof o !== "number" || typeof h !== "number" || typeof l !== "number" || typeof c !== "number") continue;
 
+        // Clean retail phantom bad-tick outlier wicks on Yahoo Finance feed
+        const body = Math.abs(c - o);
+        const maxWick = Math.max(0.00018, body * 1.8);
+        const cleanL = Math.max(l, Math.min(o, c) - maxWick);
+        const cleanH = Math.min(h, Math.max(o, c) + maxWick);
+
         const minuteT = Math.floor(rawT / 60) * 60;
         const existing = minuteMap.get(minuteT);
         if (!existing) {
           minuteMap.set(minuteT, {
             time: minuteT,
             open: roundTo(o, this.cfg.digits),
-            high: roundTo(h, this.cfg.digits),
-            low: roundTo(l, this.cfg.digits),
+            high: roundTo(cleanH, this.cfg.digits),
+            low: roundTo(cleanL, this.cfg.digits),
             close: roundTo(c, this.cfg.digits),
           });
         } else {
-          existing.high = Math.max(existing.high, roundTo(h, this.cfg.digits));
-          existing.low = Math.min(existing.low, roundTo(l, this.cfg.digits));
+          existing.high = Math.max(existing.high, roundTo(cleanH, this.cfg.digits));
+          existing.low = Math.min(existing.low, roundTo(cleanL, this.cfg.digits));
           existing.close = roundTo(c, this.cfg.digits);
         }
       }
@@ -481,7 +488,7 @@ class RealForexMarket {
           fillTime += CANDLE_SECS;
         }
 
-        const capped = sorted5s.slice(-17280);
+        const capped = sorted5s.slice(-HISTORY_96H_COUNT);
         const finalClosedCandle = capped[capped.length - 1];
         this.realTargetPrice = finalClosedCandle.close;
         this.currentPrice = finalClosedCandle.close;
@@ -501,7 +508,7 @@ class RealForexMarket {
 
         logger.info(
           { symbol: this.cfg.symbol, count: this.history.length, latest: finalClosedCandle.close },
-          "Loaded real AUD/CAD market history",
+          "Loaded real AUD/CAD 96h market history",
         );
       }
     } catch (err: any) {
@@ -585,13 +592,13 @@ class RealForexMarket {
   private applyTick(ms: number): void {
     const bucketSec = Math.floor(ms / (CANDLE_SECS * 1000)) * CANDLE_SECS;
 
-    // Fast, smooth glide towards realTargetPrice (40% per 100ms)
+    // Smooth glide towards realTargetPrice (18% per 100ms)
     const diff = this.realTargetPrice - this.currentPrice;
-    this.currentPrice += diff * 0.40;
+    this.currentPrice += diff * 0.18;
 
     // Organic micro-tick variation
     this.subTickPhase = (this.subTickPhase + 1) % 628;
-    const microJitter = (Math.sin(this.subTickPhase * 0.45) + Math.cos(this.subTickPhase * 0.85)) * 0.00001;
+    const microJitter = (Math.sin(this.subTickPhase * 0.45) + Math.cos(this.subTickPhase * 0.85)) * 0.000003;
     const tickPrice = roundTo(this.currentPrice + microJitter, this.cfg.digits);
 
     if (!this.live || bucketSec > this.live.time) {
@@ -599,7 +606,7 @@ class RealForexMarket {
         const lastInHistory = this.history[this.history.length - 1];
         if (!lastInHistory || this.live.time > lastInHistory.time) {
           this.history.push(this.live);
-          if (this.history.length > 17280) this.history.shift();
+          if (this.history.length > HISTORY_96H_COUNT) this.history.shift();
         } else if (this.live.time === lastInHistory.time) {
           this.history[this.history.length - 1] = this.live;
         }
