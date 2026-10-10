@@ -182,9 +182,11 @@ export function KycModal({ show, onClose }: KycModalProps) {
           <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
             <div>
               <h3 className="text-sm font-bold text-white/90">{t.kycTitle}</h3>
-              <p className="text-[11px] text-white/40">
-                {isVerified ? t.kycVerified : t.kycNotVerified}
-              </p>
+              {isVerified && (
+                <p className="text-[11px] text-emerald-400 font-semibold">
+                  {t.kycVerified}
+                </p>
+              )}
             </div>
             <button
               onClick={onClose}

@@ -159,7 +159,7 @@ export function SplashScreen({ onComplete, isWidgetReady }: SplashScreenProps) {
             transition={{ delay: 1 }}
             className="absolute bottom-8 text-[10px] font-medium text-muted-foreground"
           >
-            v1.0.0 • Demo
+            v5.2.4 • Demo
           </motion.p>
         </motion.div>
       )}

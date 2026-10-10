@@ -326,7 +326,7 @@ function AppContent() {
 
                   {/* App version */}
                   <div className="text-xs text-white/20 tracking-widest font-mono">
-                    Version 1.0.0
+                    Version 5.2.4
                   </div>
                 </div>
               )}

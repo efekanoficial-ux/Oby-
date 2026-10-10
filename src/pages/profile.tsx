@@ -214,16 +214,18 @@ export default function Profile() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-white/90">{t.kycTitle}</h3>
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
-                        style={{
-                          backgroundColor: isVerified ? "rgba(14,203,129,0.12)" : currentUser.kycStatus === "pending" ? "rgba(255,184,0,0.12)" : "rgba(255,255,255,0.03)",
-                          borderColor: isVerified ? "rgba(14,203,129,0.25)" : currentUser.kycStatus === "pending" ? "rgba(255,184,0,0.25)" : "rgba(255,255,255,0.08)",
-                          color: isVerified ? "#0ecb81" : currentUser.kycStatus === "pending" ? "#FFB800" : "rgba(255,255,255,0.4)"
-                        }}
-                      >
-                        {isVerified ? t.kycVerified : currentUser.kycStatus === "pending" ? t.kycPending : t.kycNotVerified}
-                      </span>
+                      {(isVerified || currentUser.kycStatus === "pending") && (
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                          style={{
+                            backgroundColor: isVerified ? "rgba(14,203,129,0.12)" : "rgba(255,184,0,0.12)",
+                            borderColor: isVerified ? "rgba(14,203,129,0.25)" : "rgba(255,184,0,0.25)",
+                            color: isVerified ? "#0ecb81" : "#FFB800"
+                          }}
+                        >
+                          {isVerified ? t.kycVerified : t.kycPending}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-white/35 mt-0.5">
                       {isVerified
@@ -298,21 +300,16 @@ export default function Profile() {
               </motion.button>
             </div>
 
-            {/* Delete Account */}
+            {/* Delete Account (Small red text under logout) */}
             {currentUser && (
-              <div className="mt-2.5 overflow-hidden rounded-2xl" style={{ backgroundColor: "#111111", border: "1px solid #1e1e1e" }}>
-                <motion.button
-                  whileTap={{ scale: 0.99 }}
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left group transition hover:bg-red-500/5 cursor-pointer"
+                  className="text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors cursor-pointer py-1 px-2 hover:underline"
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: "rgba(239,68,68,0.08)" }}>
-                    <Trash2 size={15} className="text-red-500/80 group-hover:text-red-500 transition-colors" />
-                  </div>
-                  <span className="text-sm font-semibold text-red-500/80 group-hover:text-red-500 transition-colors">
-                    {t.deleteAccount}
-                  </span>
-                </motion.button>
+                  {t.deleteAccount}
+                </button>
               </div>
             )}
           </div>

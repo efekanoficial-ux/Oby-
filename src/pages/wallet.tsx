@@ -60,6 +60,7 @@ function QRVisual({ data, imgSrc }: { data: string; imgSrc?: string }) {
 
 /* ─── 15-min countdown ───────────────────────────────────────────────────── */
 function Countdown({ startedAt }: { startedAt: number }) {
+  const { langCode } = useLanguage();
   const [rem, setRem] = useState(15 * 60 - Math.floor((Date.now() - startedAt) / 1000));
   useEffect(() => {
     const iv = setInterval(() => setRem(Math.max(0, 15 * 60 - Math.floor((Date.now() - startedAt) / 1000))), 500);
@@ -67,17 +68,21 @@ function Countdown({ startedAt }: { startedAt: number }) {
   }, [startedAt]);
   const mm = Math.floor(rem / 60).toString().padStart(2, "0");
   const ss = (rem % 60).toString().padStart(2, "0");
+  const subText = langCode === "tr"
+    ? "içinde transferi tamamlayın"
+    : (langCode === "de" ? "verbleibend für Überweisung" : "remaining to complete transfer");
   return (
     <div className="flex items-center gap-2 rounded-xl px-4 py-3 border border-white/10 bg-white/[0.04]">
       <Clock size={15} className="text-white" />
       <span className="text-sm font-black font-mono tracking-wider text-white">{mm}:{ss}</span>
-      <span className="text-xs text-white flex-1">içinde transferi tamamlayın</span>
+      <span className="text-xs text-white flex-1">{subText}</span>
     </div>
   );
 }
 
 /* ─── Copy Button ────────────────────────────────────────────────────────── */
 function CopyBtn({ text }: { text: string }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
@@ -95,7 +100,7 @@ function CopyBtn({ text }: { text: string }) {
       }}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
-      {copied ? "Kopyalandı" : "Kopyala"}
+      {copied ? t.copied : t.copy}
     </button>
   );
 }
@@ -634,45 +639,45 @@ export default function WalletPage() {
           </div>
 
           {/* Quick Segment Switcher Tabs */}
-          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-black/60 border border-white/5">
+          <div className="grid grid-cols-3 gap-0.5 p-0.5 rounded-lg bg-black/40">
             <button
               onClick={() => switchTab("deposit")}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
                 tab === "deposit"
-                  ? "bg-white/15 text-white shadow-md"
-                  : "text-white/40 hover:text-white/80"
+                  ? "bg-white/10 text-white"
+                  : "text-white/30 hover:text-white/60"
               }`}
             >
-              <ArrowDownLeft size={13} strokeWidth={2.6} />
-              <span>{t.depositBtn}</span>
+              <ArrowDownLeft size={10} strokeWidth={2.4} />
+              <span className="truncate">{t.depositBtn}</span>
             </button>
 
             <button
               onClick={() => switchTab("withdraw")}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
                 tab === "withdraw"
-                  ? "bg-white/15 text-white shadow-md"
-                  : "text-white/40 hover:text-white/80"
+                  ? "bg-white/10 text-white"
+                  : "text-white/30 hover:text-white/60"
               }`}
             >
-              <ArrowUpRight size={13} strokeWidth={2.6} />
-              <span>{t.withdrawBtn}</span>
+              <ArrowUpRight size={10} strokeWidth={2.4} />
+              <span className="truncate">{t.withdrawBtn}</span>
             </button>
 
             <button
               onClick={() => switchTab("pending")}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all relative cursor-pointer ${
+              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all relative cursor-pointer ${
                 tab === "pending"
-                  ? "bg-white/15 text-white shadow-md"
-                  : "text-white/40 hover:text-white/80"
+                  ? "bg-white/10 text-white"
+                  : "text-white/30 hover:text-white/60"
               }`}
             >
-              <Clock size={13} strokeWidth={2.4} />
-              <span>{t.transactionsTab}</span>
+              <Clock size={10} strokeWidth={2.2} />
+              <span className="truncate">{t.transactionsTab}</span>
               {pendingRequests.length > 0 ? (
-                <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1.5 right-1.5 animate-pulse" />
+                <span className="h-1 w-1 rounded-full bg-[#FFB800] absolute top-1 right-1 animate-pulse" />
               ) : unviewedRejections.length > 0 ? (
-                <span className="h-2 w-2 rounded-full bg-[#f6465d] absolute top-1.5 right-1.5" />
+                <span className="h-1 w-1 rounded-full bg-[#f6465d] absolute top-1 right-1" />
               ) : null}
             </button>
           </div>
@@ -697,15 +702,15 @@ export default function WalletPage() {
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-bold text-white block truncate">
-                    İşlem Talebiniz Reddedildi
+                    {t.requestRejectedTitle}
                   </span>
                   <span className="text-[11px] text-white/60 block truncate">
-                    {unviewedRejections[0].rejectionReason || "Detayları görmek için işlemleri inceleyin."}
+                    {unviewedRejections[0].rejectionReason || (t.rejectionReasonLabel || "Detaylar")}
                   </span>
                 </div>
               </div>
               <span className="text-[11px] font-bold text-[#f6465d] shrink-0 ml-2">
-                İncele →
+                {t.review} →
               </span>
             </motion.div>
           )}
@@ -724,11 +729,11 @@ export default function WalletPage() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-black text-white truncate">{activeDepositBonus.bonusTitle}</span>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#FF6B00] text-black uppercase tracking-wider">
-                          +% {activeDepositBonus.amount} AKTİF
+                          +% {activeDepositBonus.amount} {t.active}
                         </span>
                       </div>
                       <p className="text-[11px] text-white/70 leading-tight mt-0.5">
-                        Bu yatırımınıza <b>+% {activeDepositBonus.amount} ekstra bakiye</b> otomatik eklenecektir.
+                        {t.bonusAddedNotice.replace("%{amount}", activeDepositBonus.amount.toString())}
                       </p>
                     </div>
                   </div>
@@ -759,12 +764,12 @@ export default function WalletPage() {
                   </div>
 
                   {depositMethods.length === 0 ? (
-                    <div className="rounded-2xl p-6 border border-white/10 bg-black/40 text-center flex flex-col items-center gap-3 my-2">
+                    <div className="rounded-2xl p-6 bg-black/40 text-center flex flex-col items-center gap-3 my-2">
                       <AlertCircle size={28} className="text-[#FFB800]" />
                       <div>
-                        <p className="text-sm font-bold text-white">Aktif Yatırma Yöntemi Bulunmuyor</p>
+                        <p className="text-sm font-bold text-white">{t.noActiveDepositMethods}</p>
                         <p className="text-xs text-white/40 mt-1">
-                          Ödeme yöntemleri şu anda sistem yöneticisi tarafından geçici olarak kapatılmıştır. Lütfen daha sonra tekrar deneyiniz.
+                          {t.noActiveDepositMethodsDesc}
                         </p>
                       </div>
                     </div>
@@ -777,10 +782,10 @@ export default function WalletPage() {
                             key={m.id}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => selectDepositMethod(m)}
-                            className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 border text-left transition-all hover:border-white/20 cursor-pointer h-[64px]"
+                            className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left transition-all cursor-pointer h-[64px]"
                             style={{
                               background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
-                              borderColor: `${m.color}25`,
+                              border: "none",
                             }}
                           >
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center">
@@ -796,7 +801,6 @@ export default function WalletPage() {
                                     style={{
                                       backgroundColor: `${m.color}20`,
                                       color: m.color,
-                                      border: `1px solid ${m.color}40`,
                                     }}
                                   >
                                     {m.badge}
@@ -819,10 +823,10 @@ export default function WalletPage() {
                   )}
 
                   {/* Security Badge */}
-                  <div className="flex items-center gap-2 rounded-2xl p-3.5 border border-white/5 bg-white/[0.02] mt-2">
+                  <div className="flex items-center gap-2 rounded-2xl p-3.5 bg-white/[0.02] mt-2">
                     <ShieldCheck size={16} className="text-[#0ecb81] shrink-0" />
                     <p className="text-[11px] text-white/40 leading-relaxed">
-                      Tüm para transferleri 256-bit SSL ve blokzincir doğrulamasıyla güvenli bir şekilde işlenir.
+                      {t.sslSecurityNotice}
                     </p>
                   </div>
                 </motion.div>
@@ -841,7 +845,7 @@ export default function WalletPage() {
                     onClick={() => setDStep("method")}
                     className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
                   >
-                    <ArrowLeft size={13} /> Farklı yöntem seç
+                    <ArrowLeft size={13} /> {t.chooseDifferentMethod}
                   </button>
 
                   <div className="rounded-2xl p-4 border border-white/10 bg-black/50">
@@ -852,7 +856,7 @@ export default function WalletPage() {
                       <div>
                         <p className="text-xs font-black text-white">{method.label}</p>
                         <p className="text-[11px] text-white/40">
-                          Minimum Tutar: {isTL ? `₺${method.min}` : `$${method.min}`}
+                          {t.minDepositAmount} {isTL ? `₺${method.min}` : `$${method.min}`}
                         </p>
                       </div>
                     </div>
@@ -860,7 +864,7 @@ export default function WalletPage() {
 
                   <div>
                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-2">
-                      Yatırılacak Tutar ({isTL ? "TL" : method.currency})
+                      {t.depositAmount} ({isTL ? "TL" : method.currency})
                     </label>
                     <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black px-4 py-3.5 focus-within:border-[#0ecb81]/50 transition-colors">
                       <span className="text-2xl font-black text-white/30">
@@ -908,7 +912,7 @@ export default function WalletPage() {
                           </span>
                         </div>
                         <p className="text-[10px] text-white/35 mt-1.5 leading-relaxed">
-                          * Dolar hesabınız için TR IBAN hesabına güncel kurdan (1 USD = 38.00 TL) TL transferi yapılacaktır.
+                          * {t.wireConversionNotice}
                         </p>
                       </div>
                     )}
@@ -924,7 +928,7 @@ export default function WalletPage() {
                       boxShadow: `0 8px 24px ${method.color}35`,
                     }}
                   >
-                    Devam Et →
+                    {t.continueBtn} →
                   </motion.button>
                 </motion.div>
               )}
@@ -942,16 +946,16 @@ export default function WalletPage() {
                     onClick={() => setDStep("amount")}
                     className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
                   >
-                    <ArrowLeft size={13} /> Tutarı Değiştir
+                    <ArrowLeft size={13} /> {t.changeAmount}
                   </button>
 
                   <div className="rounded-2xl p-4 border border-[#0ecb81]/25"
                     style={{ background: "rgba(14,203,129,0.05)" }}>
                     <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
                       <div>
-                        <span className="text-xs font-bold text-white/50 block">Transfer Edilecek Tutar (TL)</span>
+                        <span className="text-xs font-bold text-white/50 block">{t.depositAmount} (TL)</span>
                         {!isTL && (
-                          <span className="text-[10px] text-white/35">Dolar Hesabı İçin Kur: 1 USD = 38.00 TL</span>
+                          <span className="text-[10px] text-white/35">{t.wireExchangeRateLabel}</span>
                         )}
                       </div>
                       <div className="text-right">
@@ -962,25 +966,27 @@ export default function WalletPage() {
                           }
                         </span>
                         {!isTL && (
-                          <span className="text-[10px] font-bold text-white/40">Hesabınıza +${amount} USD yatacaktır</span>
+                          <span className="text-[10px] font-bold text-white/40">
+                            {t.wireAccountCreditNotice.replace("{amount}", amount)}
+                          </span>
                         )}
                       </div>
                     </div>
 
                     {[
-                      { label: "Banka", value: paymentSettings.ibanBank || "Garanti BBVA", copy: false },
-                      { label: "Hesap Sahibi", value: paymentSettings.ibanHolder || "Obyo Financial Technologies Ltd.", copy: true },
-                      { label: "IBAN", value: paymentSettings.ibanNumber || "TR88 0006 2000 8765 4321 0099 73", copy: true },
+                      { label: t.bank, value: paymentSettings.ibanBank || "Garanti BBVA", copy: false },
+                      { label: t.accountHolder, value: paymentSettings.ibanHolder || "Obyo Financial Technologies Ltd.", copy: true },
+                      { label: t.iban, value: paymentSettings.ibanNumber || "TR88 0006 2000 8765 4321 0099 73", copy: true },
                       {
-                        label: "Yatırılacak Tutar (TL)",
+                        label: `${t.depositAmount} (TL)`,
                         value: isTL
                           ? `₺${parseFloat(amount || "0").toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : `₺${(parseFloat(amount || "0") * USD_TRY_RATE).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                         copy: true,
                         accent: "#0ecb81"
                       },
-                      ...(!isTL ? [{ label: "Hesaba Geçecek Tutar", value: `$${amount} USD`, copy: false }] : []),
-                      { label: "Açıklama (Zorunlu)", value: transferCode, copy: true, accent: "#FFB800" },
+                      ...(!isTL ? [{ label: "USD", value: `$${amount} USD`, copy: false }] : []),
+                      { label: t.descriptionMandatory, value: transferCode, copy: true, accent: "#FFB800" },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                         <span className="text-xs text-white/40 shrink-0">{row.label}</span>
@@ -997,7 +1003,7 @@ export default function WalletPage() {
                   <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/10 bg-white/[0.03]">
                     <AlertCircle size={16} className="text-white mt-0.5 shrink-0" />
                     <p className="text-xs text-white leading-relaxed">
-                      Lütfen bankanızın transfer açıklama kısmına kesinlikle <span className="text-white font-bold underline">"{transferCode}"</span> kodunu yazınız. Bu açıklama olmadan yapılan transferler eşleştirilemez.
+                      {t.wireRefNotice} <span className="text-white font-bold underline">"{transferCode}"</span>
                     </p>
                   </div>
 
@@ -1012,26 +1018,24 @@ export default function WalletPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <FileText size={16} className="text-[#0ecb81]" />
-                              <span className="text-xs font-black text-white">Transfer Dekontu</span>
+                              <span className="text-xs font-black text-white">{t.transferReceipt}</span>
                               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                                 isReceiptMandatory
                                   ? "bg-[#f6465d]/20 text-[#f6465d] border border-[#f6465d]/40"
                                   : "bg-[#0ecb81]/20 text-[#0ecb81] border border-[#0ecb81]/40"
                               }`}>
-                                {isReceiptMandatory ? "Zorunlu" : "İsteğe Bağlı"}
+                                {isReceiptMandatory ? t.mandatory : t.optional}
                               </span>
                             </div>
                             {receiptFile && (
                               <span className="text-[10px] font-bold text-[#0ecb81] flex items-center gap-1">
-                                <CheckCircle2 size={12} /> Yüklendi
+                                <CheckCircle2 size={12} /> {t.uploaded}
                               </span>
                             )}
                           </div>
 
                           <p className="text-[11px] text-white/50 leading-relaxed">
-                            {isReceiptMandatory
-                              ? "Transferinizi bankanızdan gerçekleştirdikten sonra oluşan dekontun ekran görüntüsünü veya fotoğrafını yükleyiniz. Transferiniz admin tarafından dekont kontrol edilerek onaylanacaktır."
-                              : "Dilerseniz transfer dekontunuzu yükleyerek işleminizin daha hızlı onaylanmasını sağlayabilirsiniz. (İsteğe bağlı)"}
+                            {isReceiptMandatory ? t.wireReceiptDescMandatory : t.wireReceiptDescOptional}
                           </p>
 
                           {/* Gizli Dosya Seçici */}
@@ -1213,13 +1217,13 @@ export default function WalletPage() {
                         <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/8 bg-black/60 p-5">
                           <p className="text-xs font-bold text-white/50">{method.label} — {networkLabel}</p>
                           <QRVisual data={cryptoAddress} imgSrc={qrImgSrc} />
-                          <span className="text-[10px] text-white/30 font-medium">QR kodunu cüzdanınızla taratın</span>
+                          <span className="text-[10px] text-white/30 font-medium">{t.scanQrWithWallet}</span>
                         </div>
 
                         <div className="rounded-2xl border border-white/8 bg-black/60 p-4">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-bold text-white/35 uppercase tracking-widest">
-                              Yatırma Cüzdan Adresi
+                              {t.depositWalletAddress}
                             </span>
                             <CopyBtn text={cryptoAddress} />
                           </div>
@@ -1230,25 +1234,25 @@ export default function WalletPage() {
 
                         <div className="grid grid-cols-3 gap-2">
                           <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
-                            <p className="text-[9px] text-white/30 font-bold uppercase">Ağ</p>
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.network}</p>
                             <p className="text-xs font-black text-white mt-0.5">{networkLabel}</p>
                           </div>
                           <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
-                            <p className="text-[9px] text-white/30 font-bold uppercase">Tutar</p>
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.amount}</p>
                             <p className="text-xs font-black text-[#0ecb81] mt-0.5">
                               {isTL ? `₺${amount}` : `$${amount} USDT`}
                             </p>
                           </div>
                           <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
-                            <p className="text-[9px] text-white/30 font-bold uppercase">Onay Süresi</p>
-                            <p className="text-xs font-black text-white mt-0.5">~1-3 Dakika</p>
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.confirmationTime}</p>
+                            <p className="text-xs font-black text-white mt-0.5">{t.approxMinutes}</p>
                           </div>
                         </div>
 
                         <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-[#f6465d]/20 bg-[#f6465d]/[0.05]">
                           <AlertCircle size={15} className="text-[#f6465d] mt-0.5 shrink-0" />
                           <p className="text-xs text-white/50 leading-relaxed">
-                            Yalnızca <span className="text-white font-bold">{networkLabel}</span> ağı üzerinden <span className="text-white font-bold">USDT</span> transferi yapınız. Farklı ağlardan gönderilen fonlar kurtarılamaz.
+                            Yalnızca <span className="text-white font-bold">{networkLabel}</span> ağı üzerinden <span className="text-white font-bold">USDT</span> transferi yapınız.
                           </p>
                         </div>
 
@@ -1262,7 +1266,7 @@ export default function WalletPage() {
                             boxShadow: `0 8px 24px ${method.color}30`,
                           }}
                         >
-                          {isSubmitting ? "İşleniyor..." : "✓ Gönderimi Tamamladım"}
+                          {isSubmitting ? t.processing : t.completedDeposit}
                         </motion.button>
                       </>
                     );
@@ -1283,7 +1287,7 @@ export default function WalletPage() {
                     onClick={() => setDStep("amount")}
                     className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
                   >
-                    <ArrowLeft size={13} /> Tutarı Değiştir
+                    <ArrowLeft size={13} /> {t.changeAmount}
                   </button>
 
                   {countdownAt && <Countdown startedAt={countdownAt} />}
@@ -1291,9 +1295,9 @@ export default function WalletPage() {
                   {/* QR Code container if available */}
                   {method.customData.qrCode && (
                     <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/8 bg-black/60 p-5">
-                      <p className="text-xs font-bold text-white/50">{method.label} — Karekod ile Ödeme</p>
+                      <p className="text-xs font-bold text-white/50">{method.label}</p>
                       <QRVisual data={method.customData.accountNumber || method.customData.name} imgSrc={method.customData.qrCode} />
-                      <span className="text-[10px] text-white/30 font-medium">QR kodu taratarak transfer yapabilirsiniz</span>
+                      <span className="text-[10px] text-white/30 font-medium">{t.scanQrWithWallet}</span>
                     </div>
                   )}
 
@@ -1307,7 +1311,7 @@ export default function WalletPage() {
                   >
                     <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
                       <div>
-                        <span className="text-xs font-bold text-white/50 block">Yatırma Bilgileri</span>
+                        <span className="text-xs font-bold text-white/50 block">{t.depositDetails}</span>
                         <span className="text-[10px] text-white/35">{method.label}</span>
                       </div>
                       <div className="text-right">
@@ -1318,15 +1322,15 @@ export default function WalletPage() {
                     </div>
 
                     {[
-                      ...(method.customData.accountHolder ? [{ label: "Alıcı / Hesap Sahibi", value: method.customData.accountHolder, copy: true }] : []),
-                      ...(method.customData.accountNumber ? [{ label: "Hesap / Cüzdan No", value: method.customData.accountNumber, copy: true, accent: "#ffffff" }] : []),
+                      ...(method.customData.accountHolder ? [{ label: t.accountHolder, value: method.customData.accountHolder, copy: true }] : []),
+                      ...(method.customData.accountNumber ? [{ label: t.destinationAddress, value: method.customData.accountNumber, copy: true, accent: "#ffffff" }] : []),
                       {
-                        label: "Yatırılacak Tutar",
+                        label: t.depositAmount,
                         value: isTL || method.currency === "TL" ? `₺${amount}` : `${amount} ${method.currency}`,
                         copy: true,
                         accent: "#0ecb81"
                       },
-                      ...(method.customData.transferCode ? [{ label: "Açıklama / Referans Kodu", value: method.customData.transferCode, copy: true, accent: "#FFB800" }] : []),
+                      ...(method.customData.transferCode ? [{ label: t.descriptionMandatory, value: method.customData.transferCode, copy: true, accent: "#FFB800" }] : []),
                       ...(method.customData.customRows || []).map(r => ({ label: r.label, value: r.value, copy: r.copy !== false })),
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
@@ -1359,7 +1363,7 @@ export default function WalletPage() {
                     <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/8 bg-white/[0.03]">
                       <AlertCircle size={16} className="text-white/40 mt-0.5 shrink-0" />
                       <p className="text-xs text-white/50 leading-relaxed">
-                        Lütfen yukarıda belirtilen hesap bilgilerine transferinizi gönderdikten sonra aşağıdaki butona tıklayarak transfer bildirimini tamamlayınız.
+                        Lütfen belirtilen hesap bilgilerine transferinizi tamamladıktan sonra butona tıklayınız.
                       </p>
                     </div>
                   )}
@@ -1374,7 +1378,7 @@ export default function WalletPage() {
                       boxShadow: `0 8px 24px ${method.color}30`,
                     }}
                   >
-                    {isSubmitting ? "İşleniyor..." : "✓ Gönderimi Tamamladım"}
+                    {isSubmitting ? t.processing : t.completedDeposit}
                   </motion.button>
                 </motion.div>
               )}
@@ -1398,9 +1402,9 @@ export default function WalletPage() {
                   </motion.div>
 
                   <div>
-                    <h3 className="text-xl font-black text-white mb-1.5">Yatırım Talebi Gönderildi</h3>
+                    <h3 className="text-xl font-black text-white mb-1.5">{t.depositRequestSent}</h3>
                     <p className="text-sm text-white/50 leading-relaxed max-w-sm">
-                      Transfer bildiriminiz sisteme ulaştı. Kontroller tamamlandıktan sonra bakiye hesabınıza <span className="text-[#0ecb81] font-bold">anında yansıtılacaktır.</span>
+                      {t.depositRequestSentDesc}
                     </p>
                   </div>
 
@@ -1409,14 +1413,14 @@ export default function WalletPage() {
                       onClick={() => setTab("pending")}
                       className="flex-1 rounded-2xl py-3.5 text-xs font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
                     >
-                      İşlemi Görüntüle
+                      {t.viewTransaction}
                     </button>
                     <button
                       onClick={() => navigate("/")}
                       className="flex-1 rounded-2xl py-3.5 text-xs font-black text-black cursor-pointer"
                       style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
                     >
-                      İşlemlere Başla
+                      {t.startTrading}
                     </button>
                   </div>
                 </motion.div>
@@ -1458,24 +1462,24 @@ export default function WalletPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="flex flex-col gap-3"
                 >
-                  <div className="flex items-center justify-between p-3.5 rounded-xl border border-white/8 bg-black/60">
-                    <span className="text-xs text-white/40">Çekilebilir Bakiye</span>
-                    <span className="text-base font-normal text-white">
+                  <div className="flex items-center justify-between px-1 py-2">
+                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{t.withdrawableBalance}</span>
+                    <span className="text-sm font-black text-white">
                       {userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   {realBal <= 0 && (
-                    <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-[#FFB800]/25 bg-[#FFB800]/[0.06]">
+                    <div className="flex items-start gap-2.5 rounded-2xl p-3.5 bg-[#FFB800]/[0.06]">
                       <AlertCircle size={15} className="text-[#FFB800] mt-0.5 shrink-0" />
                       <p className="text-xs text-white/60 leading-relaxed">
-                        Para çekebilmek için gerçek bakiyenizde kullanılabilir bakiye olması gerekmektedir. Önce para yatırarak başlayabilirsiniz.
+                        {t.insufficientRealBalWithdraw}
                       </p>
                     </div>
                   )}
 
                   <p className="text-xs font-black uppercase tracking-wider text-white/40 px-1 mt-1">
-                    Çekim Yöntemi Seçin
+                    {t.selectWithdrawMethod}
                   </p>
 
                   <div className="flex flex-col gap-2">
@@ -1487,10 +1491,10 @@ export default function WalletPage() {
                           whileTap={{ scale: 0.98 }}
                           onClick={() => selectWithdrawMethod(m)}
                           disabled={realBal <= 0}
-                          className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 border text-left disabled:opacity-30 cursor-pointer h-[64px]"
+                          className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left disabled:opacity-30 cursor-pointer h-[64px]"
                           style={{
                             background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
-                            borderColor: `${m.color}25`,
+                            border: "none",
                           }}
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center">
@@ -1523,7 +1527,7 @@ export default function WalletPage() {
                     onClick={() => setWStep("method")}
                     className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
                   >
-                    <ArrowLeft size={13} /> Farklı yöntem seç
+                    <ArrowLeft size={13} /> {t.chooseDifferentMethod}
                   </button>
 
                   {/* Selected method card */}
@@ -1534,7 +1538,7 @@ export default function WalletPage() {
                       </div>
                       <div>
                         <p className="text-xs font-black text-white">{method.label}</p>
-                        <p className="text-[11px] text-white/40">Minimum Çekim Tutarı: {userSym}{withdrawMin}</p>
+                        <p className="text-[11px] text-white/40">{t.minWithdrawAmount} {userSym}{withdrawMin}</p>
                       </div>
                     </div>
                   </div>
@@ -1543,14 +1547,14 @@ export default function WalletPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                        Çekim Tutarı
+                        {t.withdrawAmount}
                       </label>
                       <button
                         type="button"
                         onClick={() => setAmount(realBal.toString())}
                         className="text-[11px] font-bold text-[#FF6B00] hover:underline cursor-pointer"
                       >
-                        Tümünü Çek ({userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                        {t.withdrawAll} ({userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                       </button>
                     </div>
 
@@ -1592,7 +1596,7 @@ export default function WalletPage() {
                   {/* Destination input */}
                   <div>
                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-2">
-                      {method.id === "iban" ? "IBAN Numaranız (TR...)" : "Cüzdan Adresiniz"}
+                      {method.id === "iban" ? "IBAN (TR...)" : t.destinationWalletOrIban}
                     </label>
                     <input
                       placeholder={method.id === "iban" ? "TR00 0000 0000 0000 0000 0000 00" : "0x... veya T..."}
@@ -1618,7 +1622,7 @@ export default function WalletPage() {
                       boxShadow: `0 8px 24px ${method.color}30`,
                     }}
                   >
-                    {isSubmitting ? "Talep Alınıyor..." : "Çekim Talebi Oluştur"}
+                    {isSubmitting ? t.processing : t.submitRequest}
                   </motion.button>
                 </motion.div>
               )}
@@ -1642,9 +1646,9 @@ export default function WalletPage() {
                   </motion.div>
 
                   <div>
-                    <h3 className="text-xl font-black text-white mb-1.5">Çekim Talebi Alındı</h3>
+                    <h3 className="text-xl font-black text-white mb-1.5">{t.withdrawRequestSent}</h3>
                     <p className="text-sm text-white/50 leading-relaxed max-w-sm">
-                      Çekim işleminiz sıraya alındı. Güvenlik teyidi sonrası <span className="text-white font-bold">1 ile 3 saat</span> içerisinde hesabınıza aktarılacaktır.
+                      {t.withdrawRequestSentDesc}
                     </p>
                   </div>
 
@@ -1653,14 +1657,14 @@ export default function WalletPage() {
                       onClick={() => setTab("pending")}
                       className="flex-1 rounded-2xl py-3.5 text-xs font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
                     >
-                      İşlemi Görüntüle
+                      {t.viewTransaction}
                     </button>
                     <button
                       onClick={() => navigate("/")}
                       className="flex-1 rounded-2xl py-3.5 text-xs font-black text-black cursor-pointer"
                       style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
                     >
-                      İşlemlere Başla
+                      {t.continueTrading}
                     </button>
                   </div>
                 </motion.div>
@@ -1675,26 +1679,23 @@ export default function WalletPage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between px-1">
                 <p className="text-xs font-black uppercase tracking-wider text-white/40">
-                  Transfer Talepleriniz
+                  {t.transactionsTab}
                 </p>
-                <span className="text-[11px] text-white/30">{userRequests.length} İşlem</span>
+                <span className="text-[11px] text-white/30">{userRequests.length} {t.txCount}</span>
               </div>
 
               {userRequests.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center border border-white/5 rounded-3xl bg-black/40">
+                <div className="flex flex-col items-center justify-center py-16 text-center rounded-3xl bg-black/40">
                   <Hash size={32} className="text-white/15 mb-3" />
-                  <p className="text-sm text-white/40 font-bold">Henüz işlem talebiniz bulunmuyor</p>
-                  <p className="text-xs text-white/20 mt-1 max-w-xs">
-                    Para yatırma veya çekme yaptığınızda durumlarını buradan canlı olarak takip edebilirsiniz.
-                  </p>
+                  <p className="text-sm text-white/40 font-bold">{t.noTransactions}</p>
                 </div>
               ) : (
                 userRequests.map((req) => {
                   const isD = req.type === "deposit";
                   const statusCfg = {
-                    pending:  { color: "#FFB800", label: "İncelemede" },
-                    accepted: { color: "#0ecb81", label: "Tamamlandı" },
-                    rejected: { color: "#f6465d", label: "Reddedildi" },
+                    pending:  { color: "#FFB800", label: t.statusPending },
+                    accepted: { color: "#0ecb81", label: t.statusAccepted },
+                    rejected: { color: "#f6465d", label: t.statusRejected },
                   }[req.status];
 
                   return (
@@ -1718,7 +1719,7 @@ export default function WalletPage() {
                             {isD ? <ArrowDownCircle size={13} className="text-[#0ecb81]" /> : <ArrowUpCircle size={13} className="text-[#FF6B00]" />}
                           </div>
                           <div className="min-w-0">
-                            <span className="text-xs font-bold text-white block">{isD ? "Para Yatırma" : "Para Çekme"}</span>
+                            <span className="text-xs font-bold text-white block">{isD ? t.depositTx : t.withdrawTx}</span>
                             <span className="text-[10px] text-white/35 font-mono">{req.method}</span>
                           </div>
                         </div>
@@ -1747,7 +1748,7 @@ export default function WalletPage() {
                           >
                             {req.destination && (
                               <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                                <span className="text-[9px] font-bold text-white/30 uppercase block mb-0.5">Hedef Adres</span>
+                                <span className="text-[9px] font-bold text-white/30 uppercase block mb-0.5">{t.destinationAddress}</span>
                                 <span className="text-[11px] font-mono text-white/70 break-all">{req.destination}</span>
                               </div>
                             )}
@@ -1756,21 +1757,21 @@ export default function WalletPage() {
                             {req.receiptUrl && (
                               <div className="p-2 rounded-lg bg-[#0ecb81]/[0.05] border border-[#0ecb81]/25 flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <FileText size={14} className="text-[#0ecb81] shrink-0" />
+                                  <FileText size={14} className="text-[#0ecb81]" />
                                   <div className="min-w-0">
-                                    <span className="text-[9px] font-bold text-white/35 uppercase block">Havale / EFT Dekontu</span>
+                                    <span className="text-[9px] font-bold text-white/35 uppercase block">{t.transferReceipt}</span>
                                     <span className="text-[11px] text-white/80 font-medium truncate block max-w-[160px]">
-                                      {req.receiptName || "Dekont Belgesi"}
+                                      {req.receiptName || t.transferReceipt}
                                     </span>
                                   </div>
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Havale Dekontu" })}
+                                  onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Dekont" })}
                                   className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#0ecb81]/15 hover:bg-[#0ecb81]/25 text-[#0ecb81] text-[10px] font-bold transition-all cursor-pointer shrink-0"
                                 >
                                   <Eye size={12} />
-                                  <span>İncele</span>
+                                  <span>{t.review}</span>
                                 </button>
                               </div>
                             )}
@@ -1780,7 +1781,7 @@ export default function WalletPage() {
                               <div className="p-2.5 rounded-lg bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
                                 <div className="flex items-center gap-1.5 text-[#f6465d] font-bold text-[11px] mb-1">
                                   <AlertCircle size={13} className="shrink-0" />
-                                  <span>Red Gerekçesi:</span>
+                                  <span>{t.rejectionReasonLabel}</span>
                                 </div>
                                 <p className="text-[11px] text-white/90 leading-relaxed pl-4 font-normal">
                                   {req.rejectionReason}
@@ -1798,7 +1799,7 @@ export default function WalletPage() {
                                       className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white transition-all cursor-pointer"
                                     >
                                       <ArrowDownLeft size={11} className="text-[#0ecb81]" />
-                                      <span>Para Yatırma Ekranına Git</span>
+                                      <span>{t.goToDepositScreen}</span>
                                     </button>
                                   </div>
                                 )}
@@ -1808,7 +1809,7 @@ export default function WalletPage() {
                             <div className="flex items-center justify-between pt-1 text-[10px] text-white/30">
                               <span className="font-mono">{req.id}</span>
                               <span>
-                                {new Date(req.createdAt).toLocaleDateString("tr-TR", {
+                                {new Date(req.createdAt).toLocaleDateString(isTL ? "tr-TR" : "en-US", {
                                   day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                                 })}
                               </span>

@@ -111,11 +111,11 @@ export default function History() {
   const visibleActive     = viewIsReal ? visibleRealActive : visibleDemoActive;
 
   return (
-    <div className="flex h-full flex-col bg-[#08080a] text-white">
+    <div className="flex h-full flex-col bg-black text-white" style={{ backgroundColor: "#000000" }}>
 
       {/* ── Active Trades Section ──────────────────────────────────────── */}
       {visibleActive.length > 0 && (
-        <div className="shrink-0 px-4 pt-4 pb-2">
+        <div className="shrink-0 px-4 pt-4 pb-2 bg-black">
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-white/60">
               {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
@@ -135,7 +135,7 @@ export default function History() {
               const dirAccent = isUp ? "#10b981" : "#ef4444";
 
               return (
-                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-[#121217] border border-white/[0.06] flex items-center justify-between relative overflow-hidden shrink-0 min-w-full snap-start">
+                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-black border border-white/10 flex items-center justify-between relative overflow-hidden shrink-0 min-w-full snap-start">
                   <div className="flex items-center gap-3">
                     {renderAssetIcon(tr.asset)}
                     <div>
@@ -180,7 +180,7 @@ export default function History() {
       )}
 
       {/* ── Filter Pills ──────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-center px-4 pt-4 pb-3">
+      <div className="shrink-0 flex items-center justify-center px-4 pt-4 pb-3 bg-black">
         <div className="flex items-center justify-center gap-2">
           {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => {
             const isActive = filter === f;
@@ -191,15 +191,15 @@ export default function History() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   isActive
-                    ? "bg-[#22222b] text-white border border-white/15 shadow-sm"
-                    : "bg-[#111115] text-white/50 hover:text-white/80 border border-white/[0.04]"
+                    ? "bg-white text-black font-bold border border-white shadow-sm"
+                    : "bg-black text-white/50 hover:text-white/80 border border-white/10"
                 }`}
               >
                 <span>{label}</span>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-lg font-medium ${
-                  isActive ? "bg-white/10 text-white" : "bg-white/[0.03] text-white/40"
+                  isActive ? "bg-black/10 text-black font-bold" : "bg-white/[0.05] text-white/40"
                 }`}>
                   {count}
                 </span>
@@ -210,18 +210,18 @@ export default function History() {
       </div>
 
       {/* ── Trade List (Soft Cards) ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-24 space-y-2">
+      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-24 space-y-2 bg-black">
 
         {tradesLoading && (
-          <div className="flex flex-col items-center justify-center py-16">
+          <div className="flex flex-col items-center justify-center py-16 bg-black">
             <div className="animate-spin mb-3 h-8 w-8 rounded-full border-2 border-white/10 border-t-white/40" />
             <p className="text-xs font-medium text-white/40">Yükleniyor...</p>
           </div>
         )}
 
         {!tradesLoading && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center my-4 rounded-3xl border border-white/[0.05] bg-[#111116] p-6">
-            <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-3 bg-white/[0.03] border border-white/[0.06]">
+          <div className="flex flex-col items-center justify-center py-16 text-center my-4 rounded-3xl border border-white/10 bg-black p-6">
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-3 bg-white/[0.04] border border-white/10">
               <BarChart2 size={22} className="text-white/40" />
             </div>
             <p className="text-sm font-semibold text-white/80">{t.noHistoryTitle}</p>
@@ -230,7 +230,7 @@ export default function History() {
             </p>
             <Link href="/">
               <button
-                className="mt-5 flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white bg-[#22222b] border border-white/10 shadow-sm transition-all hover:bg-[#2a2a35] active:scale-95"
+                className="mt-5 flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white bg-white/10 border border-white/15 shadow-sm transition-all hover:bg-white/15 active:scale-95 cursor-pointer"
               >
                 <TrendingUp size={14} className="text-emerald-400" />
                 <span>{t.tradeNow}</span>
@@ -247,11 +247,11 @@ export default function History() {
 
           return (
             <div key={trade.id} className="flex flex-col">
-              {/* TRADE CARD (SOUTHEAST / CALM NEUTRAL) */}
+              {/* TRADE CARD */}
               <div
                 onClick={() => setExpandedId(isExpanded ? null : trade.id)}
-                className={`px-4 py-3.5 bg-[#111115] border border-white/[0.05] transition-all cursor-pointer flex items-center justify-between hover:bg-[#16161b] active:scale-[0.995] ${
-                  isExpanded ? "rounded-t-2xl border-b-0 bg-[#141419]" : "rounded-2xl"
+                className={`px-4 py-3.5 bg-black border border-white/10 transition-all cursor-pointer flex items-center justify-between hover:bg-white/[0.03] active:scale-[0.995] ${
+                  isExpanded ? "rounded-t-2xl border-b-0" : "rounded-2xl"
                 }`}
               >
                 {/* Left: Asset Icon + Info */}
@@ -295,16 +295,16 @@ export default function History() {
 
               {/* EXPANDED DETAILS ACCORDION */}
               {isExpanded && (
-                <div className="bg-[#141419] border border-t-0 border-white/[0.05] rounded-b-2xl pt-2 pb-3.5 px-4 grid grid-cols-3 gap-2.5 text-[10px] text-white/60">
-                  <div className="rounded-xl bg-[#1c1c24] border border-white/[0.04] p-2.5">
+                <div className="bg-black border border-t-0 border-white/10 rounded-b-2xl pt-2 pb-3.5 px-4 grid grid-cols-3 gap-2.5 text-[10px] text-white/60">
+                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
                     <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.entryPrice}</span>
                     <span className="font-mono font-semibold text-white/90 text-xs">{trade.entryPrice ? trade.entryPrice.toFixed(5) : "—"}</span>
                   </div>
-                  <div className="rounded-xl bg-[#1c1c24] border border-white/[0.04] p-2.5">
+                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
                     <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.exitPrice}</span>
                     <span className="font-mono font-semibold text-white/90 text-xs">{trade.exitPrice ? trade.exitPrice.toFixed(5) : "—"}</span>
                   </div>
-                  <div className="rounded-xl bg-[#1c1c24] border border-white/[0.04] p-2.5">
+                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
                     <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.closeTime}</span>
                     <span className="font-mono text-white/80 text-[11px] block mt-0.5">{fmt(trade.closedAt, langCode)}</span>
                   </div>

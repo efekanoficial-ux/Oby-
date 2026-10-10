@@ -175,10 +175,10 @@ export default function Balance() {
                   type="button"
                   onClick={toggleBalanceHidden}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all text-[11px] cursor-pointer"
-                  title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+                  title={isBalanceHidden ? (t.showBalance || "Bakiyeyi Göster") : (t.hideBalance || "Bakiyeyi Gizle")}
                 >
                   {isBalanceHidden ? <EyeOff size={12} className="text-amber-400" /> : <Eye size={12} />}
-                  <span>{isBalanceHidden ? "Gizli" : "Göster"}</span>
+                  <span>{isBalanceHidden ? (t.hidden || "Gizli") : (t.show || "Göster")}</span>
                 </button>
               )}
             </div>
@@ -199,7 +199,7 @@ export default function Balance() {
           </div>
 
           {/* mini stats row */}
-          <div className="relative flex gap-5 mb-6">
+          <div className="relative flex gap-5 mb-5">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
                 style={{ color: "rgba(255,255,255,0.2)" }}>{t.deposited}</p>
@@ -228,46 +228,46 @@ export default function Balance() {
           </div>
 
           {/* CTA buttons */}
-          <div className="relative grid grid-cols-2 gap-3">
+          <div className="relative grid grid-cols-2 gap-2.5">
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => openWallet("deposit")}
-              className="flex flex-col items-center gap-2 rounded-2xl py-4"
+              className="flex items-center justify-center gap-4 rounded-xl py-6 px-10"
               style={{
                 background: isReal ? "rgba(14,203,129,0.12)" : "rgba(255,107,0,0.12)",
-                border: `1px solid ${isReal ? "rgba(14,203,129,0.22)" : "rgba(255,107,0,0.22)"}`,
+                border: "none",
               }}>
-              <div className="h-10 w-10 rounded-2xl flex items-center justify-center"
-                style={{ background: isReal ? "rgba(14,203,129,0.18)" : "rgba(255,107,0,0.18)" }}>
-                <ArrowDownLeft size={17} strokeWidth={2.5} style={{ color: isReal ? "#0ecb81" : "#FF6B00" }} />
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center"
+                style={{ background: isReal ? "rgba(14,203,129,0.22)" : "rgba(255,107,0,0.22)" }}>
+                <ArrowDownLeft size={24} strokeWidth={2.5} style={{ color: isReal ? "#0ecb81" : "#FF6B00" }} />
               </div>
-              <span className="text-xs font-black" style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}>{t.depositBtn}</span>
+              <span className="text-base font-black" style={{ color: isReal ? "#0ecb81" : "#FF6B00" }}>{t.depositBtn}</span>
             </motion.button>
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => openWallet("withdraw")}
-              className="flex flex-col items-center gap-2 rounded-2xl py-4"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="h-10 w-10 rounded-2xl flex items-center justify-center"
+              className="flex items-center justify-center gap-4 rounded-xl py-6 px-10"
+              style={{ background: "rgba(255,255,255,0.04)", border: "none" }}>
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.06)" }}>
-                <ArrowUpRight size={17} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.4)" }} />
+                <ArrowUpRight size={24} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.4)" }} />
               </div>
-              <span className="text-xs font-black" style={{ color: "rgba(255,255,255,0.35)" }}>{t.withdrawBtn}</span>
+              <span className="text-base font-black" style={{ color: "rgba(255,255,255,0.4)" }}>{t.withdrawBtn}</span>
             </motion.button>
           </div>
         </motion.div>
 
         {/* ── Section label ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 px-5 mb-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] shrink-0"
+        <div className="flex items-center gap-3 px-5 mb-2.5">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] shrink-0"
             style={{ color: "rgba(255,255,255,0.22)" }}>{t.depositMethods}</p>
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.05)" }} />
         </div>
 
         {/* ── Tab selector ─────────────────────────────────────────────── */}
-        <div className="flex gap-2 px-4 mb-3">
+        <div className="flex gap-1 px-4 mb-2.5">
           {(["deposit", "withdraw"] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className="px-4 py-2 rounded-full text-xs font-black transition-all"
+              className="px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all"
               style={activeTab === tab
-                ? { background: `${accent}15`, border: `1px solid ${accent}30`, color: accent }
-                : { background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)" }}>
+                ? { background: `${accent}15`, border: "none", color: accent }
+                : { background: "rgba(255,255,255,0.03)", border: "none", color: "rgba(255,255,255,0.3)" }}>
               {tab === "deposit" ? t.depositBtn : t.withdrawBtn}
             </button>
           ))}
@@ -275,7 +275,7 @@ export default function Balance() {
 
         {/* ── Methods list ─────────────────────────────────────────────── */}
         <div className="mx-4 mb-5 rounded-2xl overflow-hidden"
-          style={{ background: "#0a0a0a", border: "1px solid #181818" }}>
+          style={{ background: "#0a0a0a", border: "none" }}>
           {methods.map((m, i) => (
             <MethodRow
               key={m.label}
@@ -346,11 +346,11 @@ export default function Balance() {
                     <AlertCircle size={13} className="text-[#f6465d]" />
                   </div>
                   <span className="text-xs font-black text-[#f6465d]">
-                    {unviewedRejectedReqs.length === 1 ? "İşleminiz Reddedildi" : `${unviewedRejectedReqs.length} Talebiniz Reddedildi`}
+                    {unviewedRejectedReqs.length === 1 ? t.requestRejectedTitle : `${unviewedRejectedReqs.length} ${t.requestRejectedTitle}`}
                   </span>
                 </div>
                 <span className="text-[10px] text-white/50 font-bold flex items-center gap-1">
-                  İşlemlerde İncele →
+                  {t.review} →
                 </span>
               </div>
               {unviewedRejectedReqs.slice(0, 3).map(r => (
@@ -359,7 +359,7 @@ export default function Balance() {
                     <span className="text-xs font-bold text-white">
                       {r.type === "deposit" ? t.depositTx : t.withdrawTx} ({sym}{r.amount})
                     </span>
-                    <span className="text-[10px] font-black text-[#f6465d]">Reddedildi</span>
+                    <span className="text-[10px] font-black text-[#f6465d]">{t.statusRejected}</span>
                   </div>
                   {r.rejectionReason && (
                     <p className="text-xs text-white/80 mt-1 pl-2 border-l-2 border-[#f6465d]/50 leading-relaxed font-medium">

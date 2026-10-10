@@ -90,7 +90,6 @@ function ExpiryCountdownBadge({ expiryTime, x, color }: { expiryTime: number; x:
       top: 8,
       transform: "translateX(-100%)",
       background: "rgba(0,0,0,0.85)",
-      border: "1px solid rgba(246,70,93,0.5)",
       borderRadius: 5,
       padding: "2px 6px",
       fontSize: 10,
@@ -280,7 +279,7 @@ function calcFractals(candles: Candle[]) {
 export function CandleChart({
   symbol,
   digits,
-  chartInterval = "5s",
+  chartInterval = "5m",
   onPriceChange,
   activeEntries = [],
   currencySymbol = "$",
@@ -324,6 +323,7 @@ export function CandleChart({
   type EntryOverlay = {
     expiryX: number; entryX: number;
     entryY?: number; lineColor: string; amount?: number;
+    isWinning?: boolean;
     expiryTime?: number;  // ms
     stableKey: number;    // entryTime ms — unique per trade, used as React key
   };
@@ -466,14 +466,15 @@ export function CandleChart({
             ? currentPrice >= ae.entryPrice 
             : currentPrice <= ae.entryPrice;
           
-          // Green (#0ecb81) if winning, Red (#f6465d) if losing
-          const statusColor = isWinning ? "#0ecb81" : "#f6465d";
+          // Green (#0ecb81) if winning, Pale Gray (rgba(255, 255, 255, 0.40)) if not winning / losing (no red)
+          const statusColor = isWinning ? "#0ecb81" : "rgba(255, 255, 255, 0.40)";
 
           return {
             expiryX:    dotX + (ae.expiryTime / 1000 - live.time) * pxPerSec,
             entryX:     dotX + (ae.entryTime  / 1000 - live.time) * pxPerSec,
             entryY:     entryY_c !== null ? (entryY_c as unknown as number) : undefined,
             lineColor:  statusColor,
+            isWinning,
             amount:     ae.amount,
             expiryTime: ae.expiryTime,
             stableKey:  ae.entryTime,  // ms — unique per trade, stable across re-renders
@@ -689,11 +690,6 @@ export function CandleChart({
     } catch {
       rebuildDisplay(false);
     }
-    if (live) {
-      const isUp = live.close >= live.open;
-      const col = isUp ? "#0ecb81" : "#f6465d";
-      seriesRef.current?.applyOptions({ priceLineColor: col });
-    }
     setReal(true);
     const now = Date.now();
     if (now - lastNotifyRef.current >= 150) {
@@ -793,8 +789,8 @@ export function CandleChart({
       priceLineVisible: true,
       lastValueVisible: true,
       priceLineWidth: 1,
-      priceLineColor: "#0ecb81",
-      priceLineStyle: LineStyle.Dotted,
+      priceLineColor: "rgba(255, 255, 255, 0.35)",
+      priceLineStyle: LineStyle.Solid,
       priceFormat: {
         type: "price",
         precision: initDigits,
@@ -811,8 +807,8 @@ export function CandleChart({
       priceLineVisible: true,
       lastValueVisible: true,
       priceLineWidth: 1,
-      priceLineColor: "#FF6B00",
-      priceLineStyle: LineStyle.Dotted,
+      priceLineColor: "rgba(255, 255, 255, 0.35)",
+      priceLineStyle: LineStyle.Solid,
       visible: false,
       priceFormat: {
         type: "price",
@@ -1455,7 +1451,7 @@ export function CandleChart({
                 <ExpiryCountdownBadge expiryTime={entry.expiryTime} x={entry.expiryX} color="#f6465d" />
               )}
 
-              {/* Thin dotted horizontal entry line (Green if winning, Red if losing) */}
+              {/* Dotted horizontal entry line (Green if winning, pale gray if losing) */}
               {entry.entryY !== undefined && (
                 <div style={{
                   position: "absolute",
@@ -1468,23 +1464,25 @@ export function CandleChart({
                 }} />
               )}
 
-              {/* Semi-transparent amount bubble at entry level */}
+              {/* Semi-transparent amount bubble at entry level (Green if winning, pale gray if not winning) */}
               {entry.amount !== undefined && entry.entryY !== undefined && (
                 <div style={{
                   position: "absolute",
                   left: entry.entryX,
                   top: entry.entryY - 22,
                   transform: "translateX(-50%)",
-                  background: entry.lineColor === "#0ecb81"
+                  background: entry.isWinning
                     ? "rgba(14, 203, 129, 0.30)"
-                    : "rgba(246, 70, 93, 0.30)",
-                  border: `1px solid ${entry.lineColor}70`,
+                    : "rgba(255, 255, 255, 0.12)",
+                  border: entry.isWinning
+                    ? "1px solid rgba(14, 203, 129, 0.50)"
+                    : "1px solid rgba(255, 255, 255, 0.25)",
                   backdropFilter: "blur(8px)",
                   WebkitBackdropFilter: "blur(8px)",
                   borderRadius: 8,
                   padding: "2px 7px",
                   fontSize: 10, fontWeight: 800,
-                  color: "#ffffff",
+                  color: entry.isWinning ? "#ffffff" : "rgba(255, 255, 255, 0.90)",
                   whiteSpace: "nowrap",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
                   letterSpacing: "0.02em",
