@@ -870,6 +870,8 @@ export function CandleChart({
     });
     ro.observe(el);
     window.addEventListener("resize", updateChartSize);
+    window.addEventListener("focus", updateChartSize);
+    document.addEventListener("visibilitychange", updateChartSize);
 
     // Run resize across multiple layout passes
     requestAnimationFrame(updateChartSize);
@@ -884,6 +886,8 @@ export function CandleChart({
       clearTimeout(t3);
       clearTimeout(t4);
       window.removeEventListener("resize", updateChartSize);
+      window.removeEventListener("focus", updateChartSize);
+      document.removeEventListener("visibilitychange", updateChartSize);
       ro.disconnect();
     };
   }, []);

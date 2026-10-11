@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useAuth, type PaymentSettings, type CustomPaymentMethod, compressDataUrlIfNeeded } from "@/context/AuthContext";
 import { useAccountMode } from "@/context/AccountModeContext";
+import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
 import { UsdtErc20Icon } from "@/components/usdt-erc20-icon";
@@ -14,7 +15,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
   ShieldCheck, RefreshCw, Wallet as WalletIcon, ExternalLink,
   CreditCard, QrCode, CircleDollarSign, Coins, FileText,
-  UploadCloud, Eye, Trash2, X, Paperclip, Gift,
+  UploadCloud, Eye, Trash2, X, Paperclip, Gift, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { listenUserClaims, type UserBonusClaim } from "@/lib/bonuses";
 
@@ -126,7 +127,8 @@ export default function WalletPage() {
   const [, navigate] = useLocation();
   const { currentUser, requests, addRequest, paymentSettings, isRejectionViewed, markRejectionsAsViewed } = useAuth();
   const { isReal, currency, currencySymbol, isBalanceHidden, toggleBalanceHidden } = useAccountMode();
-  const { t } = useLanguage();
+  const { completedTrades = [] } = useDemoAccount();
+  const { t, langCode } = useLanguage();
 
   const isTL = (currentUser?.currency || currency) === "TL";
   const userSym = isTL ? "₺" : "$";
@@ -135,6 +137,71 @@ export default function WalletPage() {
   const withdrawMin = isTL ? 150 : 5;
 
   const isTurkey = useIsTurkey();
+
+  // ── Günlük Sıfırlanan Kâr / Zarar Hesaplaması ─────────────────────────────
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { walletTodayPnl, walletTodayPercent } = useMemo(() => {
+    // Bugünün başlangıcı (00:00:00)
+    const todayDate = new Date(nowTick);
+    todayDate.setHours(0, 0, 0, 0);
+    const startOfToday = todayDate.getTime();
+
+    // Sadece gerçek hesapta yapılan bugünkü işlemler (Wallet sayfası gerçek bakiye gösterir)
+    // Eğer real işlem yoksa ama kullanıcı demo modundaysa veya demo işlemleri varsa mode'a göre
+    const todayTrades = completedTrades.filter((tr) => {
+      const modeMatches = tr.mode === "real";
+      const closedAt = tr.closedAt || 0;
+      return modeMatches && closedAt >= startOfToday;
+    });
+
+    if (todayTrades.length === 0) {
+      return { walletTodayPnl: 0, walletTodayPercent: 0 };
+    }
+
+    const netPnl = todayTrades.reduce((sum, tr) => {
+      const net = tr.result === "WIN"
+        ? (typeof tr.profit === "number" && tr.profit > 0 ? tr.profit : tr.amount * 0.85)
+        : (typeof tr.profit === "number" && tr.profit < 0 ? tr.profit : -Math.abs(tr.amount));
+      return sum + net;
+    }, 0);
+
+    const currentBal = currentUser?.realBalance ?? 0;
+    const startingBal = currentBal - netPnl;
+    const baseBal = startingBal > 0 ? startingBal : (currentBal > 0 ? currentBal : 100);
+    const pct = baseBal > 0 ? (netPnl / baseBal) * 100 : 0;
+
+    return {
+      walletTodayPnl: Math.round(netPnl * 100) / 100,
+      walletTodayPercent: Math.round(pct * 100) / 100,
+    };
+  }, [completedTrades, currentUser?.realBalance, nowTick]);
+
+  const isWalletProfit = walletTodayPnl > 0.005;
+  const isWalletLoss = walletTodayPnl < -0.005;
+  const isWalletZero = !isWalletProfit && !isWalletLoss;
+
+  const walletPnlColorClass = isWalletProfit
+    ? "text-emerald-400"
+    : isWalletLoss
+    ? "text-rose-400"
+    : "text-neutral-400";
+
+  const walletPnlBgClass = isWalletProfit
+    ? "bg-emerald-500/10 border-emerald-500/25"
+    : isWalletLoss
+    ? "bg-rose-500/10 border-rose-500/25"
+    : "bg-white/[0.04] border-white/10";
+
+  // Değer formatı: TL hesabında TL (₺), Dolar hesabında Dolar ($)
+  // İkon zaten yönü belirttiği için + ve - işaretleri kaldırıldı
+  const absWalletPnlFormatted = Math.abs(walletTodayPnl).toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedWalletPnl = `${userSym}${absWalletPnlFormatted}`;
+  const formattedWalletPercent = `${Math.abs(walletTodayPercent).toFixed(2)}%`;
 
   const [userClaims, setUserClaims] = useState<UserBonusClaim[]>([]);
   useEffect(() => {
@@ -608,78 +675,130 @@ export default function WalletPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#050505] text-white overflow-hidden">
-      {/* ── Modern Quick Overview Card ─────────────────────────────────────── */}
-      <div className="px-4 pt-3 pb-1.5 shrink-0">
-        <div className="relative rounded-3xl p-5 overflow-hidden border border-white/8"
+      {/* ── Modern Crypto Quick Overview Card ─────────────────────────────── */}
+      <div className="px-4 pt-3 pb-2 shrink-0">
+        <div
+          className="relative rounded-3xl p-5 overflow-hidden border border-white/10"
           style={{
-            background: "linear-gradient(135deg, #101014 0%, #0d0e12 60%, #08080a 100%)",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
-          }}>
+            background: "linear-gradient(145deg, #121318 0%, #0c0d12 50%, #07080a 100%)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.65)",
+          }}
+        >
           {/* Subtle Ambient Glow */}
-          <div className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(255,107,0,0.12), transparent 70%)" }} />
+          <div
+            className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-36 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(255,107,0,0.14), transparent 70%)" }}
+          />
 
-          <div className="relative mb-3">
-            <span className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
+          {/* Centered Balance Title & Eye toggle */}
+          <div className="relative mb-2 flex items-center justify-center gap-2">
+            <span className="text-[10px] sm:text-[11px] font-bold text-white/40 uppercase tracking-widest">
               {t.realWalletBalance}
             </span>
+            <button
+              type="button"
+              onClick={toggleBalanceHidden}
+              className="text-white/35 hover:text-white transition-colors cursor-pointer p-0.5"
+              title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+            >
+              {isBalanceHidden ? <Eye size={13} /> : <Eye size={13} className="opacity-60" />}
+            </button>
           </div>
 
+          {/* Centered Large Balance Display */}
           <div 
             onClick={toggleBalanceHidden}
-            className="relative flex items-baseline gap-2 mb-4 cursor-pointer select-none group"
+            className="relative flex items-baseline justify-center gap-2 mb-2 cursor-pointer select-none group text-center"
             title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
           >
-            <span className="text-3xl sm:text-4xl font-black text-white tracking-tight group-hover:text-white/90 transition-colors">
+            <span className="text-3xl sm:text-4xl font-semibold text-white tracking-tight group-hover:text-white/90 transition-colors drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
               {isBalanceHidden
                 ? (isTL ? "*****₺" : "*****$")
                 : `${userSym}${realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </span>
-            <span className="text-xs font-bold text-white/35">{userCurrCode}</span>
+            <span className="text-xs font-medium text-white/40 tracking-wider">{userCurrCode}</span>
           </div>
 
-          {/* Quick Segment Switcher Tabs */}
-          <div className="grid grid-cols-3 gap-0.5 p-0.5 rounded-lg bg-black/40">
-            <button
-              onClick={() => switchTab("deposit")}
-              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
-                tab === "deposit"
-                  ? "bg-white/10 text-white"
-                  : "text-white/30 hover:text-white/60"
-              }`}
+          {/* Günlük Sıfırlanan Kâr / Zarar & Yüzde (Arka plansız, çerçevesiz, ikonlu - bakiye gizlendiğinde görünmez olur ama buton konumu asla değişmez) */}
+          <div className={`flex items-center justify-center mb-5 h-5 transition-opacity ${
+            isBalanceHidden ? "invisible pointer-events-none" : "visible"
+          }`}>
+            <div
+              className={`inline-flex items-center gap-1.5 text-[11.5px] font-mono font-semibold tracking-tight transition-colors ${walletPnlColorClass}`}
+              title={langCode === "tr" ? "Günlük sıfırlanan kâr / zarar" : "Daily reset profit / loss"}
             >
-              <ArrowDownLeft size={10} strokeWidth={2.4} />
-              <span className="truncate">{t.depositBtn}</span>
-            </button>
+              {isWalletProfit ? (
+                <TrendingUp size={13} className="shrink-0 text-emerald-400" />
+              ) : isWalletLoss ? (
+                <TrendingDown size={13} className="shrink-0 text-rose-400" />
+              ) : (
+                <Minus size={12} className="shrink-0 text-neutral-400" />
+              )}
+              <span>{formattedWalletPnl}</span>
+              <span className="opacity-80">({formattedWalletPercent})</span>
+            </div>
+          </div>
 
-            <button
-              onClick={() => switchTab("withdraw")}
-              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
-                tab === "withdraw"
-                  ? "bg-white/10 text-white"
-                  : "text-white/30 hover:text-white/60"
-              }`}
-            >
-              <ArrowUpRight size={10} strokeWidth={2.4} />
-              <span className="truncate">{t.withdrawBtn}</span>
-            </button>
+          {/* Quick Action Tabs - Completely Circular Buttons with Labels Underneath */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-xs mx-auto">
+            {/* Yatır (Deposit) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("deposit")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 border ${
+                  tab === "deposit"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.depositBtn}
+              >
+                <ArrowDownLeft size={20} strokeWidth={2.2} className={tab === "deposit" ? "text-neutral-200" : "text-neutral-400"} />
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "deposit" ? "text-white" : "text-white/60"}`}>
+                {t.depositBtn}
+              </span>
+            </div>
 
-            <button
-              onClick={() => switchTab("pending")}
-              className={`flex items-center justify-center gap-1 py-1 px-1 rounded-md text-[9.5px] font-bold transition-all relative cursor-pointer ${
-                tab === "pending"
-                  ? "bg-white/10 text-white"
-                  : "text-white/30 hover:text-white/60"
-              }`}
-            >
-              <Clock size={10} strokeWidth={2.2} />
-              <span className="truncate">{t.transactionsTab}</span>
-              {pendingRequests.length > 0 ? (
-                <span className="h-1 w-1 rounded-full bg-[#FFB800] absolute top-1 right-1 animate-pulse" />
-              ) : unviewedRejections.length > 0 ? (
-                <span className="h-1 w-1 rounded-full bg-[#f6465d] absolute top-1 right-1" />
-              ) : null}
-            </button>
+            {/* Çek (Withdraw) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("withdraw")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 border ${
+                  tab === "withdraw"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.withdrawBtn}
+              >
+                <ArrowUpRight size={20} strokeWidth={2.2} className={tab === "withdraw" ? "text-neutral-200" : "text-neutral-400"} />
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "withdraw" ? "text-white" : "text-white/60"}`}>
+                {t.withdrawBtn}
+              </span>
+            </div>
+
+            {/* İşlemler (Transactions) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("pending")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all relative cursor-pointer active:scale-95 border ${
+                  tab === "pending"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.transactionsTab}
+              >
+                <Clock size={20} strokeWidth={2.2} className={tab === "pending" ? "text-neutral-200" : "text-neutral-400"} />
+                {pendingRequests.length > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1 right-1 ring-2 ring-[#0c0d12] animate-pulse" />
+                ) : unviewedRejections.length > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-[#f6465d] absolute top-1 right-1 ring-2 ring-[#0c0d12]" />
+                ) : null}
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "pending" ? "text-white" : "text-white/60"}`}>
+                {t.transactionsTab}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -889,16 +1008,23 @@ export default function WalletPage() {
                         const isCurTL = isTL || mCur === "TL" || mCur === "TRY";
                         const baseMin = method.min || (isCurTL ? 100 : 10);
                         const presets = [baseMin, Math.round(baseMin * 2), Math.round(baseMin * 5), Math.round(baseMin * 10)];
-                        return presets.map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => setAmount(preset.toString())}
-                            className="py-2 rounded-xl text-xs font-bold border border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70 transition-all cursor-pointer"
-                          >
-                            {isCurTL ? `₺${preset}` : `$${preset}`}
-                          </button>
-                        ));
+                        return presets.map((preset) => {
+                          const isSelected = amount === preset.toString();
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setAmount(preset.toString())}
+                              className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-white/15 text-white border-white/25 shadow-sm"
+                                  : "border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70"
+                              }`}
+                            >
+                              {isCurTL ? `₺${preset}` : `$${preset}`}
+                            </button>
+                          );
+                        });
                       })()}
                     </div>
 
@@ -1580,16 +1706,23 @@ export default function WalletPage() {
 
                     {/* Quick amount presets */}
                     <div className="grid grid-cols-4 gap-2 mt-2.5">
-                      {(isTL ? [150, 300, 500, 1000] : [5, 10, 25, 50]).map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setAmount(preset.toString())}
-                          className="py-2 rounded-xl text-xs font-bold border border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70 transition-all cursor-pointer"
-                        >
-                          {userSym}{preset}
-                        </button>
-                      ))}
+                      {(isTL ? [150, 300, 500, 1000] : [5, 10, 25, 50]).map((preset) => {
+                        const isSelected = amount === preset.toString();
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setAmount(preset.toString())}
+                            className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-white/15 text-white border-white/25 shadow-sm"
+                                : "border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70"
+                            }`}
+                          >
+                            {userSym}{preset}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

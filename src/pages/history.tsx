@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { TrendingUp, Clock, BarChart2, Zap, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { AssetIcon } from "@/lib/asset-icons";
+import { motion, AnimatePresence } from "framer-motion";
 
 function getLiveProfit(trade: any, isReal: boolean) {
   const startPrice = isReal ? trade.entryPrice : trade.startPrice;
@@ -56,8 +57,8 @@ interface RealActiveTrade {
 /* ── Asset Flag Icon Helper ────────────────────────────────────────────── */
 function renderAssetIcon(assetLabel: string) {
   return (
-    <div className="h-9 w-9 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-      <AssetIcon label={assetLabel} size={24} />
+    <div className="shrink-0 flex items-center justify-center">
+      <AssetIcon label={assetLabel} size={28} />
     </div>
   );
 }
@@ -110,18 +111,21 @@ export default function History() {
   const visibleRealActive = realActiveTrades.filter(tr => tr.expiryTime > now - 800);
   const visibleActive     = viewIsReal ? visibleRealActive : visibleDemoActive;
 
+  const totalNet = modeTrades.reduce((acc, tr) => {
+    return tr.result === "WIN" ? acc + tr.profit : acc - tr.amount;
+  }, 0);
+  const winRate = total > 0 ? Math.round((totalWin / total) * 100) : 0;
+
   return (
     <div className="flex h-full flex-col bg-black text-white" style={{ backgroundColor: "#000000" }}>
 
       {/* ── Active Trades Section ──────────────────────────────────────── */}
       {visibleActive.length > 0 && (
-        <div className="shrink-0 px-4 pt-4 pb-2 bg-black">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-white/60">
-              {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
-            </p>
-          </div>
-          <div className="flex flex-row gap-2.5 overflow-x-auto snap-x snap-mandatory w-full no-scrollbar">
+        <div className="shrink-0 px-4 pt-3 pb-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2">
+            {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
+          </p>
+          <div className="flex flex-row gap-2 overflow-x-auto snap-x snap-mandatory w-full no-scrollbar">
             {visibleActive.map(tr => {
               const isUp   = tr.direction === "UP";
               const expiry = viewIsReal
@@ -132,45 +136,53 @@ export default function History() {
                 ? ((tr as RealActiveTrade).expiryTime - (tr as RealActiveTrade).entryTime)
                 : ((tr as typeof activeTrades[number]).duration * 1000);
               const prog   = Math.max(0, Math.min(1, rem / totalTime));
-              const dirAccent = isUp ? "#10b981" : "#ef4444";
 
               return (
-                <div key={tr.id} className="rounded-2xl px-4 py-3.5 bg-black border border-white/10 flex items-center justify-between relative overflow-hidden shrink-0 min-w-full snap-start">
-                  <div className="flex items-center gap-3">
-                    {renderAssetIcon(tr.asset)}
+                <div
+                  key={tr.id}
+                  className="rounded-2xl p-3 flex items-center justify-between relative overflow-hidden shrink-0 min-w-full snap-start border border-white/[0.07] shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+                  style={{
+                    background: "linear-gradient(135deg, #101114 0%, #0c0d10 50%, rgba(255, 107, 0, 0.05) 100%)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="relative shrink-0">
+                      {renderAssetIcon(tr.asset)}
+                      <div className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center border border-black bg-[#2d3038] text-gray-200 text-[8px] font-black shadow-sm">
+                        {isUp ? "▲" : "▼"}
+                      </div>
+                    </div>
                     <div>
-                      <p className="text-xs font-bold text-white/90 leading-none">{tr.asset}</p>
-                      <p className="text-[10px] text-white/40 mt-1 font-medium flex items-center gap-1.5">
-                        {isUp ? t.upBtn : t.downBtn} · {sym}{tr.amount}
-                        <span className="text-white/20">|</span>
-                        <span className="font-mono text-white/60">{fmtCountdown(rem)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-semibold text-white leading-none">{tr.asset}</p>
+                      </div>
+                      <p className="text-[10px] text-white/50 mt-1 font-medium">
+                        {sym}{tr.amount} · <span className="font-mono text-amber-300 font-bold">{fmtCountdown(rem)}</span>
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="text-right pt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
                       {(() => {
                         const profit = getLiveProfit(tr, viewIsReal);
-                        return (
-                          <div className="flex flex-col items-center">
-                            <p className="text-xs font-bold font-mono text-white/90">{sym}{tr.amount}</p>
-                            {profit <= 0 ? (
-                               <p className="text-[10px] font-bold font-mono text-white/30">0</p>
-                            ) : (
-                               <p className="text-[10px] font-bold font-mono text-emerald-400">
-                                 {sym}{(tr.amount + profit).toFixed(2)}
-                               </p>
-                            )}
-                          </div>
+                        return profit <= 0 ? (
+                          <p className="text-xs font-mono font-bold text-white/40">{sym}0.00</p>
+                        ) : (
+                          <p className="text-xs font-mono font-bold text-emerald-400">
+                            +{sym}{(tr.amount + profit).toFixed(2)}
+                          </p>
                         );
                       })()}
                     </div>
                   </div>
 
-                  {/* Bottom progress bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.04]">
-                    <div className="h-full transition-all duration-1000" style={{ width: `${prog * 100}%`, background: "#F59E0B" }} />
+                  {/* Progress bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/10">
+                    <div
+                      className="h-full bg-amber-400 transition-all duration-1000"
+                      style={{ width: `${prog * 100}%` }}
+                    />
                   </div>
                 </div>
               );
@@ -179,9 +191,9 @@ export default function History() {
         </div>
       )}
 
-      {/* ── Filter Pills ──────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-center px-4 pt-4 pb-3 bg-black">
-        <div className="flex items-center justify-center gap-2">
+      {/* ── Filter Tabs ──────────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-center px-4 pt-3 pb-2">
+        <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] w-full max-w-xs">
           {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => {
             const isActive = filter === f;
             const label = f === "ALL" ? t.all : f === "WIN" ? t.winners : t.losers;
@@ -191,15 +203,15 @@ export default function History() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`flex-1 rounded-lg py-1.5 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   isActive
-                    ? "bg-white text-black font-bold border border-white shadow-sm"
-                    : "bg-black text-white/50 hover:text-white/80 border border-white/10"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-white/40 hover:text-white/70"
                 }`}
               >
                 <span>{label}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-lg font-medium ${
-                  isActive ? "bg-black/10 text-black font-bold" : "bg-white/[0.05] text-white/40"
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  isActive ? "bg-white/20 text-white" : "bg-white/[0.06] text-white/40"
                 }`}>
                   {count}
                 </span>
@@ -209,30 +221,28 @@ export default function History() {
         </div>
       </div>
 
-      {/* ── Trade List (Soft Cards) ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-24 space-y-2 bg-black">
+      {/* ── Trade List ──────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-24 space-y-2">
 
         {tradesLoading && (
-          <div className="flex flex-col items-center justify-center py-16 bg-black">
-            <div className="animate-spin mb-3 h-8 w-8 rounded-full border-2 border-white/10 border-t-white/40" />
-            <p className="text-xs font-medium text-white/40">Yükleniyor...</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin mb-3 h-7 w-7 rounded-full border-2 border-white/20 border-t-white" />
+            <p className="text-xs text-white/40">İşlem geçmişi yükleniyor...</p>
           </div>
         )}
 
         {!tradesLoading && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center my-4 rounded-3xl border border-white/10 bg-black p-6">
-            <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-3 bg-white/[0.04] border border-white/10">
-              <BarChart2 size={22} className="text-white/40" />
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-3 bg-white/[0.04] border border-white/[0.08]">
+              <BarChart2 size={22} className="text-white/30" />
             </div>
-            <p className="text-sm font-semibold text-white/80">{t.noHistoryTitle}</p>
+            <p className="text-sm font-bold text-white/80">{t.noHistoryTitle}</p>
             <p className="text-xs text-white/40 mt-1 max-w-xs leading-relaxed">
               {viewIsReal ? t.noHistoryRealDesc : t.noHistoryDemoDesc}
             </p>
             <Link href="/">
-              <button
-                className="mt-5 flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white bg-white/10 border border-white/15 shadow-sm transition-all hover:bg-white/15 active:scale-95 cursor-pointer"
-              >
-                <TrendingUp size={14} className="text-emerald-400" />
+              <button className="mt-4 flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-black bg-[#FF6B00] hover:bg-[#FF8533] transition-colors cursor-pointer">
+                <TrendingUp size={13} className="text-black" />
                 <span>{t.tradeNow}</span>
               </button>
             </Link>
@@ -242,74 +252,86 @@ export default function History() {
         {!tradesLoading && filtered.map((trade: CompletedTrade) => {
           const isUp   = trade.direction === "UP";
           const isWin  = trade.result === "WIN";
-          const tradeAccent = isWin ? "#34d399" : "#f87171";
           const isExpanded  = expandedId === trade.id;
 
           return (
-            <div key={trade.id} className="flex flex-col">
-              {/* TRADE CARD */}
+            <div
+              key={trade.id}
+              className="rounded-2xl border border-white/[0.07] hover:border-white/15 overflow-hidden transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+              style={{
+                background: "linear-gradient(135deg, #0f1013 0%, #0a0b0d 50%, rgba(255, 107, 0, 0.04) 100%)",
+              }}
+            >
+              {/* TRADE CARD MAIN ROW */}
               <div
                 onClick={() => setExpandedId(isExpanded ? null : trade.id)}
-                className={`px-4 py-3.5 bg-black border border-white/10 transition-all cursor-pointer flex items-center justify-between hover:bg-white/[0.03] active:scale-[0.995] ${
-                  isExpanded ? "rounded-t-2xl border-b-0" : "rounded-2xl"
-                }`}
+                className="px-4 py-3 cursor-pointer flex items-center justify-between select-none"
               >
                 {/* Left: Asset Icon + Info */}
                 <div className="flex items-center gap-3 min-w-0">
                   {renderAssetIcon(trade.asset)}
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white/90 truncate leading-none">{trade.asset}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-semibold leading-none shrink-0 ${
-                        isUp ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                      }`}>
-                        {isUp ? t.upBtn : t.downBtn}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-white truncate leading-none">{trade.asset}</span>
+                      <span className="text-[10px] font-bold leading-none text-white/40">
+                        {isUp ? "▲" : "▼"}
                       </span>
                     </div>
 
-                    <p className="text-[10px] text-white/40 mt-1 font-mono font-normal truncate">
+                    <p className="text-[10px] text-white/40 mt-1 font-mono truncate">
                       {reltime(trade.closedAt, langCode)} · {fmt(trade.closedAt, langCode)}
                     </p>
                   </div>
                 </div>
 
                 {/* Right: Outcome badge + Profit */}
-                <div className="flex items-center gap-3 shrink-0 text-right">
+                <div className="flex items-center gap-2 shrink-0 text-right">
                   <div>
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-semibold ${
-                        isWin ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                      }`}>
-                        {isWin ? t.won : t.lost}
-                      </span>
-                    </div>
-                    <p className="text-sm font-bold leading-tight mt-1 font-mono" style={{ color: tradeAccent }}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider ${
+                      isWin ? "bg-white/10 text-white" : "bg-white/5 text-white/50"
+                    }`}>
+                      {isWin ? t.won : t.lost}
+                    </span>
+                    <p className={`text-xs font-bold leading-tight mt-0.5 font-mono ${
+                      isWin ? "text-emerald-400" : "text-white/50"
+                    }`}>
                       {isWin ? `+${sym}${trade.profit.toFixed(2)}` : `-${sym}${trade.amount.toFixed(2)}`}
                     </p>
                   </div>
 
-                  <ChevronDown size={14} className={`text-white/30 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                  <ChevronDown size={14} className={`text-white/40 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                 </div>
               </div>
 
-              {/* EXPANDED DETAILS ACCORDION */}
-              {isExpanded && (
-                <div className="bg-black border border-t-0 border-white/10 rounded-b-2xl pt-2 pb-3.5 px-4 grid grid-cols-3 gap-2.5 text-[10px] text-white/60">
-                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
-                    <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.entryPrice}</span>
-                    <span className="font-mono font-semibold text-white/90 text-xs">{trade.entryPrice ? trade.entryPrice.toFixed(5) : "—"}</span>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
-                    <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.exitPrice}</span>
-                    <span className="font-mono font-semibold text-white/90 text-xs">{trade.exitPrice ? trade.exitPrice.toFixed(5) : "—"}</span>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.04] border border-white/5 p-2.5">
-                    <span className="text-white/40 block text-[9px] mb-1 font-medium">{t.closeTime}</span>
-                    <span className="font-mono text-white/80 text-[11px] block mt-0.5">{fmt(trade.closedAt, langCode)}</span>
-                  </div>
-                </div>
-              )}
+              {/* SMOOTH ACCORDION DETAILS */}
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    key="details"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                    className="overflow-hidden border-t border-white/[0.06] bg-black/40"
+                  >
+                    <div className="py-2.5 px-4 grid grid-cols-3 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-white/40 block text-[9px] mb-0.5">{t.entryPrice}</span>
+                        <span className="font-mono text-white/80">{trade.entryPrice ? trade.entryPrice.toFixed(5) : "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[9px] mb-0.5">{t.exitPrice}</span>
+                        <span className="font-mono text-white/80">{trade.exitPrice ? trade.exitPrice.toFixed(5) : "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[9px] mb-0.5">{t.closeTime}</span>
+                        <span className="font-mono text-white/80">{fmt(trade.closedAt, langCode)}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}

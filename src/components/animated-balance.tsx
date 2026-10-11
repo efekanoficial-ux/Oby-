@@ -90,9 +90,10 @@ export function AnimatedBalance({
     maximumFractionDigits: 2,
   });
 
+  const hasDisplay = className.includes("block") || className.includes("flex") || className.includes("inline");
   return (
     <span
-      className={`tabular-nums inline-block select-none ${className}`}
+      className={`tabular-nums ${!hasDisplay ? "inline-block" : ""} select-none ${className}`}
       style={style}
     >
       {prefix}
