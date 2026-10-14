@@ -418,6 +418,7 @@ export default function Admin() {
         erc20Address: erc20Item?.address || formSettings.erc20Address,
         erc20Enabled: erc20Item ? erc20Item.enabled : formSettings.erc20Enabled,
         erc20QrCode: erc20Item?.qrCode !== undefined ? erc20Item.qrCode : formSettings.erc20QrCode,
+        bankTransferIconURL: formSettings.bankTransferIconURL,
       };
       const res = await updatePaymentSettings(settingsToSave);
       if (res.success) {
@@ -1846,10 +1847,46 @@ export default function Admin() {
                     />
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
-                      Transfer Açıklama Kodu (Açıklama)
-                    </label>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                        Banka Transferi Logosu (URL veya Yükle)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={formSettings.bankTransferIconURL || ""}
+                          onChange={(e) => setFormSettings(prev => ({ ...prev, bankTransferIconURL: e.target.value }))}
+                          placeholder="Logonun URL'sini girin"
+                          className="flex-1 rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setFormSettings(prev => ({ ...prev, bankTransferIconURL: ev.target?.result as string }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                          id="bank-icon-upload"
+                        />
+                        <label
+                          htmlFor="bank-icon-upload"
+                          className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-colors flex items-center"
+                        >
+                          Yükle
+                        </label>
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                        Transfer Açıklama Kodu (Açıklama)
+                      </label>
                     <input
                       type="text"
                       value={formSettings.ibanDescription ?? ""}

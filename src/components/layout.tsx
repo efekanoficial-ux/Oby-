@@ -717,18 +717,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-1 select-none shrink-0 text-right">
               <div 
                 onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
-                className="flex flex-col items-end justify-center cursor-pointer select-none text-right"
+                className="flex items-center gap-2 cursor-pointer select-none text-right"
               >
-                <span className="text-[9px] font-medium leading-tight text-white/50 whitespace-nowrap">
-                  {modeLabel}
-                </span>
-                <AnimatedBalance
-                  value={displayBalance}
-                  currency={currency}
-                  symbol={isTournament ? "¥" : undefined}
-                  isMasked={isReal && isBalanceHidden}
-                  className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap text-right"
-                />
+                <div onClick={(e) => { e.stopPropagation(); toggleBalanceHidden(); }} className="text-white/40">
+                  {isBalanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                </div>
+                <div className="flex flex-col items-end justify-center">
+                  <span className="text-[9px] font-medium leading-tight text-white/50 whitespace-nowrap">
+                    {modeLabel}
+                  </span>
+                  <AnimatedBalance
+                    value={displayBalance}
+                    currency={currency}
+                    symbol={isTournament ? "¥" : undefined}
+                    isMasked={isReal && isBalanceHidden}
+                    className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap text-right"
+                  />
+                </div>
               </div>
 
 

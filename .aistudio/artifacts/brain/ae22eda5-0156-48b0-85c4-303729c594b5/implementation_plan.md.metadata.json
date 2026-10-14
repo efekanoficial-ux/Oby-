@@ -1,6 +1,6 @@
 {
-  "summary": "Kapsamlı kripto para yatırma yöntemleri, renkli logo kartları, admin panelinden açılır/kapanır ve içerik düzenleme entegrasyonu ve cüzdan adresi girildiğinde otomatik anlık QR kod oluşturucu mimari uygulama planı.",
-  "updatedAt": "2026-10-14T07:59:04.247651231Z",
+  "summary": "Implement admin-driven image upload for the Bank Transfer icon.",
+  "updatedAt": "2026-10-14T12:10:32.856850900Z",
   "requestFeedback": true,
   "userFacing": true
 }

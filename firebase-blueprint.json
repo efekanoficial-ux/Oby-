@@ -57,6 +57,7 @@
         "erc20Enabled": { "type": "boolean" },
         "erc20Address": { "type": "string" },
         "customMethods": { "type": "array" },
+        "bankTransferIconURL": { "type": "string" },
         "updatedAt": { "type": "number" }
       }
     }

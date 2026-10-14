@@ -720,16 +720,15 @@ export default function WalletPage() {
 
           {/* Centered Balance Title */}
           <div className="relative mb-2 flex items-center justify-center gap-2">
-            <span className="text-[10px] sm:text-[11px] font-bold text-white/40 uppercase tracking-widest">
+            <span className="text-[10px] sm:text-[11px] font-bold text-white/40 uppercase tracking-widest text-center">
               {t.realWalletBalance}
             </span>
           </div>
 
           {/* Centered Large Balance Display */}
           <div 
-            onClick={toggleBalanceHidden}
-            className="relative flex items-baseline justify-center gap-2 mb-2 cursor-pointer select-none group text-center"
-            title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+            className="relative flex items-baseline justify-center gap-2 mb-2 select-none group text-center"
+            title={isBalanceHidden ? "Bakiye Gizli" : "Bakiye Görünür"}
           >
             <span className="text-3xl sm:text-4xl font-semibold text-white tracking-tight group-hover:text-white/90 transition-colors drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
               {isBalanceHidden
@@ -904,7 +903,7 @@ export default function WalletPage() {
 
                   {/* Category Pills & Search */}
                   <div className="flex flex-col gap-2.5">
-                    <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/5 overflow-x-auto">
+                    <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
                       <button
                         type="button"
                         onClick={() => setDepositFilterCategory("all")}
@@ -1781,7 +1780,7 @@ export default function WalletPage() {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="flex flex-col gap-4"
+                  className="flex flex-col gap-4 w-full"
                 >
                   <button
                     onClick={() => setWStep("method")}
