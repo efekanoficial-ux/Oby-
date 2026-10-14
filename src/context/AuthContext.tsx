@@ -96,6 +96,166 @@ export interface CustomPaymentMethod {
   customRows?: Array<{ label: string; value: string; copy?: boolean }>;
 }
 
+export interface CryptoPaymentMethod {
+  id: string;
+  coin: string;
+  name: string;
+  network: string;
+  enabled: boolean;
+  address: string;
+  qrCode?: string;
+  minAmount: number;
+  badge?: string;
+  notes?: string;
+  memoOrTagRequired?: boolean;
+  memoOrTagValue?: string;
+}
+
+export const DEFAULT_CRYPTO_METHODS: CryptoPaymentMethod[] = [
+  {
+    id: "usdt-trc20",
+    coin: "USDT",
+    name: "Tether USD",
+    network: "Tron (TRC-20)",
+    enabled: true,
+    address: "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S",
+    minAmount: 10,
+    notes: "Yalnızca Tron (TRC-20) ağı üzerinden USDT gönderiniz.",
+  },
+  {
+    id: "usdt-erc20",
+    coin: "USDT",
+    name: "Tether USD",
+    network: "Ethereum (ERC-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 20,
+    notes: "Yalnızca Ethereum (ERC-20) ağı üzerinden USDT gönderiniz.",
+  },
+  {
+    id: "usdt-bep20",
+    coin: "USDT",
+    name: "Tether USD",
+    network: "BNB Smart Chain (BEP-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 10,
+    notes: "Yalnızca BNB Smart Chain (BEP-20) ağı üzerinden USDT gönderiniz.",
+  },
+  {
+    id: "btc",
+    coin: "BTC",
+    name: "Bitcoin",
+    network: "Bitcoin Native",
+    enabled: true,
+    address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    minAmount: 0.0005,
+    notes: "Yalnızca Bitcoin ağı üzerinden BTC gönderiniz.",
+  },
+  {
+    id: "eth",
+    coin: "ETH",
+    name: "Ethereum",
+    network: "Ethereum (ERC-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 0.005,
+    notes: "Yalnızca Ethereum ağı üzerinden ETH gönderiniz.",
+  },
+  {
+    id: "sol",
+    coin: "SOL",
+    name: "Solana",
+    network: "Solana Mainnet",
+    enabled: true,
+    address: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    minAmount: 0.1,
+    notes: "Yalnızca Solana ağı üzerinden SOL gönderiniz.",
+  },
+  {
+    id: "ton",
+    coin: "TON",
+    name: "Toncoin",
+    network: "The Open Network (TON)",
+    enabled: true,
+    address: "EQBvW8Z5huBkMJYdnfAEMnTWffK6PfzpTY3Tvqda2O5NsMND",
+    minAmount: 2,
+    notes: "Yalnızca TON ağı üzerinden Toncoin gönderiniz.",
+  },
+  {
+    id: "bnb",
+    coin: "BNB",
+    name: "Binance Coin",
+    network: "BNB Smart Chain (BEP-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 0.05,
+    notes: "Yalnızca BEP-20 ağı üzerinden BNB gönderiniz.",
+  },
+  {
+    id: "xrp",
+    coin: "XRP",
+    name: "Ripple",
+    network: "Ripple Network",
+    enabled: true,
+    address: "rEb8TK3gBgk5auZyyb6328ndiiUMJ59EEo",
+    minAmount: 10,
+    memoOrTagRequired: true,
+    memoOrTagValue: "1098234",
+    notes: "Transfer yaparken Destination Tag girmeyi unutmayınız.",
+  },
+  {
+    id: "doge",
+    coin: "DOGE",
+    name: "Dogecoin",
+    network: "Dogecoin Network",
+    enabled: true,
+    address: "D8v2vxLijbtG6qQ4gXk5U2x2jM2gE3h1B1",
+    minAmount: 50,
+    notes: "Yalnızca Dogecoin ağı üzerinden DOGE gönderiniz.",
+  },
+  {
+    id: "shib",
+    coin: "SHIB",
+    name: "Shiba Inu",
+    network: "Ethereum (ERC-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 500000,
+    notes: "Yalnızca ERC-20 ağı üzerinden SHIB gönderiniz.",
+  },
+  {
+    id: "pepe",
+    coin: "PEPE",
+    name: "Pepe",
+    network: "Ethereum (ERC-20)",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 1000000,
+    notes: "Yalnızca ERC-20 ağı üzerinden PEPE gönderiniz.",
+  },
+  {
+    id: "avax",
+    coin: "AVAX",
+    name: "Avalanche",
+    network: "Avalanche C-Chain",
+    enabled: true,
+    address: "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
+    minAmount: 0.5,
+    notes: "Yalnızca C-Chain üzerinden AVAX gönderiniz.",
+  },
+  {
+    id: "ltc",
+    coin: "LTC",
+    name: "Litecoin",
+    network: "Litecoin Network",
+    enabled: true,
+    address: "LQTpS3y7Z5C5qW6eQ8Y2z9vF1x3B5m7K9p",
+    minAmount: 0.1,
+    notes: "Yalnızca Litecoin ağı üzerinden LTC gönderiniz.",
+  },
+];
+
 export interface PaymentSettings {
   ibanEnabled?:     boolean;
   ibanReceiptRequired?: boolean;
@@ -113,6 +273,7 @@ export interface PaymentSettings {
   erc20Address:     string;
   erc20QrCode?:     string;
 
+  cryptoMethods?:   CryptoPaymentMethod[];
   customMethods?:   CustomPaymentMethod[];
   updatedAt?:       number;
 
@@ -143,6 +304,7 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   erc20Address:    "0x742d35Cc6634C0532925a3b844D28f32be0A5b5f",
   erc20QrCode:     "",
 
+  cryptoMethods:   DEFAULT_CRYPTO_METHODS,
   customMethods:   [],
 
   telegramEnabled:             true,
@@ -428,6 +590,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(doc(db, "settings", "payment"), (snap) => {
       if (snap.exists()) {
         const data = snap.data() || {};
+        
+        // Merge stored crypto methods with defaults to ensure all coins are always available
+        const savedCryptoList: CryptoPaymentMethod[] = Array.isArray(data.cryptoMethods) ? data.cryptoMethods : [];
+        const mergedCryptoMethods: CryptoPaymentMethod[] = DEFAULT_CRYPTO_METHODS.map(def => {
+          const found = savedCryptoList.find(m => m.id === def.id);
+          if (found) {
+            return {
+              ...def,
+              ...found,
+            };
+          }
+          // Legacy fallback sync for TRC20 and ERC20
+          if (def.id === "usdt-trc20" && data.trc20Address) {
+            return {
+              ...def,
+              address: data.trc20Address,
+              enabled: data.trc20Enabled !== undefined ? Boolean(data.trc20Enabled) : def.enabled,
+              qrCode: data.trc20QrCode || def.qrCode,
+            };
+          }
+          if (def.id === "usdt-erc20" && data.erc20Address) {
+            return {
+              ...def,
+              address: data.erc20Address,
+              enabled: data.erc20Enabled !== undefined ? Boolean(data.erc20Enabled) : def.enabled,
+              qrCode: data.erc20QrCode || def.qrCode,
+            };
+          }
+          return def;
+        });
+
+        // Also append any custom-created crypto tokens that might have been added
+        savedCryptoList.forEach(sc => {
+          if (!mergedCryptoMethods.some(m => m.id === sc.id)) {
+            mergedCryptoMethods.push(sc);
+          }
+        });
+
         setPaymentSettings({
           ...DEFAULT_PAYMENT_SETTINGS,
           ...data,
@@ -435,6 +635,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ibanReceiptRequired: data.ibanReceiptRequired !== undefined ? Boolean(data.ibanReceiptRequired) : true,
           trc20Enabled: data.trc20Enabled !== undefined ? Boolean(data.trc20Enabled) : true,
           erc20Enabled: data.erc20Enabled !== undefined ? Boolean(data.erc20Enabled) : true,
+          cryptoMethods: mergedCryptoMethods,
           customMethods: Array.isArray(data.customMethods) ? data.customMethods : [],
         } as PaymentSettings);
       }

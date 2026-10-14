@@ -192,8 +192,8 @@ export default function History() {
       )}
 
       {/* ── Filter Tabs ──────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-center px-4 pt-3 pb-2">
-        <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] w-full max-w-xs">
+      <div className="shrink-0 w-full px-3 sm:px-4 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] w-full max-w-sm sm:max-w-md mx-auto">
           {(["ALL", "WIN", "LOSE"] as Filter[]).map(f => {
             const isActive = filter === f;
             const label = f === "ALL" ? t.all : f === "WIN" ? t.winners : t.losers;
@@ -203,14 +203,14 @@ export default function History() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`flex-1 rounded-lg py-1.5 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`flex-1 min-w-0 rounded-lg py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer select-none ${
                   isActive
                     ? "bg-white/10 text-white shadow-sm"
                     : "text-white/40 hover:text-white/70"
                 }`}
               >
-                <span>{label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                <span className="truncate">{label}</span>
+                <span className={`shrink-0 text-[9.5px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-mono leading-none ${
                   isActive ? "bg-white/20 text-white" : "bg-white/[0.06] text-white/40"
                 }`}>
                   {count}

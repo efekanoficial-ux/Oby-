@@ -386,6 +386,11 @@ const tr = {
   wireRefNotice: "Lütfen bankanızın transfer açıklama kısmına kesinlikle bu kodu yazınız. Bu açıklama olmadan yapılan transferler eşleştirilemez.",
   wireReceiptDescMandatory: "Transferinizi bankanızdan gerçekleştirdikten sonra oluşan dekontun ekran görüntüsünü veya fotoğrafını yükleyiniz. Transferiniz admin tarafından dekont kontrol edilerek onaylanacaktır.",
   wireReceiptDescOptional: "Dilerseniz transfer dekontunuzu yükleyerek işleminizin daha hızlı onaylanmasını sağlayabilirsiniz. (İsteğe bağlı)",
+  cryptoCurrencies: "Kripto Paralar",
+  bankTransfer: "Havale / EFT",
+  searchCryptoOrMethod: "Kripto veya yöntem ara (USDT, BTC, SOL, TON, Havale)...",
+  noDepositMethodFound: "Seçilen kriterde aktif yöntem bulunamadı.",
+  clearFilters: "Filtreleri Temizle",
 };
 
 const en: typeof tr = {
@@ -764,6 +769,11 @@ const en: typeof tr = {
   wireRefNotice: "Please enter this exact reference code in your transfer note. Transfers without this code cannot be matched.",
   wireReceiptDescMandatory: "Please upload a screenshot or photo of the bank transfer receipt. Your transfer will be verified and approved by the admin.",
   wireReceiptDescOptional: "Optionally upload your receipt to accelerate the verification process.",
+  cryptoCurrencies: "Cryptocurrencies",
+  bankTransfer: "Bank Transfer",
+  searchCryptoOrMethod: "Search crypto or method (USDT, BTC, SOL, Wire)...",
+  noDepositMethodFound: "No active method found for the selected criteria.",
+  clearFilters: "Clear Filters",
 };
 
 const de: typeof tr = {
@@ -1142,10 +1152,15 @@ const de: typeof tr = {
   wireRefNotice: "Bitte geben Sie diesen Referenzcode im Verwendungszweck an.",
   wireReceiptDescMandatory: "Bitte laden Sie den Überweisungsbeleg hoch.",
   wireReceiptDescOptional: "Laden Sie optional den Beleg hoch.",
+  cryptoCurrencies: "Kryptowährungen",
+  bankTransfer: "Banküberweisung",
+  searchCryptoOrMethod: "Krypto oder Methode suchen (USDT, BTC, SOL)...",
+  noDepositMethodFound: "Keine aktive Methode für die ausgewählten Kriterien gefunden.",
+  clearFilters: "Filter zurücksetzen",
 };
-const es: typeof tr = { ...en, navHistory: "Historial", navTrade: "Operar", navBalance: "Saldo", navVip: "VIP / Perfil", upBtn: "SUBE", downBtn: "BAJA", selectAccount: "Seleccionar cuenta", demoAccount: "Cuenta Demo", realAccount: "Cuenta Real", tournamentAccount: "Cuenta de Torneo", tournamentTab: "Torneo", dailyRankingTab: "Clasificación Diaria", youTag: "TÚ" };
-const ru: typeof tr = { ...en, navHistory: "История", navTrade: "Торговля", navBalance: "Баланс", navVip: "VIP / Профиль", upBtn: "BЫШЕ", downBtn: "НИЖЕ", selectAccount: "Выбрать счет", demoAccount: "Демо счет", realAccount: "Реальный счет", tournamentAccount: "Турнирный счет", tournamentTab: "Турнир", dailyRankingTab: "Ежедневный рейтинг", youTag: "ВЫ" };
-const ar: typeof tr = { ...en, navHistory: "السجل", navTrade: "تداول", navBalance: "الرصيد", navVip: "VIP / الملف", upBtn: "أعلى", downBtn: "أسفل", selectAccount: "اختر الحساب", demoAccount: "حساب تجريبي", realAccount: "حساب حقيقي", tournamentAccount: "حساب البطولة", tournamentTab: "البطولة", dailyRankingTab: "الترتيب اليومي", youTag: "أنت" };
+const es: typeof tr = { ...en, navHistory: "Historial", navTrade: "Operar", navBalance: "Saldo", navVip: "VIP / Perfil", upBtn: "SUBE", downBtn: "BAJA", selectAccount: "Seleccionar cuenta", demoAccount: "Cuenta Demo", realAccount: "Cuenta Real", tournamentAccount: "Cuenta de Torneo", tournamentTab: "Torneo", dailyRankingTab: "Clasificación Diaria", youTag: "TÚ", all: "Todos", winners: "Ganadores", losers: "Perdedores", cryptoCurrencies: "Criptomonedas", bankTransfer: "Transferencia bancaria", searchCryptoOrMethod: "Buscar cripto o método...", noDepositMethodFound: "No se encontró ningún método activo.", clearFilters: "Borrar filtros" };
+const ru: typeof tr = { ...en, navHistory: "История", navTrade: "Торговля", navBalance: "Баланс", navVip: "VIP / Профиль", upBtn: "BЫШЕ", downBtn: "НИЖЕ", selectAccount: "Выбрать счет", demoAccount: "Демо счет", realAccount: "Реальный счет", tournamentAccount: "Турнирный счет", tournamentTab: "Турнир", dailyRankingTab: "Ежедневный рейтинг", youTag: "ВЫ", all: "Все", winners: "Выигрыши", losers: "Проигрыши", cryptoCurrencies: "Криптовалюты", bankTransfer: "Банковский перевод", searchCryptoOrMethod: "Поиск криптовалюты или метода...", noDepositMethodFound: "Активные методы не найдены.", clearFilters: "Очистить фильтры" };
+const ar: typeof tr = { ...en, navHistory: "السجل", navTrade: "تداول", navBalance: "الرصيد", navVip: "VIP / الملف", upBtn: "أعلى", downBtn: "أسفل", selectAccount: "اختر الحساب", demoAccount: "حساب تجريبي", realAccount: "حساب حقيقي", tournamentAccount: "حساب البطولة", tournamentTab: "البطولة", dailyRankingTab: "الترتيب اليومي", youTag: "أنت", all: "الكل", winners: "الرابحة", losers: "الخاسرة", cryptoCurrencies: "العملات الرقمية", bankTransfer: "تحويل بنكي", searchCryptoOrMethod: "البحث عن عملة أو طريقة...", noDepositMethodFound: "لم يتم العثور على طريقة نشطة.", clearFilters: "إعادة ضبط الفلاتر" };
 
 export const translationsMap = { tr, en, de, es, ru, ar };
 

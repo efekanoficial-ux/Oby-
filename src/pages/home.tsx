@@ -2365,7 +2365,7 @@ export default function Home() {
           </div>
 
           {/* Right: Account Controls & Profile */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 ml-auto">
             
             {/* Phone support */}
             <CallRequestMenu
@@ -2374,7 +2374,16 @@ export default function Home() {
               align="right"
             />
 
-            {/* Account Selector & Balance */}
+            {/* Language Settings */}
+            <button
+              onClick={() => setShowDesktopLangModal(true)}
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:text-white bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer shrink-0"
+              title={t.languageSettings}
+            >
+              <Settings size={14} />
+            </button>
+
+            {/* Account Selector & Balance (Sağa yanaştırılmış) */}
             <div className="relative shrink-0">
               <div
                 onClick={() => currentUser ? setShowDesktopAccountSwitcher(s => !s) : navigate("/wallet")}
@@ -2386,28 +2395,17 @@ export default function Home() {
                   <span className="text-[9px] font-bold text-white/40 uppercase tracking-wider">
                     {modeLabel}
                   </span>
-                  <AnimatedBalance
-                    value={displayBalance}
-                    currency={currency}
-                    symbol={isTournament ? "¥" : undefined}
-                    isMasked={isReal && isBalanceHidden}
-                    className="text-xs font-black text-white tracking-tight"
-                  />
+                  
+                  <div className="flex items-center gap-0">
+                    <AnimatedBalance
+                      value={displayBalance}
+                      currency={currency}
+                      symbol={isTournament ? "¥" : undefined}
+                      isMasked={isReal && isBalanceHidden}
+                      className="text-xs font-black text-white tracking-tight"
+                    />
+                  </div>
                 </div>
-
-                {isReal && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleBalanceHidden();
-                    }}
-                    className="flex h-5 w-5 items-center justify-center text-white/40 hover:text-white transition-colors cursor-pointer shrink-0"
-                    title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
-                  >
-                    {isBalanceHidden ? <Eye size={12} /> : <EyeOff size={12} />}
-                  </button>
-                )}
 
                 <ChevronDown size={12} className="text-white/40 shrink-0 ml-0.5" />
               </div>
@@ -2428,26 +2426,6 @@ export default function Home() {
                 currency={currency}
               />
             </div>
-
-            {/* Wallet / Deposit Button */}
-            <button
-              onClick={() => navigate("/wallet")}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-black text-black transition-transform active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-sm shadow-[#FF6B00]/30"
-              style={{ background: "linear-gradient(135deg, #FF6B00, #FF9500)" }}
-              title="Cüzdan & Para Yatırma"
-            >
-              <Wallet size={13} className="shrink-0" />
-              <span className="font-extrabold">{t.wallet}</span>
-            </button>
-
-            {/* Language Settings */}
-            <button
-              onClick={() => setShowDesktopLangModal(true)}
-              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:text-white bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer shrink-0"
-              title={t.languageSettings}
-            >
-              <Settings size={14} />
-            </button>
 
             {/* Profile Avatar / Login */}
             {!currentUser ? (

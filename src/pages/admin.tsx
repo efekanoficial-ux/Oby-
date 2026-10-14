@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, ObyoUser, ObyoRequest, PaymentSettings, CustomPaymentMethod } from "@/context/AuthContext";
+import { useAuth, ObyoUser, ObyoRequest, PaymentSettings, CustomPaymentMethod, CryptoPaymentMethod, DEFAULT_CRYPTO_METHODS } from "@/context/AuthContext";
+import { CryptoIcon } from "@/components/crypto-icons";
+import { CryptoQrCode } from "@/components/crypto-qr";
 import {
   Users, ArrowDownCircle, ArrowUpCircle, Check, X, LogOut,
   Shield, Clock, ChevronDown, ChevronUp, Filter, TrendingUp,
@@ -167,6 +169,20 @@ export default function Admin() {
   /* Custom Payment Method modal and editing state */
   const [editingCustomMethod, setEditingCustomMethod] = useState<CustomPaymentMethod | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  /* Crypto Management Admin State */
+  const [cryptoSearchQuery, setCryptoSearchQuery] = useState("");
+  const [cryptoCategoryFilter, setCryptoCategoryFilter] = useState<"all" | "stable" | "major" | "meme">("all");
+  const [isNewCryptoModalOpen, setIsNewCryptoModalOpen] = useState(false);
+  const [newCryptoForm, setNewCryptoForm] = useState<Partial<CryptoPaymentMethod>>({
+    coin: "USDT",
+    name: "",
+    network: "",
+    address: "",
+    minAmount: 10,
+    badge: "",
+    notes: "",
+  });
 
   /* Tournament Management Admin State */
   const [tournaments, setTournaments] = useState<Tournament[]>(DEFAULT_TOURNAMENTS);
@@ -390,7 +406,20 @@ export default function Admin() {
     setIsSavingSettings(true);
     setSettingsSaveMsg(null);
     try {
-      const res = await updatePaymentSettings(formSettings);
+      const cryptoList = formSettings.cryptoMethods || DEFAULT_CRYPTO_METHODS;
+      const trc20Item = cryptoList.find(c => c.id === "usdt-trc20");
+      const erc20Item = cryptoList.find(c => c.id === "usdt-erc20");
+      const settingsToSave: Partial<PaymentSettings> = {
+        ...formSettings,
+        cryptoMethods: cryptoList,
+        trc20Address: trc20Item?.address || formSettings.trc20Address,
+        trc20Enabled: trc20Item ? trc20Item.enabled : formSettings.trc20Enabled,
+        trc20QrCode: trc20Item?.qrCode !== undefined ? trc20Item.qrCode : formSettings.trc20QrCode,
+        erc20Address: erc20Item?.address || formSettings.erc20Address,
+        erc20Enabled: erc20Item ? erc20Item.enabled : formSettings.erc20Enabled,
+        erc20QrCode: erc20Item?.qrCode !== undefined ? erc20Item.qrCode : formSettings.erc20QrCode,
+      };
+      const res = await updatePaymentSettings(settingsToSave);
       if (res.success) {
         setSettingsSaveMsg("Hesap ve cüzdan bilgileri başarıyla güncellendi.");
       } else {
@@ -400,6 +429,109 @@ export default function Admin() {
       setIsSavingSettings(false);
       setTimeout(() => setSettingsSaveMsg(null), 4000);
     }
+  };
+
+  const handleUpdateCryptoField = (cryptoId: string, field: keyof CryptoPaymentMethod, val: any) => {
+    setFormSettings(prev => {
+      const currentList = prev.cryptoMethods || DEFAULT_CRYPTO_METHODS;
+      const updatedList = currentList.map(c => c.id === cryptoId ? { ...c, [field]: val } : c);
+      return {
+        ...prev,
+        cryptoMethods: updatedList,
+      };
+    });
+  };
+
+  const handleToggleAllCrypto = (enabled: boolean) => {
+    setFormSettings(prev => {
+      const currentList = prev.cryptoMethods || DEFAULT_CRYPTO_METHODS;
+      return {
+        ...prev,
+        cryptoMethods: currentList.map(c => ({ ...c, enabled })),
+      };
+    });
+  };
+
+  const handleQrUploadForCrypto = (e: React.ChangeEvent<HTMLInputElement>, cryptoId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Dosya boyutu 2MB'dan küçük olmalıdır.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 500;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          handleUpdateCryptoField(cryptoId, "qrCode", dataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearQrForCrypto = (cryptoId: string) => {
+    handleUpdateCryptoField(cryptoId, "qrCode", "");
+  };
+
+  const handleCreateNewCrypto = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCryptoForm.name || !newCryptoForm.coin || !newCryptoForm.address) return;
+    const newId = `custom_${newCryptoForm.coin.toLowerCase().trim()}_${Date.now().toString(36)}`;
+    const newEntry: CryptoPaymentMethod = {
+      id: newId,
+      coin: (newCryptoForm.coin || "TOKEN").toUpperCase().trim(),
+      name: newCryptoForm.name.trim(),
+      network: newCryptoForm.network?.trim() || `${newCryptoForm.coin} Network`,
+      enabled: true,
+      address: newCryptoForm.address.trim(),
+      minAmount: Number(newCryptoForm.minAmount) || 1,
+      badge: newCryptoForm.badge?.trim() || "",
+      notes: newCryptoForm.notes?.trim() || "",
+    };
+    setFormSettings(prev => ({
+      ...prev,
+      cryptoMethods: [...(prev.cryptoMethods || DEFAULT_CRYPTO_METHODS), newEntry],
+    }));
+    setIsNewCryptoModalOpen(false);
+    setNewCryptoForm({
+      coin: "USDT",
+      name: "",
+      network: "",
+      address: "",
+      minAmount: 10,
+      badge: "",
+      notes: "",
+    });
+  };
+
+  const handleDeleteCrypto = (cryptoId: string) => {
+    setFormSettings(prev => ({
+      ...prev,
+      cryptoMethods: (prev.cryptoMethods || DEFAULT_CRYPTO_METHODS).filter(c => c.id !== cryptoId),
+    }));
   };
 
   /* Telegram Bot settings state */
@@ -1768,159 +1900,336 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* 2. KRİPTO CÜZDAN BİLGİLERİ (TRC-20) */}
-              <div className={`rounded-2xl p-5 border transition-all ${
-                formSettings.trc20Enabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
-              } flex flex-col gap-4`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#27AE60]/10 border border-[#27AE60]/25">
-                      <Zap size={16} className="text-[#27AE60]" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-white">USDT TRC-20 (Tron Ağı)</h4>
-                      <p className="text-[11px] text-white/40">Tron blokzinciri üzerinden USDT yatırma cüzdanı</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {formSettings.trc20Enabled !== false ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
-                        <Eye size={11} /> Aktif / Görünür
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-                        <EyeOff size={11} /> Kapalı / Gizli
-                      </span>
-                    )}
-                    <ToggleSwitch
-                      checked={formSettings.trc20Enabled !== false}
-                      onChange={(v) => setFormSettings(prev => ({ ...prev, trc20Enabled: v }))}
-                    />
-                  </div>
-                </div>
+              {/* 2. TÜM KRİPTO PARA YÖNTEMLERİ & OTOMATİK QR KOD YÖNETİMİ */}
+              {(() => {
+                const cryptoList = formSettings.cryptoMethods || DEFAULT_CRYPTO_METHODS;
+                const totalCount = cryptoList.length;
+                const activeCount = cryptoList.filter(c => c.enabled !== false).length;
 
-                {formSettings.trc20Enabled === false && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <span>Bu yöntem şu an kapalıdır. Kullanıcıların Para Yatır ekranında listelenmeyecektir.</span>
-                  </div>
-                )}
+                // Filtering by category & search
+                const filteredList = cryptoList.filter(c => {
+                  if (cryptoSearchQuery.trim()) {
+                    const q = cryptoSearchQuery.toLowerCase().trim();
+                    const matchText = `${c.name} ${c.coin} ${c.network} ${c.address}`.toLowerCase();
+                    if (!matchText.includes(q)) return false;
+                  }
+                  if (cryptoCategoryFilter === "stable") {
+                    return c.coin === "USDT" || c.coin === "USDC";
+                  }
+                  if (cryptoCategoryFilter === "major") {
+                    return ["BTC", "ETH", "SOL", "BNB", "TON", "XRP", "AVAX", "LTC"].includes(c.coin);
+                  }
+                  if (cryptoCategoryFilter === "meme") {
+                    return ["DOGE", "SHIB", "PEPE"].includes(c.coin) || c.badge?.toLowerCase().includes("meme");
+                  }
+                  return true;
+                });
 
-                <div className="flex flex-col gap-3.5">
-                  <div>
-                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
-                      USDT TRC-20 Cüzdan Adresi (Tron Ağı)
-                    </label>
-                    <input
-                      type="text"
-                      value={formSettings.trc20Address}
-                      onChange={(e) => setFormSettings(prev => ({ ...prev, trc20Address: e.target.value }))}
-                      placeholder="T..."
-                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#27AE60]/50 transition-colors mb-2"
-                      required
-                    />
-                    <div className="flex items-center gap-3">
-                      {formSettings.trc20QrCode && (
-                        <div className="w-12 h-12 rounded-xl bg-white p-1 shrink-0 overflow-hidden">
-                          <img src={formSettings.trc20QrCode} alt="TRC20 QR" className="w-full h-full object-contain" />
+                return (
+                  <div className="rounded-2xl p-5 border border-white/10 bg-[#0d0d10] flex flex-col gap-5">
+                    {/* Main Header */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-[#F7931A]/10 border border-[#F7931A]/25 shrink-0">
+                          <Bitcoin size={20} className="text-[#F7931A]" />
                         </div>
-                      )}
-                      <label className="flex items-center justify-center gap-2 flex-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white cursor-pointer hover:bg-white/10 transition-colors">
-                        <PlusCircle size={14} />
-                        QR Kod Yükle
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleQrUpload(e, 'trc20QrCode')}
-                        />
-                      </label>
-                      {formSettings.trc20QrCode && (
-                        <button type="button" onClick={() => setFormSettings(prev => ({...prev, trc20QrCode: ''}))} className="p-2 text-white/40 hover:text-red-400 bg-white/5 rounded-xl border border-white/10 transition-colors">
-                           <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. KRİPTO CÜZDAN BİLGİLERİ (ERC-20) */}
-              <div className={`rounded-2xl p-5 border transition-all ${
-                formSettings.erc20Enabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
-              } flex flex-col gap-4`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#627EEA]/10 border border-[#627EEA]/25">
-                      <Bitcoin size={16} className="text-[#627EEA]" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-white">USDT ERC-20 (Ethereum Ağı)</h4>
-                      <p className="text-[11px] text-white/40">Ethereum blokzinciri üzerinden USDT yatırma cüzdanı</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {formSettings.erc20Enabled !== false ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
-                        <Eye size={11} /> Aktif / Görünür
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-                        <EyeOff size={11} /> Kapalı / Gizli
-                      </span>
-                    )}
-                    <ToggleSwitch
-                      checked={formSettings.erc20Enabled !== false}
-                      onChange={(v) => setFormSettings(prev => ({ ...prev, erc20Enabled: v }))}
-                    />
-                  </div>
-                </div>
-
-                {formSettings.erc20Enabled === false && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <span>Bu yöntem şu an kapalıdır. Kullanıcıların Para Yatır ekranında listelenmeyecektir.</span>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-3.5">
-                  <div>
-                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
-                      USDT ERC-20 Cüzdan Adresi (Ethereum Ağı)
-                    </label>
-                    <input
-                      type="text"
-                      value={formSettings.erc20Address}
-                      onChange={(e) => setFormSettings(prev => ({ ...prev, erc20Address: e.target.value }))}
-                      placeholder="0x..."
-                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#627EEA]/50 transition-colors mb-2"
-                      required
-                    />
-                    <div className="flex items-center gap-3">
-                      {formSettings.erc20QrCode && (
-                        <div className="w-12 h-12 rounded-xl bg-white p-1 shrink-0 overflow-hidden">
-                          <img src={formSettings.erc20QrCode} alt="ERC20 QR" className="w-full h-full object-contain" />
+                        <div>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h4 className="text-sm font-black text-white">Kripto Para Yatırma Yöntemleri & Cüzdan Yönetimi</h4>
+                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#0ecb81]/10 border border-[#0ecb81]/25 text-[#0ecb81]">
+                              {activeCount} / {totalCount} Aktif
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-white/40 mt-0.5">
+                            Tüm kripto paralar için cüzdan adresi, otomatik anlık QR kod ve açık/kapalı durumunu yönetin
+                          </p>
                         </div>
-                      )}
-                      <label className="flex items-center justify-center gap-2 flex-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white cursor-pointer hover:bg-white/10 transition-colors">
-                        <PlusCircle size={14} />
-                        QR Kod Yükle
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleQrUpload(e, 'erc20QrCode')}
-                        />
-                      </label>
-                      {formSettings.erc20QrCode && (
-                        <button type="button" onClick={() => setFormSettings(prev => ({...prev, erc20QrCode: ''}))} className="p-2 text-white/40 hover:text-red-400 bg-white/5 rounded-xl border border-white/10 transition-colors">
-                           <X size={16} />
+                      </div>
+
+                      {/* Top Action Buttons */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAllCrypto(true)}
+                          className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-white transition-colors cursor-pointer"
+                        >
+                          Tümünü Aç
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAllCrypto(false)}
+                          className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-white/60 hover:text-white transition-colors cursor-pointer"
+                        >
+                          Tümünü Kapat
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsNewCryptoModalOpen(true)}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0ecb81] hover:bg-[#0ecb81]/90 text-black text-[11px] font-black transition-all cursor-pointer shadow-sm active:scale-95"
+                        >
+                          <Plus size={13} />
+                          <span>Yeni Kripto Ekle</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Toolbar */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="relative flex-1 max-w-md">
+                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
+                        <input
+                          type="text"
+                          value={cryptoSearchQuery}
+                          onChange={(e) => setCryptoSearchQuery(e.target.value)}
+                          placeholder="Kripto adı, sembol (BTC, SOL), ağ veya adres ara..."
+                          className="w-full rounded-xl bg-black/60 border border-white/10 pl-9 pr-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                        />
+                        {cryptoSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setCryptoSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Category segmented filter */}
+                      <div className="flex items-center gap-1 p-1 bg-black/40 rounded-xl border border-white/5 self-start sm:self-auto overflow-x-auto max-w-full">
+                        <button
+                          type="button"
+                          onClick={() => setCryptoCategoryFilter("all")}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            cryptoCategoryFilter === "all" ? "bg-white/15 text-white" : "text-white/40 hover:text-white"
+                          }`}
+                        >
+                          Tümü ({cryptoList.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCryptoCategoryFilter("stable")}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            cryptoCategoryFilter === "stable" ? "bg-white/15 text-[#26A17B]" : "text-white/40 hover:text-white"
+                          }`}
+                        >
+                          USDT (Tether)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCryptoCategoryFilter("major")}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            cryptoCategoryFilter === "major" ? "bg-white/15 text-[#F7931A]" : "text-white/40 hover:text-white"
+                          }`}
+                        >
+                          Major Coinler
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCryptoCategoryFilter("meme")}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            cryptoCategoryFilter === "meme" ? "bg-white/15 text-[#E65E26]" : "text-white/40 hover:text-white"
+                          }`}
+                        >
+                          Meme Coinler
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Crypto Methods Cards List */}
+                    <div className="flex flex-col gap-3.5">
+                      {filteredList.map((cm) => {
+                        const isEnabled = cm.enabled !== false;
+                        const hasCustomQr = Boolean(cm.qrCode);
+
+                        return (
+                          <div
+                            key={cm.id}
+                            className={`rounded-2xl p-4 sm:p-5 border transition-all ${
+                              isEnabled
+                                ? "border-white/10 bg-black/40"
+                                : "border-white/5 bg-black/20 opacity-70"
+                            }`}
+                          >
+                            {/* Card Top: Logo, Info, Switch */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <CryptoIcon coin={cm.coin} size={32} />
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h5 className="text-sm font-black text-white">{cm.name}</h5>
+                                    <span className="text-[10px] font-mono font-bold text-white/50 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                                      {cm.network}
+                                    </span>
+                                    {cm.badge && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                        {cm.badge}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-white/35 mt-0.5">
+                                    Sembol: <strong className="text-white/70">{cm.coin}</strong> · Min: <strong className="text-white/70">{cm.minAmount} {cm.coin}</strong>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 self-end sm:self-center">
+                                {isEnabled ? (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
+                                    <Eye size={11} /> Aktif / Görünür
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                                    <EyeOff size={11} /> Kapalı / Gizli
+                                  </span>
+                                )}
+                                <ToggleSwitch
+                                  checked={isEnabled}
+                                  onChange={(v) => handleUpdateCryptoField(cm.id, "enabled", v)}
+                                />
+                                {cm.id.startsWith("custom_") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCrypto(cm.id)}
+                                    title="Bu yöntemi sil"
+                                    className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Body: Address + Live Auto QR */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-3.5">
+                              {/* Left Inputs */}
+                              <div className="lg:col-span-8 flex flex-col gap-3">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-[10px] font-bold text-white/40 uppercase">
+                                      Cüzdan Adresi (Bütçe Adresi)
+                                    </label>
+                                    <span className="text-[10px] text-[#0ecb81] font-bold flex items-center gap-1">
+                                      <Sparkles size={11} /> QR Otomatik Oluşturulur
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={cm.address}
+                                    onChange={(e) => handleUpdateCryptoField(cm.id, "address", e.target.value)}
+                                    placeholder="Cüzdan adresini yapıştırın veya yazın..."
+                                    className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                                    required={isEnabled}
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                  <div>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase block mb-1">
+                                      Ağ Protokolü
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={cm.network}
+                                      onChange={(e) => handleUpdateCryptoField(cm.id, "network", e.target.value)}
+                                      placeholder="Örn: TRC-20, ERC-20"
+                                      className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase block mb-1">
+                                      Min. Yatırma
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={cm.minAmount}
+                                      onChange={(e) => handleUpdateCryptoField(cm.id, "minAmount", parseFloat(e.target.value) || 0)}
+                                      placeholder="10"
+                                      className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase block mb-1">
+                                      Özel Rozet
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={cm.badge || ""}
+                                      onChange={(e) => handleUpdateCryptoField(cm.id, "badge", e.target.value)}
+                                      placeholder="Örn: Popüler, Hızlı"
+                                      className="w-full rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                                    />
+                                  </div>
+                                </div>
+
+                                {cm.memoOrTagRequired && (
+                                  <div>
+                                    <label className="text-[9px] font-bold text-amber-400 uppercase block mb-1">
+                                      Memo / Destination Tag (Gerekli)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={cm.memoOrTagValue || ""}
+                                      onChange={(e) => handleUpdateCryptoField(cm.id, "memoOrTagValue", e.target.value)}
+                                      placeholder="Örn: 1098234"
+                                      className="w-full rounded-xl bg-black border border-amber-500/30 px-3.5 py-2 text-xs font-mono font-bold text-amber-300 outline-none focus:border-amber-400"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right: Live Automatic QR Code Preview & Override */}
+                              <div className="lg:col-span-4 rounded-xl bg-white/[0.02] border border-white/5 p-3 flex flex-col items-center justify-center text-center">
+                                <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+                                  {hasCustomQr ? "Yüklenen Özel QR Görseli" : "Canlı Otomatik QR Kodu"}
+                                </div>
+
+                                {hasCustomQr ? (
+                                  <div className="w-[110px] h-[110px] rounded-xl bg-white p-1 shrink-0 overflow-hidden mb-2">
+                                    <img src={cm.qrCode} alt="Özel QR" className="w-full h-full object-contain" />
+                                  </div>
+                                ) : (
+                                  <CryptoQrCode value={cm.address} size={110} />
+                                )}
+
+                                <p className="text-[10px] text-white/35 mt-2 leading-relaxed">
+                                  {hasCustomQr
+                                    ? "Özel yüklenmiş QR görseli kullanılmaktadır."
+                                    : "Yazdığınız cüzdan adresi değiştikçe QR kod anında ekranda otomatik oluşturulur."}
+                                </p>
+
+                                <div className="flex items-center gap-2 mt-2.5 w-full">
+                                  <label className="flex items-center justify-center gap-1.5 flex-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white cursor-pointer transition-colors">
+                                    <PlusCircle size={12} />
+                                    <span>Özel QR Yükle</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => handleQrUploadForCrypto(e, cm.id)}
+                                    />
+                                  </label>
+                                  {hasCustomQr && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleClearQrForCrypto(cm.id)}
+                                      title="Özel görseli kaldır ve otomatik QR koduna dön"
+                                      className="p-1.5 text-white/40 hover:text-red-400 bg-white/5 rounded-lg border border-white/10 transition-colors cursor-pointer"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* 4. ÖZEL / FARKLI ÖDEME YÖNTEMLERİ (CUSTOM PAYMENT METHODS) */}
               <div className="rounded-2xl p-5 border border-white/10 bg-[#0d0d10] flex flex-col gap-4">
@@ -2836,6 +3145,152 @@ export default function Admin() {
                     </button>
                   </div>
 
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── NEW CRYPTO MODAL ────────────────────────────────────── */}
+        <AnimatePresence>
+          {isNewCryptoModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#121217] p-5 sm:p-6 text-white shadow-2xl flex flex-col gap-4 my-8"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-[#F7931A]/10 border border-[#F7931A]/25 text-[#F7931A]">
+                      <Bitcoin size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white">Yeni Kripto Para Yatırma Yöntemi Ekle</h3>
+                      <p className="text-[11px] text-white/40">Sisteme dilediğiniz yeni coin veya tokenı ekleyin</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewCryptoModalOpen(false)}
+                    className="p-2 rounded-xl text-white/40 hover:text-white bg-white/5 border border-white/10 transition-colors cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateNewCrypto} className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Coin Sembolü *
+                      </label>
+                      <input
+                        type="text"
+                        value={newCryptoForm.coin || ""}
+                        onChange={(e) => setNewCryptoForm(prev => ({ ...prev, coin: e.target.value.toUpperCase() }))}
+                        placeholder="Örn: SUI, NEAR, MATIC"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Görüntülenen İsim *
+                      </label>
+                      <input
+                        type="text"
+                        value={newCryptoForm.name || ""}
+                        onChange={(e) => setNewCryptoForm(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Örn: Sui Network"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Ağ / Protokol Adı
+                      </label>
+                      <input
+                        type="text"
+                        value={newCryptoForm.network || ""}
+                        onChange={(e) => setNewCryptoForm(prev => ({ ...prev, network: e.target.value }))}
+                        placeholder="Örn: Sui Mainnet, Polygon PoS"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                        Min. Yatırım Tutarı
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={newCryptoForm.minAmount ?? 10}
+                        onChange={(e) => setNewCryptoForm(prev => ({ ...prev, minAmount: parseFloat(e.target.value) || 0 }))}
+                        placeholder="10"
+                        className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      Cüzdan Adresi (Bütçe Adresi) *
+                    </label>
+                    <input
+                      type="text"
+                      value={newCryptoForm.address || ""}
+                      onChange={(e) => setNewCryptoForm(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="Adresi yapıştırın..."
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                      required
+                    />
+                  </div>
+
+                  {/* Canlı Otomatik QR Önizleme */}
+                  <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-3.5 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-bold text-white/50 uppercase mb-2">
+                      Canlı Otomatik QR Kod Önizleme
+                    </span>
+                    <CryptoQrCode value={newCryptoForm.address || ""} size={120} />
+                    <p className="text-[11px] text-white/40 mt-2">
+                      Adres yazıldıkça QR kod anında oluşur ve kullanıcı ekranına yansıtılır.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1">
+                      Özel Rozet (Opsiyonel)
+                    </label>
+                    <input
+                      type="text"
+                      value={newCryptoForm.badge || ""}
+                      onChange={(e) => setNewCryptoForm(prev => ({ ...prev, badge: e.target.value }))}
+                      placeholder="Örn: Hızlı, Popüler, Meme"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-3 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setIsNewCryptoModalOpen(false)}
+                      className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 rounded-xl text-xs font-black text-black cursor-pointer shadow-lg transition-transform active:scale-98 bg-[#0ecb81] hover:bg-[#0ecb81]/90"
+                    >
+                      Kripto Yöntemini Ekle
+                    </button>
+                  </div>
                 </form>
               </motion.div>
             </div>

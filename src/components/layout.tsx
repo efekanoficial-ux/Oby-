@@ -560,29 +560,17 @@ function DesktopHeader({
               <span className="text-xs font-semibold text-white/50 whitespace-nowrap">
                 {modeLabel}:
               </span>
-              <AnimatedBalance
-                value={displayBalance}
-                currency={currency}
-                symbol={isTournament ? "¥" : undefined}
-                isMasked={isReal && isBalanceHidden}
-                className="text-xs font-medium text-white tracking-tight ml-0.5 whitespace-nowrap"
-              />
+              
+              <div className="flex items-center gap-0">
+                <AnimatedBalance
+                  value={displayBalance}
+                  currency={currency}
+                  symbol={isTournament ? "¥" : undefined}
+                  isMasked={isReal && isBalanceHidden}
+                  className="text-xs font-medium text-white tracking-tight ml-0.5 whitespace-nowrap"
+                />
+              </div>
             </div>
-
-            {/* Sadece gerçek bakiyede kapalı göz ikonu */}
-            {isReal && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleBalanceHidden();
-                }}
-                className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:text-white transition-all cursor-pointer shrink-0"
-                title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
-              >
-                {isBalanceHidden ? <Eye size={13} /> : <EyeOff size={13} />}
-              </button>
-            )}
 
             <ChevronDown
               size={13}
@@ -722,16 +710,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Right: Telefon + Bakiye + Cüzdan */}
-          <div className="relative flex items-center gap-1.5 shrink-0 flex-nowrap">
-            {/* Müşteri Hizmetleri / Telefon Butonu (Bakiyenin hemen yanında) */}
-            <CallRequestMenu buttonClass="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 shrink-0 cursor-pointer" iconSize={15} align="right" />
-
-            {/* Bakiye Kısmı */}
-            <div className="flex items-center gap-1 select-none shrink-0">
+          {/* Right: Bakiye + Telefon */}
+          <div className="relative flex items-center gap-2 shrink-0 flex-nowrap ml-auto justify-end">
+            
+            {/* Bakiye Kısmı (Sağa tam yanaştırılmış) */}
+            <div className="flex items-center gap-1 select-none shrink-0 text-right">
               <div 
                 onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
-                className="flex flex-col items-end justify-center cursor-pointer select-none"
+                className="flex flex-col items-end justify-center cursor-pointer select-none text-right"
               >
                 <span className="text-[9px] font-medium leading-tight text-white/50 whitespace-nowrap">
                   {modeLabel}
@@ -741,24 +727,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   currency={currency}
                   symbol={isTournament ? "¥" : undefined}
                   isMasked={isReal && isBalanceHidden}
-                  className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap"
+                  className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap text-right"
                 />
               </div>
 
-              {/* Sadece gerçek bakiyede kapalı göz ikonu */}
-              {isReal && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleBalanceHidden();
-                  }}
-                  className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:text-white transition-colors cursor-pointer shrink-0"
-                  title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
-                >
-                  {isBalanceHidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                </button>
-              )}
 
               <ChevronDown 
                 size={12} 
@@ -766,18 +738,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="text-white/40 shrink-0 cursor-pointer" 
               />
             </div>
-
-            {/* Cüzdan Butonu */}
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={() => navigate("/wallet")}
-              className="flex h-[34px] items-center gap-1.5 rounded-xl px-2.5 font-black text-black text-xs shrink-0 whitespace-nowrap select-none"
-              style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
-              title="Cüzdan"
-            >
-              <Wallet size={13} className="shrink-0" />
-              <span className="whitespace-nowrap shrink-0">{t.wallet}</span>
-            </motion.button>
+            
+            {/* Müşteri Hizmetleri / Telefon Butonu (Bakiyenin sağında) */}
+            <CallRequestMenu buttonClass="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 shrink-0 cursor-pointer" iconSize={15} align="right" />
 
             <AccountSwitcher
               align="right"
@@ -870,7 +833,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
         {location !== "/" && (
           <DesktopHeader
-            onWallet={() => navigate("/wallet")}
             onNotif={() => setShowNotifModal(v => !v)}
             onSettings={() => setShowLangModal(true)}
           />

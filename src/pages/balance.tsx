@@ -12,7 +12,7 @@ import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowDownLeft, ArrowUpRight,
   Clock, ArrowDownLeft as DepIcon, ArrowUpRight as WithIcon,
-  Hourglass, TrendingUp, TrendingDown, Minus, AlertCircle, Eye, EyeOff,
+  Hourglass, TrendingUp, TrendingDown, Minus, AlertCircle, Eye, EyeOff, X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -151,15 +151,15 @@ export default function Balance() {
   const formattedPercent = `${Math.abs(todayPercent).toFixed(2)}%`;
 
   const depositMethods = [
-    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",    sub: t.instantApprove,  color: "#26A17B", badge: t.fastBadge },
-    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",    sub: t.ethNetwork,      color: "#627EEA", badge: null   },
-    { id: "iban",  icon: BankTransferIcon,label: t.wireTransfer,   sub: t.hours1to24,      color: "#FFA800", badge: null   },
+    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",    sub: t.instantApprove,  color: "#26A17B", badge: null },
+    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",    sub: t.ethNetwork,      color: "#627EEA", badge: null },
+    { id: "iban",  icon: BankTransferIcon,label: t.wireTransfer,   sub: t.hours1to24,      color: "#FFA800", badge: null },
   ];
 
   const withdrawMethods = [
-    { id: "iban",  icon: BankTransferIcon,label: t.bankWire,       sub: t.businessDays1to3, color: "#FFA800", badge: null    },
-    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",     sub: t.instant,          color: "#26A17B", badge: t.fastBadge },
-    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",     sub: t.ethChain,         color: "#627EEA", badge: null    },
+    { id: "iban",  icon: BankTransferIcon,label: t.bankWire,       sub: t.businessDays1to3, color: "#FFA800", badge: null },
+    { id: "trc20", icon: UsdtTrc20Icon,   label: "USDT TRC-20",     sub: t.instant,          color: "#26A17B", badge: null },
+    { id: "erc20", icon: UsdtErc20Icon,   label: "USDT ERC-20",     sub: t.ethChain,         color: "#627EEA", badge: null },
   ];
 
   const allReqs     = currentUser ? requests.filter(r => (
@@ -255,17 +255,6 @@ export default function Balance() {
               </span>
             </div>
 
-            {isReal && (
-              <button
-                type="button"
-                onClick={toggleBalanceHidden}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-white/60 hover:text-white transition-all text-[10px] font-bold border border-white/10 cursor-pointer"
-                title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
-              >
-                {isBalanceHidden ? <EyeOff size={12} className="text-amber-400" /> : <Eye size={12} />}
-                <span>{isBalanceHidden ? "Gizli" : "Göster"}</span>
-              </button>
-            )}
           </div>
 
           {/* Centered Balance Display (Hero - Always Crisp White) */}
@@ -462,8 +451,8 @@ export default function Balance() {
               <div
                 className="flex items-center gap-2.5 px-4 py-3 border-b border-amber-500/15"
               >
-                <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/20 border border-amber-500/30">
-                  <Clock size={13} className="text-amber-400" />
+                <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock size={16} className="text-neutral-500" />
                 </div>
                 <span className="text-xs font-black text-amber-300">
                   {pendingReqs.length} {t.pendingTransactions}
@@ -504,8 +493,8 @@ export default function Balance() {
                 className="flex items-center justify-between px-4 py-3 border-b border-rose-500/15"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0 bg-rose-500/20 border border-rose-500/30">
-                    <AlertCircle size={13} className="text-rose-400" />
+                  <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0">
+                    <X size={16} className="text-rose-500" />
                   </div>
                   <span className="text-xs font-black text-rose-300">
                     {unviewedRejectedReqs.length === 1 ? t.requestRejectedTitle : `${unviewedRejectedReqs.length} ${t.requestRejectedTitle}`}
