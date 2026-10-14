@@ -270,7 +270,7 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
           /* 2. Persist to Firestore (onSnapshot will reconcile the list) */
           try {
             if (isWin) {
-              await updateDoc(doc(db, "users", uid), { demoBalance: increment(trade.amount + profit) });
+              syncDemoBalanceToFirestore(trade.amount + profit);
             }
             await addDoc(collection(db, "trades"), {
               userId: uid, tradeId: trade.id,
@@ -290,7 +290,7 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
             const aSnap = await getDocs(aq);
             for (const d of aSnap.docs) await fsRemoveActiveTrade(d.id);
           } catch (e: any) {
-            if (e?.code !== "permission-denied") {
+            if (e?.code !== "permission-denied" && e?.code !== "resource-exhausted") {
               console.error("[DemoAccount] trade settle failed:", e);
             }
           }
@@ -302,6 +302,27 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
   // activeTrades (full ref) so the interval restarts correctly on every settlement
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTrades, uid, isGuest]);
+
+  const balanceUpdateTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingBalanceChange = useRef<number>(0);
+
+  const syncDemoBalanceToFirestore = (delta: number) => {
+    if (isGuest) return;
+    pendingBalanceChange.current += delta;
+    if (balanceUpdateTimer.current) clearTimeout(balanceUpdateTimer.current);
+    balanceUpdateTimer.current = setTimeout(async () => {
+      const change = pendingBalanceChange.current;
+      pendingBalanceChange.current = 0;
+      if (change === 0) return;
+      try {
+        await updateDoc(doc(db, "users", uid), { demoBalance: increment(change) });
+      } catch (err: any) {
+        if (err?.code !== "resource-exhausted" && err?.code !== "permission-denied") {
+          console.error("Demo balance sync error:", err);
+        }
+      }
+    }, 1500);
+  };
 
   /* ── Place trade ─────────────────────────────────────────────────────── */
   const placeTrade = (
@@ -341,8 +362,12 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
     });
 
     if (!isGuest) {
-      updateDoc(doc(db, "users", uid), { demoBalance: increment(-amount) }).catch(() => {});
-      fsAddActiveTrade(uid, trade).catch(() => {});
+      syncDemoBalanceToFirestore(-amount);
+      fsAddActiveTrade(uid, trade).catch((err: any) => {
+        if (err?.code !== "resource-exhausted" && err?.code !== "permission-denied") {
+          console.error(err);
+        }
+      });
     }
 
     return trade.id;
