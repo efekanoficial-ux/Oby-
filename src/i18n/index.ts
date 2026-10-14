@@ -133,6 +133,12 @@ const tr = {
   tutNavBalance: "Bakiye",
 
   // Balance Page
+  educationModeTitle: "Eğitim Platformu Modu",
+  educationModeNotice: "Bu bir eğitim platformudur. Gerçek para yatırılamaz ve finansal yatırım yapılamaz.",
+  creditCard: "Kredi Kartı ile Yatırım",
+  creditCardSub: "Visa / Mastercard ile Anında İşlem",
+  creditCardWithdrawal: "Kredi Kartı ile Çekim",
+
   balanceTitle: "Bakiye",
   realAcc: "GERÇEK",
   demoAcc: "DEMO",
@@ -517,6 +523,12 @@ const en: typeof tr = {
   tutNavTrade: "Trade",
   tutNavBalance: "Balance",
 
+  educationModeTitle: "Educational Platform Mode",
+  educationModeNotice: "This is an educational platform. Real money investment and deposits cannot be made.",
+  creditCard: "Credit Card Deposit",
+  creditCardSub: "Instant deposit via Visa / Mastercard",
+  creditCardWithdrawal: "Credit Card Withdrawal",
+
   balanceTitle: "Balance",
   realAcc: "REAL",
   demoAcc: "DEMO",
@@ -899,6 +911,12 @@ const de: typeof tr = {
   tutNavHistory: "Verlauf",
   tutNavTrade: "Handel",
   tutNavBalance: "Guthaben",
+
+  educationModeTitle: "Bildungsplattform-Modus",
+  educationModeNotice: "Dies ist eine Bildungsplattform. Echtgeldinvestitionen und Einzahlungen sind nicht möglich.",
+  creditCard: "Kreditkarteneinzahlung",
+  creditCardSub: "Sofortige Einzahlung via Visa / Mastercard",
+  creditCardWithdrawal: "Kreditkartenauszahlung",
 
   balanceTitle: "Guthaben",
   realAcc: "ECHT",

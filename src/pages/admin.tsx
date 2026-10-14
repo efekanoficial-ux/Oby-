@@ -12,7 +12,7 @@ import {
   QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle,
   FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2,
   Send, Bot, Bell, Key, Copy, CheckCheck, MessageSquare, Trophy,
-  Gift, Sparkles, Coins
+  Gift, Sparkles, Coins, GraduationCap
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -1766,6 +1766,36 @@ export default function Admin() {
 
             <form onSubmit={handleSavePaymentSettings} className="flex flex-col gap-6">
 
+              {/* 0. EĞİTİM PLATFORMU MODU */}
+              <div className="rounded-2xl p-5 border border-purple-500/30 bg-purple-500/5 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/25">
+                      <GraduationCap size={16} className="text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Eğitim Platformu Modu (Gerçek Bakiyeyi Kaldır)</h4>
+                      <p className="text-[11px] text-white/40">Açıldığında üst barda gerçek bakiye tamamen gizlenir, demo bakiyeye zorlanır ve balance sayfasında eğitim platformu uyarısı gösterilir.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {formSettings.educationModeEnabled ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-full">
+                        Aktif / Eğitim Modu
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                        Normal Mod
+                      </span>
+                    )}
+                    <ToggleSwitch
+                      checked={Boolean(formSettings.educationModeEnabled)}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, educationModeEnabled: v }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* 1. BANKA / HAVALE / EFT BİLGİLERİ */}
               <div className={`rounded-2xl p-5 border transition-all ${
                 formSettings.ibanEnabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
@@ -1933,6 +1963,129 @@ export default function Admin() {
                         />
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1.5 KREDİ KARTI ÖDEME AYARLARI */}
+              <div className={`rounded-2xl p-5 border transition-all ${
+                formSettings.creditCardEnabled !== false ? "border-white/10 bg-[#0d0d10]" : "border-white/5 bg-[#0a0a0d] opacity-80"
+              } flex flex-col gap-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/25">
+                      <CreditCard size={16} className="text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Kredi Kartı ile Yatırım Ayarları</h4>
+                      <p className="text-[11px] text-white/40">Kullanıcılara gösterilen kredi kartı ödeme bilgileri ve özel logo</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {formSettings.creditCardEnabled !== false ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#0ecb81] bg-[#0ecb81]/10 border border-[#0ecb81]/20 px-2.5 py-1 rounded-full">
+                        <Eye size={11} /> Aktif / Görünür
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                        <EyeOff size={11} /> Kapalı / Gizli
+                      </span>
+                    )}
+                    <ToggleSwitch
+                      checked={formSettings.creditCardEnabled !== false}
+                      onChange={(v) => setFormSettings(prev => ({ ...prev, creditCardEnabled: v }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      Sağlayıcı / Banka Adı
+                    </label>
+                    <input
+                      type="text"
+                      value={formSettings.creditCardBank || ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, creditCardBank: e.target.value }))}
+                      placeholder="Mastercard / Visa Ödeme Altyapısı"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      Kart Sahibi / Alıcı Adı
+                    </label>
+                    <input
+                      type="text"
+                      value={formSettings.creditCardHolder || ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, creditCardHolder: e.target.value }))}
+                      placeholder="Obyo Pay"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      Kart Numarası veya Bilgi Metni
+                    </label>
+                    <input
+                      type="text"
+                      value={formSettings.creditCardNumber || ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, creditCardNumber: e.target.value }))}
+                      placeholder="**** **** **** 4242"
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      Kredi Kartı Logosu (URL veya Yükle)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={formSettings.creditCardLogoURL || ""}
+                        onChange={(e) => setFormSettings(prev => ({ ...prev, creditCardLogoURL: e.target.value }))}
+                        placeholder="Logonun URL'sini girin"
+                        className="flex-1 rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              setFormSettings(prev => ({ ...prev, creditCardLogoURL: ev.target?.result as string }));
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="cc-icon-upload"
+                      />
+                      <label
+                        htmlFor="cc-icon-upload"
+                        className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-colors flex items-center"
+                      >
+                        Yükle
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-bold text-white/40 uppercase block mb-1.5">
+                      Açıklama / Talimatlar
+                    </label>
+                    <input
+                      type="text"
+                      value={formSettings.creditCardDescription || ""}
+                      onChange={(e) => setFormSettings(prev => ({ ...prev, creditCardDescription: e.target.value }))}
+                      placeholder="Kredi veya banka kartınız ile 3D Secure güvencesiyle anında bakiye yükleyin."
+                      className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-[#0ecb81]/50 transition-colors"
+                    />
                   </div>
                 </div>
               </div>

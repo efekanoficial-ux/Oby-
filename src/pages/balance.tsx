@@ -195,6 +195,17 @@ export default function Balance() {
     <>
       <div className="flex h-full flex-col overflow-y-auto pb-28 bg-[#050608] text-white selection:bg-emerald-500/30">
 
+        {/* Eğitim Platformu Modu Uyarısı */}
+        {paymentSettings?.educationModeEnabled && (
+          <div className="mx-4 mt-4 mb-1 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-3 text-amber-300">
+            <AlertCircle size={20} className="shrink-0 mt-0.5 text-amber-400" />
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider mb-0.5">{t.educationModeTitle || "Eğitim Platformu Modu"}</p>
+              <p className="text-xs leading-relaxed text-amber-200/90">{t.educationModeNotice}</p>
+            </div>
+          </div>
+        )}
+
         {/* ── Top Bar / Header ────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2.5">

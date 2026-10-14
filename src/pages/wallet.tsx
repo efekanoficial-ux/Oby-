@@ -8,6 +8,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
 import { UsdtErc20Icon } from "@/components/usdt-erc20-icon";
 import { BankTransferIcon } from "@/components/bank-transfer-icon";
+import { CreditCardIcon } from "@/components/credit-card-icon";
 import { CryptoIcon } from "@/components/crypto-icons";
 import { CryptoQrCode } from "@/components/crypto-qr";
 import { useIsTurkey } from "@/lib/use-country";
@@ -255,6 +256,19 @@ export default function WalletPage() {
     });
   }
 
+  // 1.5 Kredi Kartı ile Yatırım
+  if (paymentSettings.creditCardEnabled !== false) {
+    depositMethods.push({
+      id: "credit-card",
+      icon: CreditCardIcon,
+      label: t.creditCard,
+      sub: paymentSettings.creditCardDescription || t.creditCardSub,
+      color: "#8B5CF6",
+      min: isTL ? 100 : 10,
+      currency: isTL ? "TL" : "USD",
+    });
+  }
+
   // 2. Kripto Para Yöntemleri (Admin tarafından açılan/kapatılan tüm kriptolar)
   const availableCryptos = (paymentSettings.cryptoMethods && paymentSettings.cryptoMethods.length > 0)
     ? paymentSettings.cryptoMethods
@@ -319,6 +333,15 @@ export default function WalletPage() {
       label: isTL ? t.bankWire : t.wireTransfer,
       sub: isTL ? t.bankWireTr : t.bankWireTrSub,
       color: "#FFA800",
+      min: withdrawMin,
+      currency: isTL ? "TL" : "USD",
+    }] : []),
+    ...(paymentSettings.creditCardEnabled !== false ? [{
+      id: "credit-card",
+      icon: CreditCardIcon,
+      label: t.creditCardWithdrawal,
+      sub: paymentSettings.creditCardDescription || t.creditCardSub,
+      color: "#8B5CF6",
       min: withdrawMin,
       currency: isTL ? "TL" : "USD",
     }] : []),
@@ -1155,6 +1178,97 @@ export default function WalletPage() {
                     }}
                   >
                     {t.continueBtn} →
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Details - Credit Card */}
+              {dStep === "details" && method && method.id === "credit-card" && (
+                <motion.div
+                  key="dep-details-cc"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex flex-col gap-4"
+                >
+                  <button
+                    onClick={() => setDStep("amount")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.changeAmount}
+                  </button>
+
+                  <div className="rounded-2xl p-4 border border-purple-500/30 bg-purple-500/10">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <CreditCardIcon size={24} />
+                        <span className="text-xs font-black text-white">{paymentSettings.creditCardBank || "Kredi Kartı Ödemesi"}</span>
+                      </div>
+                      <span className="text-xl font-black text-purple-400">
+                        {isTL ? "₺" : "$"}{parseFloat(amount || "0").toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Kart Üzerindeki İsim</label>
+                        <input
+                          type="text"
+                          placeholder="Ad Soyad"
+                          defaultValue={currentUser ? `${currentUser.name} ${currentUser.surname}` : ""}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Kart Numarası</label>
+                        <input
+                          type="text"
+                          maxLength={19}
+                          placeholder="4532 •••• •••• 8890"
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Son Kullanma (AA/YY)</label>
+                          <input
+                            type="text"
+                            maxLength={5}
+                            placeholder="12/28"
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500 text-center"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">CVV</label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            placeholder="•••"
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500 text-center"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/10 bg-white/[0.03]">
+                    <ShieldCheck size={16} className="text-purple-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      {paymentSettings.creditCardDescription || "3D Secure güvencesiyle anında bakiye yüklemesi gerçekleştirilir."}
+                    </p>
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSentDeposit}
+                    disabled={isSubmitting}
+                    className="w-full rounded-2xl py-4 text-sm font-black text-white cursor-pointer shadow-lg transition-all"
+                    style={{
+                      background: "linear-gradient(135deg,#8B5CF6,#6D28D9)",
+                      boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
+                    }}
+                  >
+                    {isSubmitting ? "3D Secure Doğrulanıyor ve Yatırılıyor..." : "Ödemeyi Onayla ve Yatır"}
                   </motion.button>
                 </motion.div>
               )}

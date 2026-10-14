@@ -24,7 +24,7 @@ interface AccountModeContextType {
 const AccountModeContext = createContext<AccountModeContextType | null>(null);
 
 export function AccountModeProvider({ children }: { children: ReactNode }) {
-  const { currentUser } = useAuth();
+  const { currentUser, paymentSettings } = useAuth();
   const { balance: demoBalance } = useDemoAccount();
   const [mode, setModeState] = useState<AccMode>("demo");
   const [guestCurrency, setGuestCurrencyState] = useState<CurrencyCode>(() => {
@@ -36,7 +36,6 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
   });
 
   // Balance visibility hide/show state (Closed eye icon functionality)
-  // Sistem ilk açıldığında bakiye varsayılan olarak açık (görünür) gelir, kullanıcı isterse kapatır.
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(false);
 
   const toggleBalanceHidden = () => {
@@ -47,9 +46,9 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
   const currency: CurrencyCode = (currentUser?.currency as CurrencyCode) || guestCurrency;
   
   const hasJoinedTournament = Boolean(currentUser?.joinedTournaments && currentUser.joinedTournaments.length > 0);
-  // In tournament mode, symbol is ¥ (or tournament specific)
+  const educationEnabled = Boolean(paymentSettings?.educationModeEnabled);
   const isTournament = mode === "tournament" && !!currentUser && hasJoinedTournament;
-  const isReal = mode === "real" && !!currentUser;
+  const isReal = !educationEnabled && mode === "real" && !!currentUser;
   const currencySymbol = isTournament ? "¥" : (currency === "TL" ? "₺" : "$");
 
   const setGuestCurrency = (c: CurrencyCode) => {
@@ -59,9 +58,15 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
+  useEffect(() => {
+    if (educationEnabled && mode === "real") {
+      setModeState("demo");
+    }
+  }, [educationEnabled, mode]);
+
   /* Restore saved mode when user changes (login / logout / refresh) */
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || educationEnabled) {
       setModeState("demo");
     } else {
       const saved = localStorage.getItem(`obyo_mode_${currentUser.id}`);
@@ -74,9 +79,10 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
         setModeState("demo");
       }
     }
-  }, [currentUser?.id, currentUser?.joinedTournaments]);
+  }, [currentUser?.id, currentUser?.joinedTournaments, educationEnabled]);
 
   const setMode = (m: AccMode) => {
+    if (educationEnabled && m === "real") return;
     if ((m === "real" || m === "tournament") && !currentUser) return;
     if (m === "tournament" && !hasJoinedTournament) return;
     setModeState(m);

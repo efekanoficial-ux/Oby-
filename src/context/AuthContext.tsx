@@ -257,6 +257,8 @@ export const DEFAULT_CRYPTO_METHODS: CryptoPaymentMethod[] = [
 ];
 
 export interface PaymentSettings {
+  educationModeEnabled?: boolean;
+
   ibanEnabled?:     boolean;
   ibanReceiptRequired?: boolean;
   ibanBank:         string;
@@ -264,6 +266,13 @@ export interface PaymentSettings {
   ibanNumber:       string;
   ibanDescription?: string;
   ibanSwift?:       string;
+
+  creditCardEnabled?: boolean;
+  creditCardBank?:    string;
+  creditCardHolder?:  string;
+  creditCardNumber?:  string;
+  creditCardDescription?: string;
+  creditCardLogoURL?: string;
 
   trc20Enabled?:    boolean;
   trc20Address:     string;
@@ -288,6 +297,8 @@ export interface PaymentSettings {
 }
 
 export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
+  educationModeEnabled: false,
+
   ibanEnabled:     true,
   ibanReceiptRequired: true,
   ibanBank:        "Garanti BBVA",
@@ -295,6 +306,13 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   ibanNumber:      "TR88 0006 2000 8765 4321 0099 73",
   ibanDescription: "OBYO-TRANSFER",
   ibanSwift:       "",
+
+  creditCardEnabled: true,
+  creditCardBank:    "Mastercard / Visa Ödeme Altyapısı",
+  creditCardHolder:  "Obyo Pay",
+  creditCardNumber:  "**** **** **** 4242",
+  creditCardDescription: "Kredi veya banka kartınız ile 3D Secure güvencesiyle anında bakiye yükleyin.",
+  creditCardLogoURL: "",
 
   trc20Enabled:    true,
   trc20Address:    "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S",

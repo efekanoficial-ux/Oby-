@@ -275,32 +275,34 @@ export function AccountSwitcher({
             )}
           </button>
 
-          {/* Real */}
-          <button onClick={() => { 
-              if (!hasRealAccount && onRealClick) onRealClick();
-              else onSelect("real");
-              onClose(); 
-            }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer"
-            >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: mode === "real" ? "rgba(14,203,129,0.12)" : "#111", border: mode === "real" ? "1px solid rgba(14,203,129,0.3)" : "1px solid #1e1e1e" }}>
-              <Gem size={13} style={{ color: mode === "real" ? "#0ecb81" : "#555" }} />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-xs font-black" style={{ color: hasRealAccount ? (mode === "real" ? "#0ecb81" : "#888") : "#333" }}>
-                {t.realAccount}
-              </p>
-              {hasRealAccount ? (
-                <AnimatedBalance value={realBalance} currency={currency} className="text-[10px] font-bold text-[#0ecb81]" />
-              ) : (
-                <p className="text-[10px] font-bold text-[#333]">{t.loginRegister}</p>
+          {/* Real (Eğitim Modu kapalıysa göster) */}
+          {!paymentSettings?.educationModeEnabled && (
+            <button onClick={() => { 
+                if (!hasRealAccount && onRealClick) onRealClick();
+                else onSelect("real");
+                onClose(); 
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer"
+              >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: mode === "real" ? "rgba(14,203,129,0.12)" : "#111", border: mode === "real" ? "1px solid rgba(14,203,129,0.3)" : "1px solid #1e1e1e" }}>
+                <Gem size={13} style={{ color: mode === "real" ? "#0ecb81" : "#555" }} />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-black" style={{ color: hasRealAccount ? (mode === "real" ? "#0ecb81" : "#888") : "#333" }}>
+                  {t.realAccount}
+                </p>
+                {hasRealAccount ? (
+                  <AnimatedBalance value={realBalance} currency={currency} className="text-[10px] font-bold text-[#0ecb81]" />
+                ) : (
+                  <p className="text-[10px] font-bold text-[#333]">{t.loginRegister}</p>
+                )}
+              </div>
+              {mode === "real" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-[#0ecb81] shrink-0" />
               )}
-            </div>
-            {mode === "real" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-[#0ecb81] shrink-0" />
-            )}
-          </button>
+            </button>
+          )}
 
           {/* Tournament (yalnızca turnuvaya katılınca gözüksün) */}
           {hasRealAccount && hasJoinedTournament && (
