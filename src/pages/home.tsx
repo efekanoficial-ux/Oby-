@@ -2401,7 +2401,7 @@ export default function Home() {
                       value={displayBalance}
                       currency={currency}
                       symbol={isTournament ? "¥" : undefined}
-                      isMasked={isReal && isBalanceHidden}
+                      isMasked={isBalanceHidden}
                       className="text-xs font-black text-white tracking-tight"
                     />
                   </div>

@@ -549,7 +549,15 @@ function DesktopHeader({
         <CallRequestMenu buttonClass="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14151a] border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all cursor-pointer shrink-0" iconSize={15} align="right" />
 
         {/* Bakiye Kısmı (Hesap Seçici ve Bakiye) */}
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 flex items-center gap-2">
+          <div
+            onClick={(e) => { e.stopPropagation(); toggleBalanceHidden(); }}
+            className="text-white/40 cursor-pointer hover:text-white transition-colors"
+            title={isBalanceHidden ? "Bakiyeyi Göster" : "Bakiyeyi Gizle"}
+          >
+            {isBalanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+          </div>
+
           <div className="flex items-center gap-2 select-none shrink-0">
             <div
               onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
@@ -566,7 +574,7 @@ function DesktopHeader({
                   value={displayBalance}
                   currency={currency}
                   symbol={isTournament ? "¥" : undefined}
-                  isMasked={isReal && isBalanceHidden}
+                  isMasked={isBalanceHidden}
                   className="text-xs font-medium text-white tracking-tight ml-0.5 whitespace-nowrap"
                 />
               </div>
@@ -730,7 +738,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     value={displayBalance}
                     currency={currency}
                     symbol={isTournament ? "¥" : undefined}
-                    isMasked={isReal && isBalanceHidden}
+                    isMasked={isBalanceHidden}
                     className="text-[13px] font-medium text-white tracking-tight whitespace-nowrap text-right"
                   />
                 </div>

@@ -267,14 +267,14 @@ export default function Balance() {
               <AnimatedBalance
                 value={balance}
                 currency={currency}
-                isMasked={isReal && isBalanceHidden}
+                isMasked={isBalanceHidden}
                 className="text-4xl sm:text-5xl font-semibold tracking-tight text-white block max-w-full truncate drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]"
               />
             </div>
 
             {/* Günlük Sıfırlanan Kâr / Zarar & Yüzde (Arka plansız, çerçevesiz, ikonlu - bakiye gizlendiğinde görünmez olur ama yükseklik korunur) */}
             <div className={`flex items-center justify-center mt-1 h-5 transition-opacity ${
-              (isReal && isBalanceHidden) ? "invisible pointer-events-none" : "visible"
+              isBalanceHidden ? "invisible pointer-events-none" : "visible"
             }`}>
               <div
                 className={`inline-flex items-center gap-1.5 text-[11.5px] font-mono font-semibold tracking-tight transition-colors ${pnlColorClass}`}

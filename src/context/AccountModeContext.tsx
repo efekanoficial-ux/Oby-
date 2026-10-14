@@ -92,8 +92,8 @@ export function AccountModeProvider({ children }: { children: ReactNode }) {
     : (isReal ? realBalance : demoBalance);
 
   const formatMoney = (amount: number, options?: { showSymbol?: boolean; decimals?: number }): string => {
-    // If real balance is hidden and requested in real mode:
-    if (isReal && isBalanceHidden) {
+    // If balance is hidden:
+    if (isBalanceHidden) {
       return currency === "TL" ? "*****₺" : "*****$";
     }
 
