@@ -11,6 +11,7 @@ import { BankTransferIcon } from "@/components/bank-transfer-icon";
 import { CreditCardIcon } from "@/components/credit-card-icon";
 import { CryptoIcon } from "@/components/crypto-icons";
 import { CryptoQrCode } from "@/components/crypto-qr";
+import { EducationPlatformNotice } from "@/components/EducationPlatformNotice";
 import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowLeft, Copy, Check, Clock, AlertCircle, CheckCircle2,
@@ -509,6 +510,10 @@ export default function WalletPage() {
   };
 
   const selectDepositMethod = (m: MethodConfig) => {
+    if (paymentSettings?.educationModeEnabled) {
+      alert(t.educationModeNotice || "Bu bir eğitim platformudur. Gerçek para yatırılamaz.");
+      return;
+    }
     setMethod(m);
     setAmount("");
     setReceiptFile(null);
@@ -517,6 +522,10 @@ export default function WalletPage() {
   };
 
   const selectWithdrawMethod = (m: MethodConfig) => {
+    if (paymentSettings?.educationModeEnabled) {
+      alert(t.educationModeNotice || "Bu bir eğitim platformudur. Para çekme yapılamaz.");
+      return;
+    }
     setMethod(m);
     setAmount("");
     setDestination("");
@@ -690,6 +699,11 @@ export default function WalletPage() {
     }
     navigate("/");
   };
+
+  /* Education Mode Gate: Balance & Wallet page completely closed */
+  if (paymentSettings?.educationModeEnabled) {
+    return <EducationPlatformNotice />;
+  }
 
   /* Not logged in gate */
   if (!currentUser) {

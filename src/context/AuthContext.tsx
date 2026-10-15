@@ -266,6 +266,7 @@ export interface PaymentSettings {
   ibanNumber:       string;
   ibanDescription?: string;
   ibanSwift?:       string;
+  bankTransferIconURL?: string;
 
   creditCardEnabled?: boolean;
   creditCardBank?:    string;
@@ -306,6 +307,7 @@ export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   ibanNumber:      "TR88 0006 2000 8765 4321 0099 73",
   ibanDescription: "OBYO-TRANSFER",
   ibanSwift:       "",
+  bankTransferIconURL: "",
 
   creditCardEnabled: true,
   creditCardBank:    "Mastercard / Visa Ödeme Altyapısı",

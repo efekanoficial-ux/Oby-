@@ -32,12 +32,13 @@ type DemoAccountContextType = {
   activeTrades:    Trade[];
   completedTrades: CompletedTrade[];
   tradesLoading:   boolean;
-  /** Returns the trade id used internally (same as passed tradeId if provided). */
   placeTrade: (
     asset: string, direction: TradeDirection,
     amount: number, duration: number, currentPrice: number,
     tradeId?: string,
   ) => string;
+  addBalance: (amount: number) => void;
+  setDemoBalance: (val: number) => void;
 };
 
 const DemoAccountContext = createContext<DemoAccountContextType | null>(null);
@@ -373,8 +374,27 @@ export function DemoAccountProvider({ children }: { children: ReactNode }) {
     return trade.id;
   };
 
+  const addBalance = (amount: number) => {
+    setBalance(b => {
+      const next = b + amount;
+      if (isGuest) saveGuestBalance(next);
+      return next;
+    });
+    if (!isGuest) {
+      syncDemoBalanceToFirestore(amount);
+    }
+  };
+
+  const setDemoBalance = (val: number) => {
+    setBalance(val);
+    if (isGuest) saveGuestBalance(val);
+    if (!isGuest) {
+      updateDoc(doc(db, "users", uid), { demoBalance: val }).catch(() => {});
+    }
+  };
+
   return (
-    <DemoAccountContext.Provider value={{ balance, activeTrades, completedTrades, tradesLoading, placeTrade }}>
+    <DemoAccountContext.Provider value={{ balance, activeTrades, completedTrades, tradesLoading, placeTrade, addBalance, setDemoBalance }}>
       {children}
     </DemoAccountContext.Provider>
   );

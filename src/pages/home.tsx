@@ -30,18 +30,18 @@ import { AssetIcon } from "@/lib/asset-icons";
 /* ─── Assets ─────────────────────────────────────────────────────────────── */
 const ASSETS = [
   { label: "Crypto IDX",           icon: "/assets/crypto-idx.png", flag: "₿",      payout: 90, base: 6850.25, color: "#F7931A", desc: "Kripto Bileşik Endeksi",      digits: 2 },
-  { label: "AUD/CAD",            icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9900,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
-  { label: "AUD/CHF",            icon: "/assets/aud-chf.png",    flag: "🇦🇺🇨🇭", payout: 85, base: 0.5520,  color: "#E84142", desc: "Avustralya / İsviçre",       digits: 5 },
-  { label: "AUD/DKK",            icon: "/assets/aud-dkk.png",    flag: "🇦🇺🇩🇰", payout: 84, base: 4.4200,  color: "#C8102E", desc: "Avustralya / Danimarka",     digits: 4 },
-  { label: "AUD/HUF",            icon: "/assets/aud-huf.png",    flag: "🇦🇺🇭🇺", payout: 84, base: 233.50,  color: "#477050", desc: "Avustralya / Macaristan",    digits: 3 },
-  { label: "AUD/JPY",            icon: "/assets/aud-jpy.png",    flag: "🇦🇺🇯🇵", payout: 86, base: 97.20,   color: "#BC002D", desc: "Avustralya / Japonya",       digits: 3 },
-  { label: "AUD/NOK",            icon: "/assets/aud-nok.png",    flag: "🇦🇺🇳🇴", payout: 84, base: 6.9300,  color: "#00205B", desc: "Avustralya / Norveç",        digits: 4 },
-  { label: "AUD/NZD",            icon: "/assets/aud-nzd.png",    flag: "🇦🇺🇳🇿", payout: 85, base: 1.0820,  color: "#00247D", desc: "Avustralya / Yeni Zelanda",  digits: 5 },
-  { label: "AUD/SEK",            icon: "/assets/aud-sek.png",    flag: "🇦🇺🇸🇪", payout: 84, base: 6.9100,  color: "#006AA7", desc: "Avustralya / İsveç",         digits: 4 },
-  { label: "AUD/SGD",            icon: "/assets/aud-sgd.png",    flag: "🇦🇺🇸🇬", payout: 85, base: 0.8650,  color: "#EF3340", desc: "Avustralya / Singapur",      digits: 5 },
-  { label: "AUD/USD",            icon: "/assets/aud-usd.png",    flag: "🇦🇺🇺🇸", payout: 86, base: 0.6600,  color: "#0084C7", desc: "Avustralya / ABD",           digits: 5 },
-  { label: "AUD/ZAR",            icon: "/assets/aud-zar.png",    flag: "🇦🇺🇿🇦", payout: 84, base: 12.050,  color: "#007749", desc: "Avustralya / Güney Afrika",  digits: 4 },
-  { label: "CAD/CHF",            icon: "/assets/cad-chf.png",    flag: "🇨🇦🇨🇭", payout: 85, base: 0.6080,  color: "#FF0000", desc: "Kanada / İsviçre",           digits: 5 },
+  { label: "AUD/CAD (OTC)",        icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9900,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
+  { label: "AUD/CHF (OTC)",        icon: "/assets/aud-chf.png",    flag: "🇦🇺🇨🇭", payout: 85, base: 0.5520,  color: "#E84142", desc: "Avustralya / İsviçre",       digits: 5 },
+  { label: "AUD/DKK (OTC)",        icon: "/assets/aud-dkk.png",    flag: "🇦🇺🇩🇰", payout: 84, base: 4.4200,  color: "#C8102E", desc: "Avustralya / Danimarka",     digits: 4 },
+  { label: "AUD/HUF (OTC)",        icon: "/assets/aud-huf.png",    flag: "🇦🇺🇭🇺", payout: 84, base: 233.50,  color: "#477050", desc: "Avustralya / Macaristan",    digits: 3 },
+  { label: "AUD/JPY (OTC)",        icon: "/assets/aud-jpy.png",    flag: "🇦🇺🇯🇵", payout: 86, base: 97.20,   color: "#BC002D", desc: "Avustralya / Japonya",       digits: 3 },
+  { label: "AUD/NOK (OTC)",        icon: "/assets/aud-nok.png",    flag: "🇦🇺🇳🇴", payout: 84, base: 6.9300,  color: "#00205B", desc: "Avustralya / Norveç",        digits: 4 },
+  { label: "AUD/NZD (OTC)",        icon: "/assets/aud-nzd.png",    flag: "🇦🇺🇳🇿", payout: 85, base: 1.0820,  color: "#00247D", desc: "Avustralya / Yeni Zelanda",  digits: 5 },
+  { label: "AUD/SEK (OTC)",        icon: "/assets/aud-sek.png",    flag: "🇦🇺🇸🇪", payout: 84, base: 6.9100,  color: "#006AA7", desc: "Avustralya / İsveç",         digits: 4 },
+  { label: "AUD/SGD (OTC)",        icon: "/assets/aud-sgd.png",    flag: "🇦🇺🇸🇬", payout: 85, base: 0.8650,  color: "#EF3340", desc: "Avustralya / Singapur",      digits: 5 },
+  { label: "AUD/USD (OTC)",        icon: "/assets/aud-usd.png",    flag: "🇦🇺🇺🇸", payout: 86, base: 0.6600,  color: "#0084C7", desc: "Avustralya / ABD",           digits: 5 },
+  { label: "AUD/ZAR (OTC)",        icon: "/assets/aud-zar.png",    flag: "🇦🇺🇿🇦", payout: 84, base: 12.050,  color: "#007749", desc: "Avustralya / Güney Afrika",  digits: 4 },
+  { label: "CAD/CHF (OTC)",        icon: "/assets/cad-chf.png",    flag: "🇨🇦🇨🇭", payout: 85, base: 0.6080,  color: "#FF0000", desc: "Kanada / İsviçre",           digits: 5 },
 ];
 
 function renderAssetFlag(a: { label: string; flag?: string; color?: string; icon?: string }, size = 18) {
@@ -89,7 +89,7 @@ function AssetTabBar({
             </div>
 
             {/* Asset label */}
-            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[75px] text-xs" : "max-w-[105px] text-[13.5px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
+            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[100px] text-xs" : "max-w-[135px] text-[13.5px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
               {a.label}
             </span>
 
@@ -1420,7 +1420,7 @@ export default function Home() {
       const saved = localStorage.getItem("obyo_open_assets");
       if (saved) {
         const labels: string[] = JSON.parse(saved);
-        const matchAsset = (l: string) => ASSETS.find(a => a.label === l);
+        const matchAsset = (l: string) => ASSETS.find(a => a.label === l || a.label.replace(/\s*\(OTC\)/i, "").trim() === l.replace(/\s*\(OTC\)/i, "").trim());
         const found = labels.map(matchAsset).filter(Boolean) as (typeof ASSETS)[0][];
         if (found.length > 0) return found.slice(0, 2);
       }
@@ -1432,7 +1432,7 @@ export default function Home() {
     try {
       const savedLabel = localStorage.getItem("obyo_active_asset");
       if (savedLabel) {
-        const matchAsset = (l: string) => ASSETS.find(a => a.label === l);
+        const matchAsset = (l: string) => ASSETS.find(a => a.label === l || a.label.replace(/\s*\(OTC\)/i, "").trim() === l.replace(/\s*\(OTC\)/i, "").trim());
         const found = matchAsset(savedLabel);
         if (found) return found;
       }

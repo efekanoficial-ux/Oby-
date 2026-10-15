@@ -685,16 +685,29 @@ export function startEngine(): void {
   logger.info({ assets: ASSETS.length }, "Market engine started with real market tracking & fractal OTC engines");
 }
 
+function resolveSymbol(symbol: string): string {
+  if (markets.has(symbol)) return symbol;
+  if (markets.has(`${symbol} (OTC)`)) return `${symbol} (OTC)`;
+  const stripped = symbol.replace(/\s*\(OTC\)/i, "").trim();
+  if (markets.has(stripped)) return stripped;
+  return symbol;
+}
+
 export function getHistory(symbol: string): Candle[] {
-  const market = markets.get(symbol);
+  const resolved = resolveSymbol(symbol);
+  const market = markets.get(resolved);
   if (market) return market.getHistory();
-  return generateHistorySlow(symbol);
+  return generateHistorySlow(resolved);
 }
 
 export function subscribe(symbol: string, fn: Listener): (() => void) | null {
-  return markets.get(symbol)?.subscribe(fn) ?? null;
+  const resolved = resolveSymbol(symbol);
+  return markets.get(resolved)?.subscribe(fn) ?? null;
 }
 
 export function isKnownAsset(symbol: string): boolean {
-  return ASSET_BY_SYMBOL.has(symbol);
+  if (ASSET_BY_SYMBOL.has(symbol)) return true;
+  if (ASSET_BY_SYMBOL.has(`${symbol} (OTC)`)) return true;
+  const stripped = symbol.replace(/\s*\(OTC\)/i, "").trim();
+  return ASSET_BY_SYMBOL.has(stripped);
 }

@@ -66,7 +66,7 @@ function renderAssetIcon(assetLabel: string) {
 export default function History() {
   const { completedTrades, activeTrades, tradesLoading } = useDemoAccount();
   const { isReal } = useAccountMode();
-  const { currentUser } = useAuth();
+  const { currentUser, paymentSettings } = useAuth();
   const { t, langCode } = useLanguage();
   const currency = (currentUser as any)?.currency ?? "USD";
   const sym = currency === "TL" ? "₺" : "$";
@@ -76,7 +76,8 @@ export default function History() {
   const [realActiveTrades, setRealActiveTrades] = useState<RealActiveTrade[]>([]);
   const [now, setNow] = useState(Date.now());
 
-  const viewIsReal = isReal;
+  const educationActive = paymentSettings?.educationModeEnabled;
+  const viewIsReal = educationActive ? false : isReal;
   const accent = viewIsReal ? "#10b981" : "#f59e0b";
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function History() {
     return () => unsub();
   }, [currentUser?.id]);
 
-  const modeTrades = viewIsReal
+  const modeTrades = (viewIsReal && !educationActive)
     ? completedTrades.filter(tr => tr.mode === "real")
     : completedTrades.filter(tr => !tr.mode || tr.mode === "demo");
 
@@ -108,7 +109,7 @@ export default function History() {
   const total     = totalWin + totalLose;
 
   const visibleDemoActive = activeTrades.filter(tr => tr.startTime + tr.duration * 1000 > now - 800);
-  const visibleRealActive = realActiveTrades.filter(tr => tr.expiryTime > now - 800);
+  const visibleRealActive = educationActive ? [] : realActiveTrades.filter(tr => tr.expiryTime > now - 800);
   const visibleActive     = viewIsReal ? visibleRealActive : visibleDemoActive;
 
   const totalNet = modeTrades.reduce((acc, tr) => {

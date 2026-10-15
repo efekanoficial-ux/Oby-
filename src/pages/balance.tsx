@@ -12,9 +12,10 @@ import { useIsTurkey } from "@/lib/use-country";
 import {
   ArrowDownLeft, ArrowUpRight,
   Clock, ArrowDownLeft as DepIcon, ArrowUpRight as WithIcon,
-  Hourglass, TrendingUp, TrendingDown, Minus, AlertCircle, Eye, EyeOff, X,
+  Hourglass, TrendingUp, TrendingDown, Minus, AlertCircle, Eye, EyeOff, X, RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { EducationPlatformNotice } from "@/components/EducationPlatformNotice";
 
 /* ── Method row ─────────────────────────────────────────────────────────── */
 function MethodRow({
@@ -72,8 +73,8 @@ function MethodRow({
 /* ── main page ─────────────────────────────────────────────────────────── */
 export default function Balance() {
   const [, navigate] = useLocation();
-  const { currentUser, requests, isRejectionViewed } = useAuth();
-  const { balance: demoBalance, completedTrades = [] }  = useDemoAccount();
+  const { currentUser, requests, isRejectionViewed, paymentSettings } = useAuth();
+  const { balance: demoBalance, completedTrades = [], addBalance, setDemoBalance }  = useDemoAccount();
   const { isReal, isBalanceHidden, toggleBalanceHidden } = useAccountMode();
   const { t, langCode }           = useLanguage();
   const isTurkey                  = useIsTurkey();
@@ -81,6 +82,10 @@ export default function Balance() {
   const isTL = currency === "TL";
   const sym = isTL ? "₺" : "$";
   const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
+
+  if (paymentSettings?.educationModeEnabled) {
+    return <EducationPlatformNotice />;
+  }
 
   // ── Günlük Sıfırlanan Kâr / Zarar Hesaplaması ─────────────────────────────
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -346,39 +351,51 @@ export default function Balance() {
 
           {/* CTA Buttons - Completely Circular Buttons with Labels Underneath */}
           <div className="relative grid grid-cols-3 gap-2 sm:gap-4 max-w-xs mx-auto">
-            {/* Yatır (Deposit) */}
+            {/* Yatır / Ücretsiz Bakiye Ekle */}
             <div className="flex flex-col items-center gap-1.5 sm:gap-2">
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={() => openWallet("deposit")}
+                onClick={() => {
+                  if (paymentSettings?.educationModeEnabled) {
+                    addBalance(isTL ? 5000 : 100);
+                  } else {
+                    openWallet("deposit");
+                  }
+                }}
                 className="h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center border border-white/15 hover:border-white/30 shadow-[0_6px_16px_rgba(0,0,0,0.35)] transition-all cursor-pointer group"
                 style={{
                   background: "linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 100%)",
                 }}
-                title={t.depositBtn}
+                title={paymentSettings?.educationModeEnabled ? t.addFreeBalance : t.depositBtn}
               >
                 <ArrowDownLeft size={20} strokeWidth={2.2} className="text-neutral-400 group-hover:text-neutral-200 transition-all group-hover:scale-110" />
               </motion.button>
-              <span className="text-[11px] sm:text-xs font-semibold tracking-tight text-white/80 select-none">
-                {t.depositBtn}
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-tight text-white/80 select-none text-center px-1 leading-tight">
+                {paymentSettings?.educationModeEnabled ? t.addFreeBalance : t.depositBtn}
               </span>
             </div>
 
-            {/* Çek (Withdraw) */}
+            {/* Çek / Bakiye Sıfırla */}
             <div className="flex flex-col items-center gap-1.5 sm:gap-2">
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={() => openWallet("withdraw")}
+                onClick={() => {
+                  if (paymentSettings?.educationModeEnabled) {
+                    setDemoBalance(0);
+                  } else {
+                    openWallet("withdraw");
+                  }
+                }}
                 className="h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center border border-white/15 hover:border-white/30 shadow-[0_6px_16px_rgba(0,0,0,0.35)] transition-all cursor-pointer group"
                 style={{
                   background: "linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 100%)",
                 }}
-                title={t.withdrawBtn}
+                title={paymentSettings?.educationModeEnabled ? t.deleteBalance : t.withdrawBtn}
               >
                 <ArrowUpRight size={20} strokeWidth={2.2} className="text-neutral-400 group-hover:text-neutral-200 transition-all group-hover:scale-110" />
               </motion.button>
-              <span className="text-[11px] sm:text-xs font-semibold tracking-tight text-white/80 select-none">
-                {t.withdrawBtn}
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-tight text-white/80 select-none text-center px-1 leading-tight">
+                {paymentSettings?.educationModeEnabled ? t.deleteBalance : t.withdrawBtn}
               </span>
             </div>
 

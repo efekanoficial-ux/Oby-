@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift, ChevronLeft, ChevronRight, PanelLeft } from "lucide-react";
+import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift, ChevronLeft, ChevronRight, PanelLeft, RotateCcw } from "lucide-react";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
@@ -233,47 +233,74 @@ export function AccountSwitcher({
   onTournamentJoinClick?: () => void;
   currency?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, langCode } = useLanguage();
+  const { paymentSettings } = useAuth();
+  const { setDemoBalance } = useDemoAccount();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!show) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
   }, [show, onClose]);
 
   return (
     <AnimatePresence>
       {show && (
-        <motion.div ref={ref}
-          initial={{ opacity: 0, y: -6, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -6, scale: 0.96 }}
-          transition={{ type: "spring", stiffness: 420, damping: 28 }}
-          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-2 z-50 w-60 rounded-2xl overflow-hidden`}
-          style={{ background: "#0d0d0d", border: "1px solid #222", boxShadow: "0 16px 40px rgba(0,0,0,0.7)" }}>
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          />
+          <motion.div ref={ref}
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 420, damping: 28 }}
+            className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-2 z-50 w-64 rounded-2xl overflow-hidden`}
+            style={{ background: "#0d0d0d", border: "1px solid #222", boxShadow: "0 16px 40px rgba(0,0,0,0.7)" }}>
 
           <div className="px-3 pt-3 pb-1">
             <p className="text-[9px] font-black text-white/25 uppercase tracking-wider">{t.selectAccount}</p>
           </div>
 
           {/* Demo */}
-          <button onClick={() => { onSelect("demo"); onClose(); }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 transition-colors hover:bg-white/4 cursor-pointer">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: mode === "demo" ? "rgba(255,107,0,0.15)" : "#111", border: mode === "demo" ? "1px solid rgba(255,107,0,0.3)" : "1px solid #1e1e1e" }}>
-              <BarChart2 size={13} style={{ color: mode === "demo" ? "#FF6B00" : "#555" }} />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-xs font-black" style={{ color: mode === "demo" ? "#FF6B00" : "#888" }}>{t.demoAccount}</p>
-              <AnimatedBalance value={demoBalance} currency={currency} className="text-[10px] font-bold text-[#FFB800]" />
-            </div>
+          <div className="flex items-center w-full hover:bg-white/4 transition-colors">
+            <button onClick={() => { onSelect("demo"); onClose(); }}
+              className="flex items-center gap-3 flex-1 px-3 py-2.5 text-left cursor-pointer min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: mode === "demo" ? "rgba(136,136,136,0.15)" : "#111", border: mode === "demo" ? "1px solid rgba(136,136,136,0.3)" : "1px solid #1e1e1e" }}>
+                <BarChart2 size={13} style={{ color: mode === "demo" ? "#888" : "#555" }} />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-black" style={{ color: mode === "demo" ? "#ccc" : "#888" }}>{t.demoAccount}</p>
+                <AnimatedBalance value={demoBalance} currency={currency} className="text-[10px] font-bold text-white" />
+              </div>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const target = currency === "TL" ? 120000 : 10000;
+                setDemoBalance(target);
+              }}
+              className="p-1.5 mr-2 text-white/40 hover:text-white transition-colors cursor-pointer shrink-0"
+              title={langCode === "tr" ? "Bakiyeyi Sıfırla / Sabitle" : "Reset / Pin Balance"}
+            >
+              <RotateCcw size={13} />
+            </button>
             {mode === "demo" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-[#FF6B00] shrink-0" />
+              <div className="h-1.5 w-1.5 rounded-full bg-[#888] shrink-0 mr-3" />
             )}
-          </button>
+          </div>
 
           {/* Real (Eğitim Modu kapalıysa göster) */}
           {!paymentSettings?.educationModeEnabled && (
@@ -334,6 +361,7 @@ export function AccountSwitcher({
             </p>
           </div>
         </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
@@ -534,7 +562,7 @@ function DesktopHeader({
 
   const realBalance = currentUser?.realBalance ?? 0;
   const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
-  const modeColor = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
+  const modeColor = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#888888");
   const modeLabel = isTournament ? (t.tournamentTab || "Turnuva") : (isReal ? t.realAccount : t.demoAccount);
 
   return (
@@ -562,7 +590,7 @@ function DesktopHeader({
 
           <div className="flex items-center gap-2 select-none shrink-0">
             <div
-              onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
+              onClick={() => setShowSwitcher(s => !s)}
               className="flex items-center gap-1.5 shrink-0 cursor-pointer"
               title="Hesap Seçimi ve Bakiye"
             >
@@ -584,7 +612,7 @@ function DesktopHeader({
 
             <ChevronDown
               size={13}
-              onClick={() => currentUser ? setShowSwitcher(s => !s) : onWallet()}
+              onClick={() => setShowSwitcher(s => !s)}
               className="text-white/40 shrink-0 ml-0.5 cursor-pointer"
             />
           </div>
@@ -656,7 +684,7 @@ function DesktopHeader({
 export function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const [location, navigate] = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, paymentSettings } = useAuth();
   const {
     mode,
     setMode,
@@ -692,7 +720,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const realBalance = currentUser?.realBalance ?? 0;
   const tourBal = currentUser?.tournamentBalance ?? tournamentBalance;
   const sym = currency === "TL" ? "₺" : "$";
-  const modeColor   = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#FF6B00");
+  const modeColor   = isTournament ? "#A855F7" : (isReal ? "#0ecb81" : "#888888");
   const modeLabel   = isTournament ? (t.tournamentTab || "Turnuva") : (isReal ? t.realAccount : t.demoAccount);
 
   if (isMobile) {
@@ -726,7 +754,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {/* Bakiye Kısmı (Sağa tam yanaştırılmış) */}
             <div className="flex items-center gap-1 select-none shrink-0 text-right">
               <div 
-                onClick={() => currentUser ? setShowSwitcher(s => !s) : navigate("/wallet")}
+                onClick={() => setShowSwitcher(s => !s)}
                 className="flex items-center gap-2 cursor-pointer select-none text-right"
               >
                 <div onClick={(e) => { e.stopPropagation(); toggleBalanceHidden(); }} className="text-white/40">
@@ -848,6 +876,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
         {location !== "/" && (
           <DesktopHeader
+            onWallet={() => navigate("/wallet")}
             onNotif={() => setShowNotifModal(v => !v)}
             onSettings={() => setShowLangModal(true)}
           />
