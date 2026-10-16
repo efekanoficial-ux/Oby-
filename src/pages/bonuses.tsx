@@ -143,21 +143,22 @@ export default function BonusesPage() {
   });
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-[#070709] text-white flex flex-col max-w-4xl mx-auto">
-      {/* ── Sticky Top Header ── */}
-      <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-white/5 px-4 py-3 shrink-0 flex items-center justify-between">
-        <button
-          onClick={() => navigate("/profile")}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer"
-          title="Geri"
-        >
-          <ArrowLeft size={16} />
-        </button>
+    <div className="h-full w-full overflow-y-auto bg-black text-white flex flex-col" style={{ backgroundColor: "#000000" }}>
+      <div className="w-full max-w-4xl mx-auto flex flex-col flex-1 pb-16">
+        {/* ── Sticky Top Header ── */}
+        <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-white/5 px-4 py-4 shrink-0 flex items-center justify-between">
+          <button
+            onClick={() => navigate("/profile")}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer"
+            title="Geri"
+          >
+            <ArrowLeft size={16} />
+          </button>
 
-        <h1 className="text-sm font-black text-white tracking-wide">Bonuslar</h1>
+          <h1 className="text-sm font-black text-white tracking-wide">Bonuslar</h1>
 
-        <div className="w-8" />
-      </div>
+          <div className="w-8" />
+        </div>
 
       {/* ── Feedback Message Banner ── */}
       <AnimatePresence>
@@ -380,6 +381,7 @@ export default function BonusesPage() {
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   );

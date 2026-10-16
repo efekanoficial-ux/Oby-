@@ -118,15 +118,16 @@ export default function History() {
   const winRate = total > 0 ? Math.round((totalWin / total) * 100) : 0;
 
   return (
-    <div className="flex h-full flex-col bg-black text-white max-w-4xl mx-auto w-full" style={{ backgroundColor: "#000000" }}>
+    <div className="flex h-full flex-col bg-black text-white overflow-y-auto" style={{ backgroundColor: "#000000" }}>
+      <div className="w-full max-w-4xl mx-auto flex flex-col flex-1 pb-16">
 
-      {/* ── Active Trades Section ──────────────────────────────────────── */}
-      {visibleActive.length > 0 && (
-        <div className="shrink-0 px-4 pt-3 pb-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2">
-            {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
-          </p>
-          <div className="flex flex-row gap-2 overflow-x-auto snap-x snap-mandatory w-full no-scrollbar">
+        {/* ── Active Trades Section ──────────────────────────────────────── */}
+        {visibleActive.length > 0 && (
+          <div className="shrink-0 px-4 pt-4 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2">
+              {viewIsReal ? t.activeRealTrades : t.activeDemoTrades} ({visibleActive.length})
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full">
             {visibleActive.map(tr => {
               const isUp   = tr.direction === "UP";
               const expiry = viewIsReal
@@ -336,6 +337,7 @@ export default function History() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

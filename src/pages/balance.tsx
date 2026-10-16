@@ -239,7 +239,7 @@ export default function Balance() {
 
         {/* ── Crypto Wallet Hero Balance Card (Stable, Neutral Luxury Dark Glass) ── */}
         <div
-          className="mx-4 mb-5 rounded-3xl p-5 sm:p-6 relative overflow-hidden backdrop-blur-2xl transition-all"
+          className="mx-4 sm:mx-auto sm:max-w-lg w-[calc(100%-32px)] mb-4 rounded-3xl p-4 sm:p-5 relative overflow-hidden backdrop-blur-2xl transition-all"
           style={{
             background: "linear-gradient(145deg, #161821 0%, #0f1117 55%, #0a0b0e 100%)",
             border: "1px solid rgba(255,255,255,0.12)",

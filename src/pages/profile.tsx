@@ -119,9 +119,9 @@ export default function Profile() {
 
   return (
     <>
-    <div className="h-full w-full overflow-y-auto"
-        style={{ isolation: "isolate", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-        <div className="flex flex-col pb-10 max-w-2xl mx-auto w-full">
+    <div className="h-full w-full overflow-y-auto bg-black text-white"
+        style={{ backgroundColor: "#000000", isolation: "isolate", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
+        <div className="w-full max-w-4xl mx-auto flex flex-col pb-16">
 
           {/* ── Profile header ───────────────────────────────────────── */}
           <div className="flex flex-col items-center py-8 px-4">
