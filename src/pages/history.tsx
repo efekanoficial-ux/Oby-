@@ -118,7 +118,7 @@ export default function History() {
   const winRate = total > 0 ? Math.round((totalWin / total) * 100) : 0;
 
   return (
-    <div className="flex h-full flex-col bg-black text-white" style={{ backgroundColor: "#000000" }}>
+    <div className="flex h-full flex-col bg-black text-white max-w-4xl mx-auto w-full" style={{ backgroundColor: "#000000" }}>
 
       {/* ── Active Trades Section ──────────────────────────────────────── */}
       {visibleActive.length > 0 && (

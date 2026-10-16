@@ -297,7 +297,7 @@ export default function LeaderboardPage() {
   }, [firestoreTraders, userTodayStats, currentUser, tick]);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[#070709] text-white flex flex-col">
+    <div className="h-full w-full overflow-hidden bg-[#070709] text-white flex flex-col max-w-4xl mx-auto">
       {/* ── Header with Back Button & Centered Countdown ── */}
       <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-white/5 px-4 pt-3 pb-2.5 shrink-0 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">

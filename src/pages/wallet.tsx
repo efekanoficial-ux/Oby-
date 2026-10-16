@@ -739,7 +739,7 @@ export default function WalletPage() {
   const currencySym = currentUser.currency === "TL" ? "₺" : "$";
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#050505] text-white overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#050505] text-white overflow-hidden max-w-4xl mx-auto w-full">
       {/* ── Modern Crypto Quick Overview Card ─────────────────────────────── */}
       <div className="px-4 pt-3 pb-2 shrink-0">
         <div

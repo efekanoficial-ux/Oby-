@@ -143,7 +143,7 @@ export default function BonusesPage() {
   });
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-[#070709] text-white flex flex-col">
+    <div className="h-full w-full overflow-y-auto bg-[#070709] text-white flex flex-col max-w-4xl mx-auto">
       {/* ── Sticky Top Header ── */}
       <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-white/5 px-4 py-3 shrink-0 flex items-center justify-between">
         <button

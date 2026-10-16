@@ -387,7 +387,7 @@ function DesktopSidebar({
 
   return (
     <aside
-      className="flex shrink-0 flex-col border-r border-white/5 bg-[#07080a] h-full transition-all duration-200 z-20"
+      className="flex shrink-0 flex-col border-r border-white/10 bg-black h-full transition-all duration-200 z-20"
       style={{ width: collapsed ? 56 : 220 }}
     >
       {/* Sidebar toggle - NO LOGO */}
@@ -699,7 +699,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   } = useAccountMode();
   const { balance: demoBalance } = useDemoAccount();
   const [showSwitcher,      setShowSwitcher]       = useState(false);
-  const [sidebarCollapsed,  setSidebarCollapsed]   = useState(false);
+  const [sidebarCollapsed,  setSidebarCollapsed]   = useState(true);
   const [showNotifModal,    setShowNotifModal]     = useState(false);
   const [showLangModal,     setShowLangModal]      = useState(false);
   const [currentLang,       setCurrentLang]        = useState(() => localStorage.getItem("obyo_lang") || "Türkçe");
@@ -867,7 +867,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   /* ── Desktop layout ────────────────────────────────────────────────────── */
   return (
-    <div className="flex h-screen w-full bg-[#07080a] text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-black text-white overflow-hidden">
       <DesktopSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(v => !v)}

@@ -2355,10 +2355,10 @@ export default function Home() {
               {/* Signals Button */}
               <button
                 onClick={() => setShowSignalModal(true)}
-                className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg bg-[#FF6B00]/10 hover:bg-[#FF6B00]/20 border border-[#FF6B00]/30 text-[11px] font-bold text-[#FF6B00] transition-all cursor-pointer shrink-0"
+                className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-[11px] font-bold text-emerald-400 transition-all cursor-pointer shrink-0"
                 title="Sinyaller"
               >
-                <Radio size={13} className="animate-pulse" />
+                <Radio size={13} className="animate-pulse text-emerald-400" />
                 <span className="hidden xl:inline">{t.signals}</span>
               </button>
             </div>
@@ -2651,28 +2651,75 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="relative flex items-center mt-0.5">
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 touch-pan-x w-full select-none">
-                    {TIMEFRAMES.map(tFrame => {
-                      const isSelected = tf.label === tFrame.label;
-                      return (
-                        <button
-                          key={tFrame.label}
-                          onClick={() => setTf(tFrame)}
-                          className={`shrink-0 flex flex-col items-center justify-center min-w-[54px] px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer border ${
-                            isSelected
-                              ? "bg-white border-white text-black font-black shadow-[0_2px_14px_rgba(255,255,255,0.4)] scale-[1.03]"
-                              : "bg-white/5 border-white/5 text-white/50 hover:bg-white/10 hover:text-white font-semibold"
-                          }`}
-                        >
-                          <span className={`text-xs font-black leading-none ${isSelected ? "text-black" : "text-white"}`}>{tFrame.label}</span>
-                          <span className={`text-[8.5px] mt-0.5 ${isSelected ? "text-black/70 font-semibold" : "text-white/30"}`}>
-                            {tfSubLabel(tFrame.secs)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                {/* Stepper Buttons (- and +) with active duration display */}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <button
+                    onClick={() => {
+                      const idx = TIMEFRAMES.findIndex(x => x.secs === tf.secs);
+                      if (idx > 0) setTf(TIMEFRAMES[idx - 1]);
+                    }}
+                    disabled={TIMEFRAMES.findIndex(x => x.secs === tf.secs) <= 0}
+                    className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-all cursor-pointer shrink-0"
+                    title="Daha Kısa Vade"
+                  >
+                    <Minus size={15} />
+                  </button>
+                  <div className="flex-1 flex items-center justify-center gap-1.5 h-9 px-2 rounded-xl bg-black/40 border border-white/5 font-black text-white tracking-tight">
+                    <Clock size={14} className="text-white/40" />
+                    <span className="text-sm font-black text-white">{tf.label}</span>
+                    <span className="text-[10px] text-white/40 font-semibold">({tfSubLabel(tf.secs)})</span>
                   </div>
+                  <button
+                    onClick={() => {
+                      const idx = TIMEFRAMES.findIndex(x => x.secs === tf.secs);
+                      if (idx >= 0 && idx < TIMEFRAMES.length - 1) setTf(TIMEFRAMES[idx + 1]);
+                    }}
+                    disabled={TIMEFRAMES.findIndex(x => x.secs === tf.secs) >= TIMEFRAMES.length - 1}
+                    className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-all cursor-pointer shrink-0"
+                    title="Daha Uzun Vade"
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+
+                {/* Direct Selection Buttons - No Scroll (kaydırılmasın) */}
+                <div className="grid grid-cols-4 gap-1 mt-1">
+                  {TIMEFRAMES.slice(0, 4).map(tFrame => {
+                    const isSelected = tf.label === tFrame.label;
+                    return (
+                      <button
+                        key={tFrame.label}
+                        onClick={() => setTf(tFrame)}
+                        className={`rounded-lg py-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-white text-black shadow-sm font-black"
+                            : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                        }`}
+                        title={`${tFrame.label} (${tfSubLabel(tFrame.secs)})`}
+                      >
+                        {tFrame.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {TIMEFRAMES.slice(4).map(tFrame => {
+                    const isSelected = tf.label === tFrame.label;
+                    return (
+                      <button
+                        key={tFrame.label}
+                        onClick={() => setTf(tFrame)}
+                        className={`rounded-lg py-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-white text-black shadow-sm font-black"
+                            : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                        }`}
+                        title={`${tFrame.label} (${tfSubLabel(tFrame.secs)})`}
+                      >
+                        {tFrame.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
