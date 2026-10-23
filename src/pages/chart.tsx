@@ -4,7 +4,21 @@ import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AssetIcon } from "@/lib/asset-icons";
 
-import { ASSETS } from "@/lib/assets";
+const ASSETS = [
+  { label: "Crypto IDX", base: 6850.25 },
+  { label: "AUD/CAD (OTC)", base: 0.9900 },
+  { label: "AUD/CHF (OTC)", base: 0.5520 },
+  { label: "AUD/DKK (OTC)", base: 4.4200 },
+  { label: "AUD/HUF (OTC)", base: 233.50 },
+  { label: "AUD/JPY (OTC)", base: 97.20 },
+  { label: "AUD/NOK (OTC)", base: 6.9300 },
+  { label: "AUD/NZD (OTC)", base: 1.0820 },
+  { label: "AUD/SEK (OTC)", base: 6.9100 },
+  { label: "AUD/SGD (OTC)", base: 0.8650 },
+  { label: "AUD/USD (OTC)", base: 0.6600 },
+  { label: "AUD/ZAR (OTC)", base: 12.050 },
+  { label: "CAD/CHF (OTC)", base: 0.6080 },
+];
 
 export default function Chart() {
   const [asset, setAsset] = useState(ASSETS[0]);

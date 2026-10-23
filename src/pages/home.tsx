@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, where } from "firebase/firestore";
@@ -19,14 +19,30 @@ import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown, Plus, RefreshCw, Pencil, Radio, Calendar,
-  ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, X, Search,
+  ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, X,
   Clock, BarChart3, Activity, ChevronLeft, ChevronRight,
   SlidersHorizontal, CandlestickChart, LineChart, RotateCw,
   Lock, ArrowRight, ShieldCheck, History, Wallet, Settings, Eye, EyeOff, PanelRight,
 } from "lucide-react";
 import type { Candle } from "@/components/candle-chart";
 import { AssetIcon } from "@/lib/asset-icons";
-import { ASSETS } from "@/lib/assets";
+
+/* ─── Assets ─────────────────────────────────────────────────────────────── */
+const ASSETS = [
+  { label: "Crypto IDX",           icon: "/assets/crypto-idx.png", flag: "₿",      payout: 90, base: 6850.25, color: "#F7931A", desc: "Kripto Bileşik Endeksi",      digits: 2 },
+  { label: "AUD/CAD (OTC)",        icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9900,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
+  { label: "AUD/CHF (OTC)",        icon: "/assets/aud-chf.png",    flag: "🇦🇺🇨🇭", payout: 85, base: 0.5520,  color: "#E84142", desc: "Avustralya / İsviçre",       digits: 5 },
+  { label: "AUD/DKK (OTC)",        icon: "/assets/aud-dkk.png",    flag: "🇦🇺🇩🇰", payout: 84, base: 4.4200,  color: "#C8102E", desc: "Avustralya / Danimarka",     digits: 4 },
+  { label: "AUD/HUF (OTC)",        icon: "/assets/aud-huf.png",    flag: "🇦🇺🇭🇺", payout: 84, base: 233.50,  color: "#477050", desc: "Avustralya / Macaristan",    digits: 3 },
+  { label: "AUD/JPY (OTC)",        icon: "/assets/aud-jpy.png",    flag: "🇦🇺🇯🇵", payout: 86, base: 97.20,   color: "#BC002D", desc: "Avustralya / Japonya",       digits: 3 },
+  { label: "AUD/NOK (OTC)",        icon: "/assets/aud-nok.png",    flag: "🇦🇺🇳🇴", payout: 84, base: 6.9300,  color: "#00205B", desc: "Avustralya / Norveç",        digits: 4 },
+  { label: "AUD/NZD (OTC)",        icon: "/assets/aud-nzd.png",    flag: "🇦🇺🇳🇿", payout: 85, base: 1.0820,  color: "#00247D", desc: "Avustralya / Yeni Zelanda",  digits: 5 },
+  { label: "AUD/SEK (OTC)",        icon: "/assets/aud-sek.png",    flag: "🇦🇺🇸🇪", payout: 84, base: 6.9100,  color: "#006AA7", desc: "Avustralya / İsveç",         digits: 4 },
+  { label: "AUD/SGD (OTC)",        icon: "/assets/aud-sgd.png",    flag: "🇦🇺🇸🇬", payout: 85, base: 0.8650,  color: "#EF3340", desc: "Avustralya / Singapur",      digits: 5 },
+  { label: "AUD/USD (OTC)",        icon: "/assets/aud-usd.png",    flag: "🇦🇺🇺🇸", payout: 86, base: 0.6600,  color: "#0084C7", desc: "Avustralya / ABD",           digits: 5 },
+  { label: "AUD/ZAR (OTC)",        icon: "/assets/aud-zar.png",    flag: "🇦🇺🇿🇦", payout: 84, base: 12.050,  color: "#007749", desc: "Avustralya / Güney Afrika",  digits: 4 },
+  { label: "CAD/CHF (OTC)",        icon: "/assets/cad-chf.png",    flag: "🇨🇦🇨🇭", payout: 85, base: 0.6080,  color: "#FF0000", desc: "Kanada / İsviçre",           digits: 5 },
+];
 
 function renderAssetFlag(a: { label: string; flag?: string; color?: string; icon?: string }, size = 18) {
   return <AssetIcon label={a.label} size={size} />;
@@ -588,21 +604,6 @@ function ChartNotification({ notif }: { notif: ChartNotif | null }) {
 function AssetSheet({
   visible, current, onSelect, onClose,
 }: { visible: boolean; current: typeof ASSETS[0]; onSelect: (a: typeof ASSETS[0]) => void; onClose: () => void; }) {
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "stocks" | "forex">("all");
-
-  const filtered = useMemo(() => {
-    return ASSETS.filter((a) => {
-      const q = search.trim().toLowerCase();
-      const match = !q || a.label.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q);
-      if (!match) return false;
-
-      if (activeTab === "stocks") return a.category === "stocks";
-      if (activeTab === "forex") return a.category === "forex";
-      return true;
-    });
-  }, [search, activeTab]);
-
   return (
     <AnimatePresence>
       {visible && (
@@ -613,107 +614,46 @@ function AssetSheet({
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-[400px] z-[9999] rounded-3xl flex flex-col overflow-hidden shadow-2xl"
-            style={{ background: "#121215", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "80vh" }}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-[380px] z-[9999] rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+            style={{ background: "#121215", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "75vh" }}
           >
             
-            <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+            <div className="flex items-center justify-between px-5 py-3 shrink-0">
               <div>
                 <h2 className="text-sm font-black text-white">Varlık Seç</h2>
                 <p className="text-[11px] text-white/30 mt-0.5">{ASSETS.length} varlık mevcut</p>
               </div>
-              <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full cursor-pointer hover:bg-white/10" style={{ background: "rgba(255,255,255,0.06)" }}>
+              <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <X size={13} className="text-white/50" />
               </button>
             </div>
-
-            {/* Search Input */}
-            <div className="px-4 pb-2 shrink-0">
-              <div className="relative flex items-center">
-                <Search size={13} className="absolute left-3 text-white/40" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Varlık veya şirket ara (Apple, EUR, OTC)..."
-                  className="w-full pl-8 pr-8 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/30"
-                />
-                {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-2.5 text-white/40 hover:text-white cursor-pointer">
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="px-4 pb-2.5 shrink-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => setActiveTab("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "all" ? "bg-white text-black shadow-sm" : "bg-white/[0.04] text-white/50 hover:text-white"
-                }`}
-              >
-                Tümü ({ASSETS.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("stocks")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "stocks" ? "bg-white text-black shadow-sm" : "bg-white/[0.04] text-white/50 hover:text-white"
-                }`}
-              >
-                Şirketler (10)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("forex")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "forex" ? "bg-white text-black shadow-sm" : "bg-white/[0.04] text-white/50 hover:text-white"
-                }`}
-              >
-                Forex (52)
-              </button>
-            </div>
-
             <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-8">
-              {filtered.map((a) => {
+              {ASSETS.map((a) => {
                 const isActive = a.label === current.label;
                 return (
                   <button key={a.label}
                     onClick={() => { onSelect(a); onClose(); }}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 mb-1.5 transition-colors cursor-pointer group"
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 mb-1.5 transition-colors"
                     style={{ background: isActive ? "rgba(42,171,238,0.1)" : "rgba(255,255,255,0.02)", border: isActive ? "1px solid rgba(42,171,238,0.3)" : "1px solid transparent" }}
                   >
-                    {/* Clean Icon WITHOUT background box or rozet */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
                       {renderAssetFlag(a, 28)}
                     </div>
-                    <div className="flex-1 text-left min-w-0">
+                    <div className="flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[14.5px] font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{a.label}</span>
-                        {a.category === "stocks" && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
-                            Hisse OTC
-                          </span>
-                        )}
+                        <span className="text-[15px] font-bold text-white">{a.label}</span>
+                        
                       </div>
-                      <span className="text-xs text-white/40 truncate block">{a.desc}</span>
+                      <span className="text-xs text-white/40">{a.desc}</span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-[14.5px] font-bold text-[#1aa369]">{a.payout}%</div>
+                    <div className="text-right">
+                      <div className="text-[15px] font-bold text-[#1aa369]">{a.payout}%</div>
                       <div className="text-[9.5px] text-white/30">Payout</div>
                     </div>
 
                   </button>
                 );
               })}
-              {filtered.length === 0 && (
-                <div className="py-12 text-center text-xs text-white/40">
-                  Aramanıza uygun varlık bulunamadı.
-                </div>
-              )}
             </div>
           </motion.div>
         </>
@@ -2679,8 +2619,8 @@ export default function Home() {
                 title="Varlık Değiştir"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-9 w-9 flex items-center justify-center shrink-0">
-                    {renderAssetFlag(asset, 24)}
+                  <div className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 shrink-0">
+                    {renderAssetFlag(asset, 22)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">

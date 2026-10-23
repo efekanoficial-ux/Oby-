@@ -14,7 +14,7 @@ interface AuthPageProps {
 export default function AuthPage({ initialMode = "login" }: AuthPageProps = {}) {
   const [, navigate] = useLocation();
   const { login, loginWithGoogle, register, currentUser, isAdmin, ready } = useAuth();
-  const { t, langCode } = useLanguage();
+  const { t, langCode, setLanguage } = useLanguage();
 
   const [mode, setMode] = useState<Mode>(() => {
     try {
@@ -252,6 +252,28 @@ export default function AuthPage({ initialMode = "login" }: AuthPageProps = {}) 
       {/* ── Vertically Centered & PC-Optimized Content Container ── */}
       <div className="relative z-10 w-full min-h-full flex flex-col justify-center items-center px-5 py-10 sm:py-16">
         
+        {/* ── Language Switcher at Top-Right (TR / EN / DE) ── */}
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-1 bg-white/[0.06] hover:bg-white/[0.09] backdrop-blur-xl border border-white/10 rounded-full p-1 shadow-lg transition-colors">
+          {[
+            { code: "tr", label: "TR", title: "Türkçe" },
+            { code: "en", label: "EN", title: "English" },
+            { code: "de", label: "DE", title: "Deutsch" },
+          ].map((item) => (
+            <button
+              key={item.code}
+              type="button"
+              onClick={() => setLanguage(item.title)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black transition-all cursor-pointer ${
+                langCode === item.code
+                  ? "bg-white text-black shadow-sm"
+                  : "text-white/45 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <div className="w-full max-w-[420px] sm:max-w-[440px] my-auto flex flex-col gap-6">
           
           {/* ── Redesigned Line-Based Mode Switcher ("çizgi şeklinde" modern tabs) ── */}

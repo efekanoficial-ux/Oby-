@@ -99,7 +99,7 @@ export function DesktopAssetModal({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"ALL" | "STOCKS" | "FOREX" | "HIGH_PAYOUT">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "FOREX" | "HIGH_PAYOUT">("ALL");
 
   const filteredAssets = useMemo(() => {
     return assets.filter((a) => {
@@ -111,14 +111,11 @@ export function DesktopAssetModal({
 
       if (!matchSearch) return false;
 
-      if (activeTab === "STOCKS") {
-        return (a as any).category === "stocks" || (!a.label.includes("/") && a.label !== "Crypto IDX");
-      }
       if (activeTab === "FOREX") {
-        return (a as any).category === "forex" || a.label.includes("/");
+        return a.label.includes("OTC") || a.label.includes("/");
       }
       if (activeTab === "HIGH_PAYOUT") {
-        return a.payout >= 88;
+        return a.payout >= 86;
       }
       return true;
     });
@@ -201,14 +198,6 @@ export function DesktopAssetModal({
                 Tümü ({assets.length})
               </button>
               <button
-                onClick={() => setActiveTab("STOCKS")}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                  activeTab === "STOCKS" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
-                }`}
-              >
-                Hisseler / Şirketler
-              </button>
-              <button
                 onClick={() => setActiveTab("FOREX")}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                   activeTab === "FOREX" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
@@ -223,7 +212,7 @@ export function DesktopAssetModal({
                 }`}
               >
                 <Sparkles size={11} className={activeTab === "HIGH_PAYOUT" ? "text-amber-500" : "text-amber-400"} />
-                <span>%88+ Kazanç</span>
+                <span>%86+ Kazanç</span>
               </button>
             </div>
           </div>
@@ -261,8 +250,8 @@ export function DesktopAssetModal({
                   >
                     {/* Asset info */}
                     <div className="col-span-6 flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 flex items-center justify-center shrink-0">
-                        <AssetIcon label={item.label} size={24} />
+                      <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <AssetIcon label={item.label} size={22} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -396,8 +385,8 @@ export function DesktopTradeStation({
           title="Varlık Değiştir (Tıklayın)"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-9 w-9 flex items-center justify-center shrink-0">
-              <AssetIcon label={asset.label} size={24} />
+            <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+              <AssetIcon label={asset.label} size={22} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
