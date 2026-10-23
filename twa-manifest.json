@@ -1,0 +1,38 @@
+{
+  "packageId": "com.obyotrade.app",
+  "host": "ais-pre-4shokb4vbcakivct3hcp6f-786403921162.europe-west2.run.app",
+  "name": "Obyo Option",
+  "launcherName": "Obyo",
+  "display": "standalone",
+  "themeColor": "#000000",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#000000",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "http://localhost:3000/pwa-icon-512.png",
+  "maskableIconUrl": "http://localhost:3000/pwa-icon-512.png",
+  "appVersionName": "1.0.1",
+  "appVersion": "1.0.1",
+  "appVersionCode": 2,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": true,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap",
+  "webManifestUrl": "http://localhost:3000/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "minSdkVersion": 24,
+  "fullScopeUrl": "https://ais-pre-4shokb4vbcakivct3hcp6f-786403921162.europe-west2.run.app/",
+  "orientation": "portrait"
+}

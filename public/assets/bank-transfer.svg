@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <!-- Globe Gradients -->
+    <radialGradient id="globeGrad" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#EBF0F8"/>
+      <stop offset="60%" stop-color="#CAD3E2"/>
+      <stop offset="100%" stop-color="#8F9EBA"/>
+    </radialGradient>
+    <linearGradient id="orbitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6A7D9B" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#4A5C7A" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <!-- Gold Coin Gradient -->
+    <radialGradient id="goldCoin" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFE766"/>
+      <stop offset="45%" stop-color="#FFA800"/>
+      <stop offset="90%" stop-color="#E66A00"/>
+      <stop offset="100%" stop-color="#B84800"/>
+    </radialGradient>
+
+    <!-- Gold Coin Center Glow -->
+    <radialGradient id="goldCenter" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FFF28F"/>
+      <stop offset="50%" stop-color="#FF9900"/>
+      <stop offset="100%" stop-color="#CC5200"/>
+    </radialGradient>
+
+    <!-- Drop Shadow -->
+    <filter id="coinShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="centerCoinShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Back Orbit Lines -->
+  <g fill="none" stroke="url(#orbitGrad)" stroke-width="2.2" stroke-linecap="round">
+    <ellipse cx="128" cy="128" rx="106" ry="46" transform="rotate(-26 128 128)"/>
+    <ellipse cx="128" cy="128" rx="108" ry="44" transform="rotate(32 128 128)"/>
+    <ellipse cx="128" cy="128" rx="100" ry="70" transform="rotate(-5 128 128)"/>
+  </g>
+
+  <!-- Globe Base Sphere -->
+  <circle cx="128" cy="128" r="82" fill="url(#globeGrad)" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.3))"/>
+
+  <!-- Globe Latitude / Longitude Lines -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.55">
+    <!-- Latitudes -->
+    <ellipse cx="128" cy="100" rx="76" ry="18"/>
+    <ellipse cx="128" cy="128" rx="82" ry="22"/>
+    <ellipse cx="128" cy="156" rx="76" ry="18"/>
+    <!-- Longitudes -->
+    <ellipse cx="128" cy="128" rx="35" ry="82"/>
+    <ellipse cx="128" cy="128" rx="65" ry="82"/>
+    <line x1="128" y1="46" x2="128" y2="210"/>
+  </g>
+
+  <!-- Globe Continents (Stylized Vector) -->
+  <g fill="#8E9CB2" fill-opacity="0.65" clip-path="url(#globeClip)">
+    <clipPath id="globeClip">
+      <circle cx="128" cy="128" r="82"/>
+    </clipPath>
+    <!-- Europe & Africa -->
+    <path d="M120,68 Q132,60 142,65 Q148,75 140,82 Q130,86 125,80 Z"/>
+    <path d="M112,85 Q130,88 138,98 Q145,115 136,132 Q128,148 125,162 Q115,160 110,140 Q106,120 112,100 Z"/>
+    <path d="M142,100 Q155,104 160,118 Q155,130 144,124 Z"/>
+    <!-- Asia & Americas side hints -->
+    <path d="M148,70 Q168,72 178,86 Q172,98 158,92 Z"/>
+    <path d="M78,82 Q88,86 86,102 Q75,112 70,95 Z"/>
+    <path d="M80,120 Q92,130 88,148 Q76,155 72,138 Z"/>
+  </g>
+
+  <!-- Front Orbit Lines -->
+  <g fill="none" stroke="#8EA4C8" stroke-width="2.2" stroke-linecap="round" stroke-opacity="0.85">
+    <path d="M40,165 Q85,210 180,185" />
+    <path d="M30,110 Q100,50 215,85" />
+    <path d="M55,75 Q180,120 220,180" />
+  </g>
+
+  <!-- ── Orbiting Coins ── -->
+
+  <!-- Top-Left: GBP (£) -->
+  <g transform="translate(62, 38)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="18" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="15.5" fill="none" stroke="#FFE785" stroke-width="1.2"/>
+    <text x="0" y="5.5" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="900" fill="#1C1004" text-anchor="middle">£</text>
+  </g>
+
+  <!-- Top-Right: WON (₩) -->
+  <g transform="translate(192, 48)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="14" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#FFE785" stroke-width="1"/>
+    <text x="0" y="4.5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="#1C1004" text-anchor="middle">₩</text>
+  </g>
+
+  <!-- Right: EUR (€) -->
+  <g transform="translate(228, 115)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="21" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="18.5" fill="none" stroke="#FFE785" stroke-width="1.4"/>
+    <text x="0" y="7" font-family="system-ui, -apple-system, sans-serif" font-size="19" font-weight="900" fill="#1C1004" text-anchor="middle">€</text>
+  </g>
+
+  <!-- Bottom-Right: RUB / TL (₽) -->
+  <g transform="translate(202, 192)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="19" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="16.5" fill="none" stroke="#FFE785" stroke-width="1.3"/>
+    <text x="0" y="6.5" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="900" fill="#1C1004" text-anchor="middle">₽</text>
+  </g>
+
+  <!-- Bottom-Left: JPY / CNY (¥) -->
+  <g transform="translate(56, 204)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="21" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="18.5" fill="none" stroke="#FFE785" stroke-width="1.4"/>
+    <text x="0" y="6.5" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="900" fill="#1C1004" text-anchor="middle">¥</text>
+  </g>
+
+  <!-- Mid-Left: YEN (¥) / Node -->
+  <g transform="translate(28, 126)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="19" fill="url(#goldCoin)"/>
+    <circle cx="0" cy="0" r="16.5" fill="none" stroke="#FFE785" stroke-width="1.3"/>
+    <text x="0" y="6" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="900" fill="#1C1004" text-anchor="middle">¥</text>
+  </g>
+
+  <!-- ── Big Center Prominent Coin: USD ($) ── -->
+  <g transform="translate(126, 146)" filter="url(#centerCoinShadow)">
+    <circle cx="0" cy="0" r="28" fill="url(#goldCenter)"/>
+    <circle cx="0" cy="0" r="25" fill="none" stroke="#FFF5B8" stroke-width="2"/>
+    <text x="0" y="10" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#1A0D00" text-anchor="middle">$</text>
+  </g>
+</svg>

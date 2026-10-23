@@ -1,0 +1,6 @@
+{
+  "name": "Obyo Option",
+  "description": "Gerçek zamanlı piyasa grafikleri, demo ve gerçek hesap, ikili opsiyon işlemleri ve cüzdan yönetimi sunan modern PWA ticaret platformu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

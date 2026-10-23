@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="tr" style="background-color: #000000; background: #000000; color: #ffffff;">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body, #root {
+        background-color: #000000 !important;
+        background: #000000 !important;
+        color: #ffffff;
+      }
+
+      /* ── Pure CSS Hardware-Level Landscape Lock for iPhone & Mobile Phones ── */
+      #mobile-landscape-lock {
+        display: none;
+      }
+
+      @media screen and (orientation: landscape) and (min-width: 520px) and (max-height: 500px) and (max-device-width: 1024px) {
+        #mobile-landscape-lock {
+          display: flex !important;
+          position: fixed !important;
+          inset: 0 !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          z-index: 2147483647 !important;
+          background-color: #000000 !important;
+          background: #000000 !important;
+          color: #ffffff !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 24px !important;
+          text-align: center !important;
+          box-sizing: border-box !important;
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          touch-action: none !important;
+        }
+        #mobile-landscape-lock .lock-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          max-width: 320px;
+        }
+        #mobile-landscape-lock .lock-icon-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 20px;
+        }
+        #mobile-landscape-lock .device-rotate-wrap {
+          position: relative;
+          width: 60px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        #mobile-landscape-lock .lock-ring {
+          width: 60px;
+          height: 60px;
+          color: rgba(255, 255, 255, 0.9);
+          animation: obyo-spin 3.5s linear infinite;
+          transform-origin: center center;
+          display: block;
+        }
+        #mobile-landscape-lock .phone-center {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+        #mobile-landscape-lock .lock-title {
+          font-size: 18px;
+          font-weight: 900;
+          color: #ffffff;
+          margin: 0 0 8px 0;
+          letter-spacing: -0.02em;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        #mobile-landscape-lock .lock-desc {
+          font-size: 13px;
+          line-height: 1.5;
+          color: rgba(255, 255, 255, 0.6);
+          margin: 0;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        @keyframes obyo-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <title>Obyo Option — İkili Opsiyon Trading</title>
+    <meta name="description" content="Obyo Option — Forex ve OTC varlıklarla profesyonel ikili opsiyon trading platformu." />
+    <meta name="keywords" content="obyo option, ikili opsiyon, binary options, forex trading, OTC, opsiyon platformu" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://obyo.io/" />
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://obyo.io/" />
+    <meta property="og:title" content="Obyo Option — İkili Opsiyon Trading" />
+    <meta property="og:description" content="Forex ve OTC varlıklarla profesyonel ikili opsiyon trading platformu." />
+    <meta property="og:image" content="/opengraph.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Obyo Option" />
+    <meta name="twitter:description" content="Profesyonel ikili opsiyon trading platformu." />
+
+    <!-- PWA core -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="background-color" content="#000000" />
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- Favicon — logo.jpg (primary, overrides favicon.svg) -->
+    <link rel="icon" type="image/jpeg" href="%BASE_URL%logo.jpg" sizes="any" />
+    <link rel="shortcut icon" type="image/jpeg" href="%BASE_URL%logo.jpg" />
+
+    <!-- iOS PWA — CRITICAL for home screen icon -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Obyo Option" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%apple-touch-icon.png" />
+
+    <!-- Direct Mobile Orientation Lock (Portrait Only - No Warnings) -->
+    <meta name="screen-orientation" content="portrait" />
+    <meta name="x5-orientation" content="portrait" />
+    <meta name="x5-page-mode" content="app" />
+    <meta name="browsermode" content="application" />
+    <script>
+      (function() {
+        function lock() {
+          try {
+            if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+              window.screen.orientation.lock("portrait").catch(function(){});
+              window.screen.orientation.lock("portrait-primary").catch(function(){});
+            }
+          } catch(e) {}
+        }
+        lock();
+        window.addEventListener("DOMContentLoaded", lock);
+        window.addEventListener("touchstart", lock, { passive: true });
+        window.addEventListener("orientationchange", lock);
+      })();
+    </script>
+
+    <!-- Android / Chrome PWA icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="%BASE_URL%pwa-icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="%BASE_URL%pwa-icon-512.png" />
+
+    <!-- Structured data — Organization + WebSite -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "name": "Obyo Option",
+          "url": "https://obyo.io",
+          "logo": "https://obyo.io/logo.jpg",
+          "description": "Obyo Option, Forex ve OTC varlıklarla profesyonel ikili opsiyon trading platformudur.",
+          "email": "privacy@obyo.io",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "85 Great Portland Street",
+            "addressLocality": "London",
+            "postalCode": "W1W 7LT",
+            "addressCountry": "GB"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "name": "Obyo Option",
+          "url": "https://obyo.io",
+          "description": "Forex ve OTC varlıklarla profesyonel ikili opsiyon trading platformu.",
+          "inLanguage": "tr"
+        }
+      ]
+    }
+    </script>
+
+    <!-- Preconnect fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  </head>
+  <body style="background-color: #000000; background: #000000; color: #ffffff;">
+    <!-- Hardware/CSS/DOM Level Mobile Landscape Lock for iPhone & All Phones -->
+    <div id="mobile-landscape-lock" style="display: none;">
+      <div class="lock-card">
+        <div class="lock-icon-wrap">
+          <div class="device-rotate-wrap">
+            <svg class="lock-ring" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Upper clockwise arc + arrowhead -->
+              <path d="M8 24 A 16 16 0 0 1 40 24" />
+              <path d="M35 18 L 40 24 L 45 18" />
+              <!-- Lower clockwise arc + arrowhead -->
+              <path d="M40 24 A 16 16 0 0 1 8 24" />
+              <path d="M3 30 L 8 24 L 13 30" />
+            </svg>
+            <div class="phone-center">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="3" ry="3" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <h2 class="lock-title">Yatay Mod Desteklenmemektedir</h2>
+        <p class="lock-desc">Obyo platformu telefonlarda yalnızca dikey (portre) modda çalışmaktadır. Lütfen cihazınızı dik konuma getirin.</p>
+      </div>
+    </div>
+    <script>
+      (function() {
+        var lockEl = document.getElementById("mobile-landscape-lock");
+        function checkOrient() {
+          if (!lockEl) lockEl = document.getElementById("mobile-landscape-lock");
+          if (!lockEl) return;
+          var w = window.innerWidth;
+          var h = window.innerHeight;
+          // In portrait on any smartphone, width is 360-430px (always < 520px). Keyboard resize keeps width < 520px.
+          if (w < 520) {
+            lockEl.style.display = "none";
+            return;
+          }
+          var minSide = Math.min(w, h);
+          var isMobilePhone = minSide <= 500 || /Android.*Mobile|iPhone|iPod/i.test(navigator.userAgent);
+          var hasLandscapeOrient = (typeof window.orientation !== "undefined" && Math.abs(window.orientation) === 90) ||
+                                   (window.screen && window.screen.orientation && window.screen.orientation.type && window.screen.orientation.type.indexOf("landscape") !== -1) ||
+                                   (w >= 560 && w > h * 1.3 && h <= 500);
+          if (isMobilePhone && hasLandscapeOrient) {
+            lockEl.style.display = "flex";
+          } else {
+            lockEl.style.display = "none";
+          }
+        }
+        window.addEventListener("orientationchange", function() { setTimeout(checkOrient, 50); setTimeout(checkOrient, 200); });
+        window.addEventListener("resize", checkOrient);
+        checkOrient();
+      })();
+    </script>
+    <div id="root" style="background-color: #000000; background: #000000;"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,2398 @@
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
+import { useAuth, type PaymentSettings, type CustomPaymentMethod, type CryptoPaymentMethod, DEFAULT_CRYPTO_METHODS, compressDataUrlIfNeeded } from "@/context/AuthContext";
+import { useAccountMode } from "@/context/AccountModeContext";
+import { useDemoAccount } from "@/context/DemoAccountContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { UsdtTrc20Icon } from "@/components/usdt-trc20-icon";
+import { UsdtErc20Icon } from "@/components/usdt-erc20-icon";
+import { BankTransferIcon } from "@/components/bank-transfer-icon";
+import { CreditCardIcon } from "@/components/credit-card-icon";
+import { CryptoIcon } from "@/components/crypto-icons";
+import { CryptoQrCode } from "@/components/crypto-qr";
+import { EducationPlatformNotice } from "@/components/EducationPlatformNotice";
+import { useIsTurkey } from "@/lib/use-country";
+import { useMarketRates } from "@/hooks/use-market-rates";
+import {
+  ArrowLeft, Copy, Check, Clock, AlertCircle, CheckCircle2,
+  Landmark, Zap, Bitcoin, ArrowDownCircle, ArrowUpCircle,
+  ChevronRight, ChevronDown, ChevronUp, Hash, LogIn, ArrowDownLeft, ArrowUpRight,
+  ShieldCheck, RefreshCw, Wallet as WalletIcon, ExternalLink,
+  CreditCard, QrCode, CircleDollarSign, Coins, FileText, Search,
+  UploadCloud, Eye, Trash2, X, Paperclip, Gift, TrendingUp, TrendingDown, Minus,
+} from "lucide-react";
+import { listenUserClaims, type UserBonusClaim } from "@/lib/bonuses";
+
+/* ─── Fake QR code (SVG grid) ────────────────────────────────────────────── */
+function QRVisual({ data, imgSrc }: { data: string; imgSrc?: string }) {
+  if (imgSrc) {
+    return (
+      <div className="bg-black/50 border border-white/10 rounded-2xl p-1 shadow-lg inline-block">
+        <img src={imgSrc} alt="QR Code" style={{ width: 175, height: 175, objectFit: "contain", borderRadius: "12px" }} />
+      </div>
+    );
+  }
+
+  const S = 25, CS = 7;
+  const cells: boolean[] = [];
+  const inF = (r: number, c: number) =>
+    (r < 7 && c < 7) || (r < 7 && c >= S - 7) || (r >= S - 7 && c < 7);
+  for (let i = 0; i < S * S; i++) {
+    const r = Math.floor(i / S), c = i % S;
+    if (inF(r, c)) {
+      const lr = r < 7 ? r : r - (S - 7), lc = c < 7 ? c : c - (S - 7);
+      cells.push(lr === 0 || lr === 6 || lc === 0 || lc === 6 || (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4));
+      continue;
+    }
+    if (r === 6 || c === 6) { cells.push((r + c) % 2 === 0); continue; }
+    let h = 0;
+    for (let j = 0; j < data.length; j++) h = ((h * 31) ^ (data.charCodeAt(j) + i * 7)) & 0xffff;
+    cells.push((h ^ i * 0x9e37) % 3 !== 0);
+  }
+  const total = S * CS;
+  return (
+    <div style={{ background: "#fff", padding: 12, borderRadius: 20, display: "inline-block", boxShadow: "0 8px 30px rgba(0,0,0,0.4)" }}>
+      <svg width={total} height={total}>
+        {cells.map((on, idx) => {
+          if (!on) return null;
+          const r = Math.floor(idx / S), c = idx % S;
+          return <rect key={idx} x={c * CS} y={r * CS} width={CS} height={CS} fill="#000" rx={1} />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/* ─── 15-min countdown ───────────────────────────────────────────────────── */
+function Countdown({ startedAt }: { startedAt: number }) {
+  const { langCode } = useLanguage();
+  const [rem, setRem] = useState(15 * 60 - Math.floor((Date.now() - startedAt) / 1000));
+  useEffect(() => {
+    const iv = setInterval(() => setRem(Math.max(0, 15 * 60 - Math.floor((Date.now() - startedAt) / 1000))), 500);
+    return () => clearInterval(iv);
+  }, [startedAt]);
+  const mm = Math.floor(rem / 60).toString().padStart(2, "0");
+  const ss = (rem % 60).toString().padStart(2, "0");
+  const subText = langCode === "tr"
+    ? "içinde transferi tamamlayın"
+    : (langCode === "de" ? "verbleibend für Überweisung" : "remaining to complete transfer");
+  return (
+    <div className="flex items-center gap-2 rounded-xl px-4 py-3 border border-white/10 bg-white/[0.04]">
+      <Clock size={15} className="text-white" />
+      <span className="text-sm font-black font-mono tracking-wider text-white">{mm}:{ss}</span>
+      <span className="text-xs text-white flex-1">{subText}</span>
+    </div>
+  );
+}
+
+/* ─── Copy Button ────────────────────────────────────────────────────────── */
+function CopyBtn({ text }: { text: string }) {
+  const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={copy}
+      className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer select-none active:scale-95"
+      style={{
+        background: copied ? "rgba(14,203,129,0.15)" : "rgba(255,255,255,0.06)",
+        color: copied ? "#0ecb81" : "#ffffff90",
+        border: copied ? "1px solid rgba(14,203,129,0.3)" : "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+      {copied ? t.copied : t.copy}
+    </button>
+  );
+}
+
+/* ─── Constants & Types ──────────────────────────────────────────────────── */
+export type WalletTab = "deposit" | "withdraw" | "pending";
+type DepositStep = "method" | "amount" | "details" | "success";
+type WithdrawStep = "method" | "amount" | "success";
+
+interface MethodConfig {
+  id: string;
+  icon: React.ElementType;
+  label: string;
+  sub: string;
+  badge?: string;
+  color: string;
+  min: number;
+  currency: string;
+  customData?: CustomPaymentMethod;
+  cryptoData?: CryptoPaymentMethod;
+}
+
+export default function WalletPage() {
+  const [, navigate] = useLocation();
+  const { currentUser, requests, addRequest, paymentSettings, isRejectionViewed, markRejectionsAsViewed } = useAuth();
+  const { isReal, currency, currencySymbol, isBalanceHidden, toggleBalanceHidden } = useAccountMode();
+  const { completedTrades = [] } = useDemoAccount();
+  const { t, langCode } = useLanguage();
+
+  const isTL = (currentUser?.currency || currency) === "TL";
+  const userSym = isTL ? "₺" : "$";
+  const userCurrCode = isTL ? "TL" : "USD";
+  const { usdTryRate, getCoinPriceUSD, getCoinPriceTRY, getCalculatedCrypto } = useMarketRates();
+  const USD_TRY_RATE = usdTryRate; // Dynamic live rate from API (e.g. ~48-49 TL)
+  const baseDepositMin = isTL ? 480 : 10;
+  const withdrawMin = isTL ? 150 : 5;
+
+  const isTurkey = useIsTurkey();
+
+  // ── Günlük Sıfırlanan Kâr / Zarar Hesaplaması ─────────────────────────────
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { walletTodayPnl, walletTodayPercent } = useMemo(() => {
+    // Bugünün başlangıcı (00:00:00)
+    const todayDate = new Date(nowTick);
+    todayDate.setHours(0, 0, 0, 0);
+    const startOfToday = todayDate.getTime();
+
+    // Sadece gerçek hesapta yapılan bugünkü işlemler (Wallet sayfası gerçek bakiye gösterir)
+    // Eğer real işlem yoksa ama kullanıcı demo modundaysa veya demo işlemleri varsa mode'a göre
+    const todayTrades = completedTrades.filter((tr) => {
+      const modeMatches = tr.mode === "real";
+      const closedAt = tr.closedAt || 0;
+      return modeMatches && closedAt >= startOfToday;
+    });
+
+    if (todayTrades.length === 0) {
+      return { walletTodayPnl: 0, walletTodayPercent: 0 };
+    }
+
+    const netPnl = todayTrades.reduce((sum, tr) => {
+      const net = tr.result === "WIN"
+        ? (typeof tr.profit === "number" && tr.profit > 0 ? tr.profit : tr.amount * 0.85)
+        : (typeof tr.profit === "number" && tr.profit < 0 ? tr.profit : -Math.abs(tr.amount));
+      return sum + net;
+    }, 0);
+
+    const currentBal = currentUser?.realBalance ?? 0;
+    const startingBal = currentBal - netPnl;
+    const baseBal = startingBal > 0 ? startingBal : (currentBal > 0 ? currentBal : 100);
+    const pct = baseBal > 0 ? (netPnl / baseBal) * 100 : 0;
+
+    return {
+      walletTodayPnl: Math.round(netPnl * 100) / 100,
+      walletTodayPercent: Math.round(pct * 100) / 100,
+    };
+  }, [completedTrades, currentUser?.realBalance, nowTick]);
+
+  const isWalletProfit = walletTodayPnl > 0.005;
+  const isWalletLoss = walletTodayPnl < -0.005;
+  const isWalletZero = !isWalletProfit && !isWalletLoss;
+
+  const walletPnlColorClass = isWalletProfit
+    ? "text-emerald-400"
+    : isWalletLoss
+    ? "text-rose-400"
+    : "text-neutral-400";
+
+  const walletPnlBgClass = isWalletProfit
+    ? "bg-emerald-500/10 border-emerald-500/25"
+    : isWalletLoss
+    ? "bg-rose-500/10 border-rose-500/25"
+    : "bg-white/[0.04] border-white/10";
+
+  // Değer formatı: TL hesabında TL (₺), Dolar hesabında Dolar ($)
+  // İkon zaten yönü belirttiği için + ve - işaretleri kaldırıldı
+  const absWalletPnlFormatted = Math.abs(walletTodayPnl).toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedWalletPnl = `${userSym}${absWalletPnlFormatted}`;
+  const formattedWalletPercent = `${Math.abs(walletTodayPercent).toFixed(2)}%`;
+
+  const [userClaims, setUserClaims] = useState<UserBonusClaim[]>([]);
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = listenUserClaims(currentUser.id, currentUser.email, setUserClaims);
+    return () => unsub();
+  }, [currentUser]);
+
+  const activeDepositBonus = userClaims.find(
+    (c) => c.type === "deposit_match" && c.status === "activated" && c.expiresAt > Date.now()
+  );
+
+  const [depositFilterCategory, setDepositFilterCategory] = useState<"all" | "bank" | "crypto">("all");
+  const [cryptoSearchTerm, setCryptoSearchTerm] = useState("");
+
+  const getCoinColor = (coin: string): string => {
+    const sym = (coin || "").toUpperCase();
+    switch (sym) {
+      case "USDT": return "#26A17B";
+      case "BTC": return "#F7931A";
+      case "ETH": return "#627EEA";
+      case "SOL": return "#14F195";
+      case "TON": return "#0088CC";
+      case "BNB": return "#F3BA2F";
+      case "XRP": return "#00AAE4";
+      case "DOGE": return "#C2A633";
+      case "SHIB": return "#E65E26";
+      case "PEPE": return "#4B8C3A";
+      case "AVAX": return "#E84142";
+      case "LTC": return "#345D9D";
+      default: return "#9B51E0";
+    }
+  };
+
+  const formattedUsdTry = (usdTryRate || 48.00).toFixed(2);
+  const getBankWireSub = (isTLAccount: boolean) => {
+    if (isTLAccount) return t.bankWireTr;
+    return (t.bankWireTrSub || "TR Banka Transferi · 1 USD = {rate} TL")
+      .replace("{rate}", formattedUsdTry)
+      .replace("38.00", formattedUsdTry)
+      .replace("38", formattedUsdTry);
+  };
+
+  // Dynamic deposit methods based on admin settings (enabled / disabled & custom methods)
+  const depositMethods: MethodConfig[] = [];
+
+  // 1. Havale / EFT
+  if (paymentSettings.ibanEnabled !== false && isTurkey) {
+    depositMethods.push({
+      id: "iban",
+      icon: BankTransferIcon,
+      label: isTL ? t.bankWire : t.wireTransfer,
+      sub: getBankWireSub(isTL),
+      color: "#FFA800",
+      min: baseDepositMin,
+      currency: isTL ? "TL" : "USD",
+    });
+  }
+
+  // 1.5 Kredi Kartı ile Yatırım
+  if (paymentSettings.creditCardEnabled !== false) {
+    depositMethods.push({
+      id: "credit-card",
+      icon: CreditCardIcon,
+      label: t.creditCard,
+      sub: paymentSettings.creditCardDescription || t.creditCardSub,
+      color: "#8B5CF6",
+      min: baseDepositMin,
+      currency: isTL ? "TL" : "USD",
+    });
+  }
+
+  // 2. Kripto Para Yöntemleri (Admin tarafından açılan/kapatılan tüm kriptolar)
+  const availableCryptos = (paymentSettings.cryptoMethods && paymentSettings.cryptoMethods.length > 0)
+    ? paymentSettings.cryptoMethods
+    : DEFAULT_CRYPTO_METHODS;
+
+  const isIgnoredBadge = (b?: string | null) => {
+    if (!b) return true;
+    const lower = b.toLowerCase().trim();
+    return (
+      lower.includes("hızlı") ||
+      lower.includes("hizli") ||
+      lower.includes("fast") ||
+      lower.includes("ana") ||
+      lower.includes("main") ||
+      lower.includes("major")
+    );
+  };
+
+  availableCryptos.forEach((cm) => {
+    if (cm.enabled === false) return;
+    depositMethods.push({
+      id: cm.id,
+      icon: (props: any) => <CryptoIcon coin={cm.coin} size={props?.size || 28} />,
+      label: `${cm.coin} · ${cm.name}`,
+      sub: cm.network,
+      badge: isIgnoredBadge(cm.badge) ? undefined : cm.badge,
+      color: getCoinColor(cm.coin),
+      min: baseDepositMin,
+      currency: cm.coin,
+      cryptoData: cm,
+    });
+  });
+
+  // 3. Custom Payment Methods added by Admin
+  (paymentSettings.customMethods || []).forEach((cm) => {
+    if (cm.enabled === false) return;
+
+    let IconComp: React.ElementType = WalletIcon;
+    if (cm.iconType === "bank") IconComp = Landmark;
+    else if (cm.iconType === "crypto") IconComp = Bitcoin;
+    else if (cm.iconType === "card") IconComp = CreditCard;
+    else if (cm.iconType === "qr") IconComp = QrCode;
+    else if (cm.iconType === "dollar") IconComp = CircleDollarSign;
+
+    depositMethods.push({
+      id: cm.id,
+      icon: IconComp,
+      label: cm.name,
+      sub: cm.subtitle || `${cm.currency} ile transfer`,
+      badge: isIgnoredBadge(cm.badge) ? undefined : cm.badge,
+      color: cm.color || "#9B51E0",
+      min: baseDepositMin,
+      currency: cm.currency || (isTL ? "TL" : "USD"),
+      customData: cm,
+    });
+  });
+
+  const withdrawMethods: MethodConfig[] = [
+    ...(isTurkey ? [{
+      id: "iban",
+      icon: BankTransferIcon,
+      label: isTL ? t.bankWire : t.wireTransfer,
+      sub: getBankWireSub(isTL),
+      color: "#FFA800",
+      min: withdrawMin,
+      currency: isTL ? "TL" : "USD",
+    }] : []),
+    ...(paymentSettings.creditCardEnabled !== false ? [{
+      id: "credit-card",
+      icon: CreditCardIcon,
+      label: t.creditCardWithdrawal,
+      sub: paymentSettings.creditCardDescription || t.creditCardSub,
+      color: "#8B5CF6",
+      min: withdrawMin,
+      currency: isTL ? "TL" : "USD",
+    }] : []),
+    ...availableCryptos.filter(c => c.enabled !== false).map((cm) => ({
+      id: cm.id,
+      icon: (props: any) => <CryptoIcon coin={cm.coin} size={props?.size || 28} />,
+      label: `${cm.coin} · ${cm.name}`,
+      sub: cm.network,
+      badge: isIgnoredBadge(cm.badge) ? undefined : cm.badge,
+      color: getCoinColor(cm.coin),
+      min: withdrawMin,
+      currency: cm.coin,
+      cryptoData: cm,
+    })),
+  ];
+
+  // Read tab parameter from URL search or default to "deposit"
+  const getInitialTab = (): WalletTab => {
+    try {
+      const search = window.location.search;
+      const params = new URLSearchParams(search);
+      const tParam = params.get("tab");
+      if (tParam === "withdraw" || tParam === "pending" || tParam === "deposit") {
+        return tParam;
+      }
+    } catch {
+      // ignore
+    }
+    return "deposit";
+  };
+
+  const [tab, setTab] = useState<WalletTab>(getInitialTab);
+  const [dStep, setDStep] = useState<DepositStep>("method");
+  const [wStep, setWStep] = useState<WithdrawStep>("method");
+  const [method, setMethod] = useState<MethodConfig | null>(null);
+  const [amount, setAmount] = useState("");
+  const [destination, setDestination] = useState("");
+  const [countdownAt, setCountdownAt] = useState<number | null>(null);
+  const [refCode] = useState(() => `OBY-${Math.floor(100000 + Math.random() * 900000)}`);
+  const transferCode = paymentSettings.ibanDescription?.trim() || refCode;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedReqs, setExpandedReqs] = useState<Record<string, boolean>>({});
+  const toggleExpandReq = (id: string) => {
+    setExpandedReqs(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Receipt upload states for IBAN / Havale deposit
+  const [receiptFile, setReceiptFile] = useState<{
+    dataUrl: string;
+    name: string;
+    size: number;
+  } | null>(null);
+  const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
+  const [previewReceiptModal, setPreviewReceiptModal] = useState<{ url: string; name?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const handleReceiptChange = async (file: File | null) => {
+    if (!file) return;
+    setReceiptError(null);
+
+    // Check size limit: max 15MB
+    if (file.size > 15 * 1024 * 1024) {
+      setReceiptError("Dosya boyutu 15 MB'dan küçük olmalıdır.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setReceiptError("Lütfen geçerli bir resim formatı yükleyiniz (JPG, PNG, WEBP).");
+      return;
+    }
+
+    setIsProcessingReceipt(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const rawData = ev.target?.result as string;
+        if (!rawData) {
+          setIsProcessingReceipt(false);
+          setReceiptError("Dosya okunamadı, lütfen tekrar deneyiniz.");
+          return;
+        }
+
+        try {
+          const compressed = await compressDataUrlIfNeeded(rawData, 1200, 0.75);
+          setReceiptFile({
+            dataUrl: compressed,
+            name: file.name,
+            size: Math.round(compressed.length * 0.75),
+          });
+        } catch {
+          setReceiptFile({
+            dataUrl: rawData,
+            name: file.name,
+            size: file.size,
+          });
+        }
+        setIsProcessingReceipt(false);
+      };
+      reader.onerror = () => {
+        setIsProcessingReceipt(false);
+        setReceiptError("Dosya yüklenirken bir hata oluştu.");
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsProcessingReceipt(false);
+      setReceiptError(err?.message || "Dekont işlenirken hata oluştu.");
+    }
+  };
+
+  // Focus input when moving to amount step
+  useEffect(() => {
+    if (dStep === "amount" || wStep === "amount") {
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [dStep, wStep]);
+
+  // Active user requests
+  const userRequests = requests.filter(r => currentUser && (
+    r.userId === currentUser.id ||
+    (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase())
+  ));
+  const pendingRequests = userRequests.filter(r => r.status === "pending");
+  const unviewedRejections = userRequests.filter(r => r.status === "rejected" && !isRejectionViewed(r));
+
+  // Sync tab with URL search if changed externally
+  useEffect(() => {
+    try {
+      const search = window.location.search;
+      const params = new URLSearchParams(search);
+      const tParam = params.get("tab");
+      if (tParam === "withdraw" || tParam === "pending" || tParam === "deposit") {
+        setTab(tParam as WalletTab);
+      }
+    } catch {}
+  }, []);
+
+  // When user enters transactions tab, clear rejected notifications immediately
+  useEffect(() => {
+    if (tab === "pending") {
+      const unviewed = userRequests.filter(r => r.status === "rejected" && !isRejectionViewed(r));
+      if (unviewed.length > 0) {
+        markRejectionsAsViewed(unviewed.map(r => r.id));
+      }
+    }
+  }, [tab, userRequests, isRejectionViewed, markRejectionsAsViewed]);
+
+  const switchTab = (newTab: WalletTab) => {
+    setTab(newTab);
+    if (newTab === "deposit") resetDeposit();
+    if (newTab === "withdraw") resetWithdraw();
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", newTab);
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  };
+
+  const selectDepositMethod = (m: MethodConfig) => {
+    if (paymentSettings?.educationModeEnabled) {
+      alert(t.educationModeNotice || "Bu bir eğitim platformudur. Gerçek para yatırılamaz.");
+      return;
+    }
+    setMethod(m);
+    setAmount("");
+    setReceiptFile(null);
+    setReceiptError(null);
+    setDStep("amount");
+  };
+
+  const selectWithdrawMethod = (m: MethodConfig) => {
+    if (paymentSettings?.educationModeEnabled) {
+      alert(t.educationModeNotice || "Bu bir eğitim platformudur. Para çekme yapılamaz.");
+      return;
+    }
+    setMethod(m);
+    setAmount("");
+    setDestination("");
+    setWStep("amount");
+  };
+
+  const handleDepositDetails = () => {
+    if (!method || !amount || parseFloat(amount) < method.min) return;
+    setReceiptError(null);
+    setDStep("details");
+    if (method.id !== "iban") {
+      setCountdownAt(Date.now());
+    }
+  };
+
+  const notifyTelegram = (payload: {
+    type: "deposit" | "withdraw";
+    userName: string;
+    userEmail?: string;
+    amount: number;
+    currency: string;
+    method: string;
+    hasReceipt?: boolean;
+    destination?: string;
+  }) => {
+    if (paymentSettings?.telegramEnabled === false) return;
+    if (payload.type === "deposit" && paymentSettings?.telegramNotifyDeposits === false) return;
+    if (payload.type === "withdraw" && paymentSettings?.telegramNotifyWithdrawals === false) return;
+
+    fetch("/api/notify/telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        botToken: paymentSettings?.telegramBotToken,
+        chatId: paymentSettings?.telegramChatId,
+      }),
+    }).catch(() => { /* fire-and-forget */ });
+  };
+
+  const handleSentDeposit = async () => {
+    if (!currentUser || !method) return;
+
+    // Check if IBAN transfer requires receipt (controlled by Admin panel)
+    const isReceiptMandatory = paymentSettings?.ibanReceiptRequired !== false;
+    if (method.id === "iban" && isReceiptMandatory && !receiptFile?.dataUrl) {
+      setReceiptError("Banka havale/EFT transferi için lütfen transfer dekontunu yükleyiniz.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const userName = `${currentUser.name} ${currentUser.surname}`;
+      const numAmt = parseFloat(amount);
+
+      let methodLabelWithCode = method.label;
+      if (method.customData) {
+        const code = method.customData.transferCode?.trim();
+        methodLabelWithCode = `${method.label}${code ? ` (${code})` : ""}`;
+      } else if (method.id === "iban") {
+        methodLabelWithCode = `${method.label} (${transferCode})`;
+      }
+
+      const dest = method.cryptoData?.address
+        || (method.id === "trc20" ? paymentSettings.trc20Address : method.id === "crypto" ? paymentSettings.erc20Address : "")
+        || method.customData?.accountNumber
+        || "";
+
+      let finalMethodLabel = methodLabelWithCode;
+      let bonusAmountToAdd = 0;
+      let cryptoSendInfo = "";
+      if (method.cryptoData || method.id === "trc20" || method.id === "crypto") {
+        const coinSym = method.cryptoData?.coin || (method.id === "trc20" || method.id === "crypto" ? "USDT" : method.currency);
+        const calc = getCalculatedCrypto(numAmt, coinSym, isTL);
+        cryptoSendInfo = `${calc.cryptoAmountFormatted} ${coinSym}`;
+      }
+
+      if (activeDepositBonus) {
+        bonusAmountToAdd = (numAmt * activeDepositBonus.amount) / 100;
+        finalMethodLabel = `${methodLabelWithCode} ${cryptoSendInfo ? `[${cryptoSendInfo}] ` : ""}(+%${activeDepositBonus.amount} Bonus: +${bonusAmountToAdd.toFixed(2)} ${userCurrCode})`;
+      } else if (cryptoSendInfo) {
+        finalMethodLabel = `${methodLabelWithCode} [${cryptoSendInfo}]`;
+      }
+
+      const reqPayload: any = {
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        userName,
+        type: "deposit",
+        amount: numAmt,
+        currency: isTL ? "TL" : "USD",
+        method: finalMethodLabel,
+        destination: dest,
+      };
+      if (cryptoSendInfo) {
+        reqPayload.cryptoAmount = cryptoSendInfo;
+      }
+      if (activeDepositBonus) {
+        reqPayload.bonusPercent = activeDepositBonus.amount;
+        reqPayload.bonusAmount = bonusAmountToAdd;
+        reqPayload.bonusClaimId = activeDepositBonus.id;
+      }
+      if (receiptFile?.dataUrl) reqPayload.receiptUrl = receiptFile.dataUrl;
+      if (receiptFile?.name) reqPayload.receiptName = receiptFile.name;
+      await addRequest(reqPayload);
+
+      notifyTelegram({
+        type: "deposit",
+        userName,
+        userEmail: currentUser.email,
+        amount: numAmt,
+        currency: isTL ? "TL" : "USD",
+        method: finalMethodLabel,
+        destination: dest,
+        hasReceipt: Boolean(receiptFile?.dataUrl),
+      });
+
+      setReceiptFile(null);
+      setReceiptError(null);
+      setDStep("success");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "İşlem sırasında bir hata oluştu.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!currentUser || !method || !amount || !destination) return;
+    if (currentUser.kycStatus !== "verified") return;
+    const val = parseInt(amount, 10);
+    if (isNaN(val) || val < withdrawMin || val > currentUser.realBalance) return;
+    setIsSubmitting(true);
+    try {
+      const userName = `${currentUser.name} ${currentUser.surname}`;
+      await addRequest({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        userName,
+        type: "withdraw",
+        amount: val,
+        currency: method.currency,
+        method: method.label,
+        destination,
+      });
+      notifyTelegram({
+        type: "withdraw",
+        userName,
+        userEmail: currentUser.email,
+        amount: val,
+        currency: method.currency,
+        method: method.label,
+        destination,
+      });
+      setWStep("success");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetDeposit = () => {
+    setDStep("method");
+    setMethod(null);
+    setAmount("");
+    setCountdownAt(null);
+  };
+
+  const resetWithdraw = () => {
+    setWStep("method");
+    setMethod(null);
+    setAmount("");
+    setDestination("");
+  };
+
+  const handleBack = () => {
+    if (tab === "deposit") {
+      if (dStep === "details") { setDStep("amount"); return; }
+      if (dStep === "amount") { setDStep("method"); return; }
+    }
+    if (tab === "withdraw") {
+      if (wStep === "amount") { setWStep("method"); return; }
+    }
+    navigate("/");
+  };
+
+  /* Education Mode Gate: Balance & Wallet page completely closed */
+  if (paymentSettings?.educationModeEnabled) {
+    return <EducationPlatformNotice />;
+  }
+
+  /* Not logged in gate */
+  if (!currentUser) {
+    return (
+      <div className="flex-1 flex flex-col h-full bg-[#050505] text-white overflow-y-auto">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 bg-black/60 backdrop-blur-md sticky top-0 z-20">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs font-bold text-white/60 hover:text-white transition-colors cursor-pointer">
+            <ArrowLeft size={16} /> {t.back}
+          </button>
+          <div className="w-16" />
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto my-auto">
+          <h2 className="text-xl font-black text-white mb-2">{t.needLogin}</h2>
+          <p className="text-sm text-white/45 leading-relaxed mb-6">
+            {t.needLoginDesc}
+          </p>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate("/auth")}
+            className="w-full py-4 rounded-2xl text-sm font-black text-black cursor-pointer shadow-lg"
+            style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
+          >
+            {t.loginRegister}
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
+
+  const realBal = currentUser.realBalance ?? 0;
+  const currencySym = currentUser.currency === "TL" ? "₺" : "$";
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-[#050505] text-white overflow-hidden max-w-4xl mx-auto w-full">
+      {/* ── Modern Crypto Quick Overview Card ─────────────────────────────── */}
+      <div className="px-4 pt-3 pb-2 shrink-0">
+        <div
+          className="relative rounded-3xl p-5 overflow-hidden border border-white/10"
+          style={{
+            background: "linear-gradient(145deg, #121318 0%, #0c0d12 50%, #07080a 100%)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.65)",
+          }}
+        >
+          {/* Subtle Ambient Glow */}
+          <div
+            className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-36 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(255,107,0,0.14), transparent 70%)" }}
+          />
+
+          {/* Centered Balance Title */}
+          <div className="relative mb-2 flex items-center justify-center gap-2">
+            <span className="text-[10px] sm:text-[11px] font-bold text-white/40 uppercase tracking-widest text-center">
+              {t.realWalletBalance}
+            </span>
+          </div>
+
+          {/* Centered Large Balance Display */}
+          <div 
+            className="relative flex items-baseline justify-center gap-2 mb-2 select-none group text-center"
+            title={isBalanceHidden ? "Bakiye Gizli" : "Bakiye Görünür"}
+          >
+            <span className="text-3xl sm:text-4xl font-semibold text-white tracking-tight group-hover:text-white/90 transition-colors drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
+              {isBalanceHidden
+                ? (isTL ? "*****₺" : "*****$")
+                : `${userSym}${realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </span>
+            <span className="text-xs font-medium text-white/40 tracking-wider">{userCurrCode}</span>
+          </div>
+
+          {/* Günlük Sıfırlanan Kâr / Zarar & Yüzde (Arka plansız, çerçevesiz, ikonlu - bakiye gizlendiğinde görünmez olur ama buton konumu asla değişmez) */}
+          <div className={`flex items-center justify-center mb-5 h-5 transition-opacity ${
+            isBalanceHidden ? "invisible pointer-events-none" : "visible"
+          }`}>
+            <div
+              className={`inline-flex items-center gap-1.5 text-[11.5px] font-mono font-semibold tracking-tight transition-colors ${walletPnlColorClass}`}
+              title={t.dailyPnlTitle}
+            >
+              {isWalletProfit ? (
+                <TrendingUp size={13} className="shrink-0 text-emerald-400" />
+              ) : isWalletLoss ? (
+                <TrendingDown size={13} className="shrink-0 text-rose-400" />
+              ) : (
+                <Minus size={12} className="shrink-0 text-neutral-400" />
+              )}
+              <span>{formattedWalletPnl}</span>
+              <span className="opacity-80">({formattedWalletPercent})</span>
+            </div>
+          </div>
+
+          {/* Quick Action Tabs - Completely Circular Buttons with Labels Underneath */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-xs mx-auto">
+            {/* Yatır (Deposit) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("deposit")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 border ${
+                  tab === "deposit"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.depositBtn}
+              >
+                <ArrowDownLeft size={20} strokeWidth={2.2} className={tab === "deposit" ? "text-neutral-200" : "text-neutral-400"} />
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "deposit" ? "text-white" : "text-white/60"}`}>
+                {t.depositBtn}
+              </span>
+            </div>
+
+            {/* Çek (Withdraw) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("withdraw")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 border ${
+                  tab === "withdraw"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.withdrawBtn}
+              >
+                <ArrowUpRight size={20} strokeWidth={2.2} className={tab === "withdraw" ? "text-neutral-200" : "text-neutral-400"} />
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "withdraw" ? "text-white" : "text-white/60"}`}>
+                {t.withdrawBtn}
+              </span>
+            </div>
+
+            {/* İşlemler (Transactions) */}
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => switchTab("pending")}
+                className={`h-12 w-12 sm:h-13 sm:w-13 rounded-full flex items-center justify-center transition-all relative cursor-pointer active:scale-95 border ${
+                  tab === "pending"
+                    ? "bg-white/20 border-white/40 shadow-[0_4px_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+                    : "bg-white/[0.06] hover:bg-white/12 border-white/10"
+                }`}
+                title={t.transactionsTab}
+              >
+                <Clock size={20} strokeWidth={2.2} className={tab === "pending" ? "text-neutral-200" : "text-neutral-400"} />
+                {pendingRequests.length > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-[#FFB800] absolute top-1 right-1 ring-2 ring-[#0c0d12] animate-pulse" />
+                ) : unviewedRejections.length > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-[#f6465d] absolute top-1 right-1 ring-2 ring-[#0c0d12]" />
+                ) : null}
+              </button>
+              <span className={`text-[11px] sm:text-xs font-semibold tracking-tight select-none text-center ${tab === "pending" ? "text-white" : "text-white/60"}`}>
+                {t.transactionsTab}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Scrollable Tab Content ──────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 pb-8 w-full max-w-full">
+        <div className="max-w-xl mx-auto flex flex-col gap-4 w-full max-w-full overflow-hidden">
+
+          {/* Rejection Notification Banner */}
+          {tab !== "pending" && unviewedRejections.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => switchTab("pending")}
+              className="p-3 rounded-2xl bg-[#f6465d]/10 border border-[#f6465d]/25 flex items-center justify-between cursor-pointer hover:bg-[#f6465d]/15 transition-colors"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-7 w-7 rounded-xl bg-[#f6465d]/20 flex items-center justify-center shrink-0">
+                  <AlertCircle size={14} className="text-[#f6465d]" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-white block truncate">
+                    {t.requestRejectedTitle}
+                  </span>
+                  <span className="text-[11px] text-white/60 block truncate">
+                    {unviewedRejections[0].rejectionReason || (t.rejectionReasonLabel || "Detaylar")}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-[#f6465d] shrink-0 ml-2">
+                {t.review} →
+              </span>
+            </motion.div>
+          )}
+
+          {/* ═════════════════ TAB: DEPOSIT ═════════════════ */}
+          {tab === "deposit" && (
+            <div className="flex flex-col gap-3">
+              {/* Active Deposit Bonus Banner */}
+              {activeDepositBonus && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FF6B00]/20 via-[#FFB800]/10 to-transparent border border-[#FF6B00]/35 flex items-center justify-between gap-3 shadow-lg shadow-[#FF6B00]/5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-[#FF6B00]/20 flex items-center justify-center text-[#FF6B00] shrink-0 border border-[#FF6B00]/30">
+                      <Gift size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-black text-white truncate">{activeDepositBonus.bonusTitle}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#FF6B00] text-black uppercase tracking-wider">
+                          +% {activeDepositBonus.amount} {t.active}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/70 leading-tight mt-0.5">
+                        {t.bonusAddedNotice.replace("%{amount}", activeDepositBonus.amount.toString())}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/bonuses")}
+                    className="text-[11px] font-bold text-[#FF6B00] hover:text-[#FFB800] transition-colors shrink-0 underline"
+                  >
+                    Detay
+                  </button>
+                </div>
+              )}
+
+              <AnimatePresence mode="wait">
+              {/* STEP 1: Select Method */}
+              {dStep === "method" && (
+                <motion.div
+                  key="dep-method"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-xs font-black uppercase tracking-wider text-white/40">
+                      {t.selectDepositMethod}
+                    </p>
+                    <span className="text-[11px] text-white/30">{t.zeroFee}</span>
+                  </div>
+
+                  {/* Category Pills & Search */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
+                      <button
+                        type="button"
+                        onClick={() => setDepositFilterCategory("all")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                          depositFilterCategory === "all" ? "bg-white/15 text-white" : "text-white/40 hover:text-white"
+                        }`}
+                      >
+                        {t.all} ({depositMethods.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDepositFilterCategory("crypto")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                          depositFilterCategory === "crypto" ? "bg-white/15 text-white" : "text-white/40 hover:text-white"
+                        }`}
+                      >
+                        <Bitcoin size={13} />
+                        {t.cryptoCurrencies} ({depositMethods.filter(m => m.cryptoData || m.id === "trc20" || m.id === "crypto").length})
+                      </button>
+                      {depositMethods.some(m => m.id === "iban") && (
+                        <button
+                          type="button"
+                          onClick={() => setDepositFilterCategory("bank")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                            depositFilterCategory === "bank" ? "bg-white/15 text-white" : "text-white/40 hover:text-white"
+                          }`}
+                        >
+                          <Landmark size={13} />
+                          {t.bankTransfer}
+                        </button>
+                      )}
+                    </div>
+
+                    {depositMethods.length > 3 && (
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+                        <input
+                          type="text"
+                          value={cryptoSearchTerm}
+                          onChange={(e) => setCryptoSearchTerm(e.target.value)}
+                          placeholder={t.searchCryptoOrMethod}
+                          className="w-full rounded-xl bg-black/50 border border-white/10 pl-8 pr-8 py-2 text-xs font-medium text-white outline-none focus:border-white/30 placeholder:text-white/30"
+                        />
+                        {cryptoSearchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setCryptoSearchTerm("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const filteredMethods = depositMethods.filter((m) => {
+                      if (depositFilterCategory === "bank") {
+                        if (m.id !== "iban" && m.customData?.iconType !== "bank") return false;
+                      } else if (depositFilterCategory === "crypto") {
+                        if (!m.cryptoData && m.id !== "trc20" && m.id !== "crypto") return false;
+                      }
+                      if (cryptoSearchTerm.trim()) {
+                        const q = cryptoSearchTerm.toLowerCase().trim();
+                        const match = `${m.label} ${m.sub} ${m.currency}`.toLowerCase();
+                        if (!match.includes(q)) return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredMethods.length === 0) {
+                      return (
+                        <div className="rounded-2xl p-6 bg-black/40 text-center flex flex-col items-center gap-2 my-2">
+                          <AlertCircle size={24} className="text-white/30" />
+                          <p className="text-xs font-bold text-white/60">{t.noDepositMethodFound}</p>
+                          <button
+                            type="button"
+                            onClick={() => { setDepositFilterCategory("all"); setCryptoSearchTerm(""); }}
+                            className="text-xs font-bold text-white hover:underline cursor-pointer"
+                          >
+                            {t.clearFilters}
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex flex-col gap-2">
+                        {filteredMethods.map((m) => {
+                          const Icon = m.icon;
+                          return (
+                            <motion.button
+                              key={m.id}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => selectDepositMethod(m)}
+                              className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left transition-all cursor-pointer h-[64px]"
+                              style={{
+                                background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
+                                border: "none",
+                              }}
+                            >
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                                <Icon size={28} style={{ color: m.color }} />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-white">{m.label}</span>
+                                  {m.badge && (
+                                    <span
+                                      className="text-[8px] font-black px-1.5 py-0.5 rounded-full"
+                                      style={{
+                                        backgroundColor: `${m.color}20`,
+                                        color: m.color,
+                                      }}
+                                    >
+                                      {m.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-white/45 mt-0.5">{m.sub}</p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] font-bold text-white/35">
+                                  Min {isTL || m.currency === "TL" ? `₺${m.min}` : `$${m.min}`}
+                                </span>
+                                <ChevronRight size={14} className="text-white/25" />
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Security Badge */}
+                  <div className="flex items-center gap-2 rounded-2xl p-3.5 bg-white/[0.02] mt-2">
+                    <ShieldCheck size={16} className="text-[#0ecb81] shrink-0" />
+                    <p className="text-[11px] text-white/40 leading-relaxed">
+                      {t.sslSecurityNotice}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 2: Enter Amount */}
+              {dStep === "amount" && method && (
+                <motion.div
+                  key="dep-amount"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-4 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setDStep("method")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.chooseDifferentMethod}
+                  </button>
+
+                  <div className="rounded-2xl p-4 border border-white/10 bg-black/50 w-full max-w-full overflow-hidden">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <method.icon size={28} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-white truncate">{method.label}</p>
+                        <p className="text-[11px] text-white/40">
+                          {t.minDepositAmount} {isTL ? `₺${method.min}` : `$${method.min}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full max-w-full overflow-hidden">
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-2">
+                      {t.depositAmount} ({isTL ? "TL" : "USD"})
+                    </label>
+                    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black px-4 py-3.5 focus-within:border-[#0ecb81]/50 transition-colors w-full max-w-full overflow-hidden">
+                      <span className="text-2xl font-black text-white/30 shrink-0">
+                        {isTL ? "₺" : "$"}
+                      </span>
+                      <input
+                        ref={inputRef}
+                        type="number"
+                        inputMode="decimal"
+                        placeholder={`${method.min}`}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="flex-1 min-w-0 bg-transparent text-3xl font-black text-white outline-none placeholder:text-white/15"
+                      />
+                      <span className="text-xs font-black text-white/40 shrink-0">{isTL ? "TL" : "USD"}</span>
+                    </div>
+
+                    {/* Quick amount presets based on currency (min 480 TL / min $10) */}
+                    <div className="grid grid-cols-4 gap-2 mt-2.5 w-full max-w-full">
+                      {(() => {
+                        const presets = isTL ? [480, 1000, 2500, 5000] : [10, 25, 50, 100];
+                        return presets.map((preset) => {
+                          const isSelected = amount === preset.toString();
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setAmount(preset.toString())}
+                              className={`py-2 px-1 min-w-0 truncate rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-white/15 text-white border-white/25 shadow-sm"
+                                  : "border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70"
+                              }`}
+                            >
+                              {isTL ? `₺${preset}` : `$${preset}`}
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+
+                    {/* Crypto live conversion preview */}
+                    {(method.cryptoData || method.id === "trc20" || method.id === "crypto") && (
+                      <div className="mt-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col gap-2 w-full max-w-full overflow-hidden">
+                        <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                          <span className="text-white/60 shrink-0">{t.estimatedSend || "Tahmini Gönderilecek"}:</span>
+                          <span className="font-mono font-black text-[#0ecb81] text-sm break-all text-right">
+                            {(() => {
+                              const amt = parseFloat(amount || "0");
+                              const coinSym = method.cryptoData?.coin || (method.id === "trc20" || method.id === "crypto" ? "USDT" : method.currency);
+                              const calc = getCalculatedCrypto(amt, coinSym, isTL);
+                              return `${calc.cryptoAmountFormatted} ${coinSym}`;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-white/40 pt-1.5 border-t border-white/5 gap-2 flex-wrap">
+                          <span className="shrink-0">{t.liveRate || "Canlı Piyasa Kuru"}:</span>
+                          <span className="font-mono text-white/70 break-all text-right text-[10px] sm:text-[11px]">
+                            {(() => {
+                              const coinSym = method.cryptoData?.coin || (method.id === "trc20" || method.id === "crypto" ? "USDT" : method.currency);
+                              const pUSD = getCoinPriceUSD(coinSym);
+                              const pTRY = getCoinPriceTRY(coinSym);
+                              return isTL
+                                ? `1 ${coinSym} ≈ ₺${pTRY.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ($${pUSD.toLocaleString("en-US", { maximumFractionDigits: 2 })})`
+                                : `1 ${coinSym} ≈ $${pUSD.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* USD Havale TL conversion indicator */}
+                    {!isTL && method.id === "iban" && (
+                      <div className="mt-3 p-3 rounded-2xl bg-white/[0.03] border border-white/8 w-full max-w-full overflow-hidden">
+                        <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                          <span className="text-white/60 shrink-0">{t.wireBankTransferEquivalent || "Banka Transfer Karşılığı"}:</span>
+                          <span className="font-black text-[#0ecb81] text-sm break-all text-right">
+                            ₺{(parseFloat(amount || "0") * usdTryRate).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-white/35 mt-1.5 leading-relaxed break-words">
+                          * {t.wireConversionNotice} (1 USD = ₺{usdTryRate.toFixed(2)})
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleDepositDetails}
+                    disabled={!amount || parseFloat(amount) < method.min}
+                    className="w-full rounded-2xl py-4 text-sm font-black text-black disabled:opacity-30 transition-opacity cursor-pointer shadow-lg"
+                    style={{
+                      background: `linear-gradient(135deg,${method.color},${method.color}dd)`,
+                      boxShadow: `0 8px 24px ${method.color}35`,
+                    }}
+                  >
+                    {t.continueBtn} →
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Details - Credit Card */}
+              {dStep === "details" && method && method.id === "credit-card" && (
+                <motion.div
+                  key="dep-details-cc"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-4 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setDStep("amount")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.changeAmount}
+                  </button>
+
+                  <div className="rounded-2xl p-4 border border-purple-500/30 bg-purple-500/10">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <CreditCardIcon size={24} />
+                        <span className="text-xs font-black text-white">{paymentSettings.creditCardBank || "Kredi Kartı Ödemesi"}</span>
+                      </div>
+                      <span className="text-xl font-black text-purple-400">
+                        {isTL ? "₺" : "$"}{parseFloat(amount || "0").toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Kart Üzerindeki İsim</label>
+                        <input
+                          type="text"
+                          placeholder="Ad Soyad"
+                          defaultValue={currentUser ? `${currentUser.name} ${currentUser.surname}` : ""}
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Kart Numarası</label>
+                        <input
+                          type="text"
+                          maxLength={19}
+                          placeholder="4532 •••• •••• 8890"
+                          className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">Son Kullanma (AA/YY)</label>
+                          <input
+                            type="text"
+                            maxLength={5}
+                            placeholder="12/28"
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500 text-center"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-white/50 uppercase block mb-1">CVV</label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            placeholder="•••"
+                            className="w-full rounded-xl bg-black border border-white/10 px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-purple-500 text-center"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/10 bg-white/[0.03]">
+                    <ShieldCheck size={16} className="text-purple-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      {paymentSettings.creditCardDescription || "3D Secure güvencesiyle anında bakiye yüklemesi gerçekleştirilir."}
+                    </p>
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSentDeposit}
+                    disabled={isSubmitting}
+                    className="w-full rounded-2xl py-4 text-sm font-black text-white cursor-pointer shadow-lg transition-all"
+                    style={{
+                      background: "linear-gradient(135deg,#8B5CF6,#6D28D9)",
+                      boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
+                    }}
+                  >
+                    {isSubmitting ? "3D Secure Doğrulanıyor ve Yatırılıyor..." : "Ödemeyi Onayla ve Yatır"}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Details - IBAN / Havale */}
+              {dStep === "details" && method && method.id === "iban" && (
+                <motion.div
+                  key="dep-details-iban"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-3.5 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setDStep("amount")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.changeAmount}
+                  </button>
+
+                  <div className="rounded-2xl p-4 border border-[#0ecb81]/25"
+                    style={{ background: "rgba(14,203,129,0.05)" }}>
+                    <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
+                      <div>
+                        <span className="text-xs font-bold text-white/50 block">{t.depositAmount} (TL)</span>
+                        {!isTL && (
+                          <span className="text-[10px] text-white/35">
+                            {t.wireExchangeRateLabel.replace("{rate}", usdTryRate.toFixed(2))}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-black text-[#0ecb81] block">
+                          ₺{isTL
+                            ? parseFloat(amount || "0").toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : (parseFloat(amount || "0") * usdTryRate).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          }
+                        </span>
+                        {!isTL && (
+                          <span className="text-[10px] font-bold text-white/40">
+                            {t.wireAccountCreditNotice.replace("{amount}", amount)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {[
+                      { label: t.bank, value: paymentSettings.ibanBank || "Garanti BBVA", copy: false },
+                      { label: t.accountHolder, value: paymentSettings.ibanHolder || "Obyo Financial Technologies Ltd.", copy: true },
+                      { label: t.iban, value: paymentSettings.ibanNumber || "TR88 0006 2000 8765 4321 0099 73", copy: true },
+                      {
+                        label: `${t.depositAmount} (TL)`,
+                        value: isTL
+                          ? `₺${parseFloat(amount || "0").toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : `₺${(parseFloat(amount || "0") * usdTryRate).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        copy: true,
+                        accent: "#0ecb81"
+                      },
+                      ...(!isTL ? [{ label: "USD", value: `$${amount} USD`, copy: false }] : []),
+                      { label: t.descriptionMandatory, value: transferCode, copy: true, accent: "#FFB800" },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                        <span className="text-xs text-white/40 shrink-0">{row.label}</span>
+                        <div className="flex items-center gap-2 ml-3">
+                          <span className="text-xs font-mono font-bold text-right break-all" style={{ color: row.accent ?? "#ffffff" }}>
+                            {row.value}
+                          </span>
+                          {row.copy && <CopyBtn text={row.value} />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/10 bg-white/[0.03]">
+                    <AlertCircle size={16} className="text-white mt-0.5 shrink-0" />
+                    <p className="text-xs text-white leading-relaxed">
+                      {t.wireRefNotice} <span className="text-white font-bold underline">"{transferCode}"</span>
+                    </p>
+                  </div>
+
+                  {/* ── Havale / EFT Dekont Yükleme (Admin kontrollü: Zorunlu veya İsteğe Bağlı) ── */}
+                  {(() => {
+                    const isReceiptMandatory = paymentSettings?.ibanReceiptRequired !== false;
+                    const canSubmitIban = !isReceiptMandatory || Boolean(receiptFile?.dataUrl);
+
+                    return (
+                      <>
+                        <div className="rounded-2xl p-4 border border-white/10 bg-black/60 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText size={16} className="text-[#0ecb81]" />
+                              <span className="text-xs font-black text-white">{t.transferReceipt}</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                isReceiptMandatory
+                                  ? "bg-[#f6465d]/20 text-[#f6465d] border border-[#f6465d]/40"
+                                  : "bg-[#0ecb81]/20 text-[#0ecb81] border border-[#0ecb81]/40"
+                              }`}>
+                                {isReceiptMandatory ? t.mandatory : t.optional}
+                              </span>
+                            </div>
+                            {receiptFile && (
+                              <span className="text-[10px] font-bold text-[#0ecb81] flex items-center gap-1">
+                                <CheckCircle2 size={12} /> {t.uploaded}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-white/50 leading-relaxed">
+                            {isReceiptMandatory ? t.wireReceiptDescMandatory : t.wireReceiptDescOptional}
+                          </p>
+
+                          {/* Gizli Dosya Seçici */}
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/jpg"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              handleReceiptChange(file);
+                              e.target.value = "";
+                            }}
+                          />
+
+                          {receiptFile ? (
+                            /* Yüklenen Dekont Kartı */
+                            <div className="rounded-xl p-3 border border-[#0ecb81]/30 bg-[#0ecb81]/[0.06] flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  onClick={() => setPreviewReceiptModal({ url: receiptFile.dataUrl, name: receiptFile.name })}
+                                  className="relative h-12 w-12 rounded-lg overflow-hidden border border-white/15 bg-black/50 shrink-0 cursor-pointer group"
+                                  title="Büyütmek için tıklayın"
+                                >
+                                  <img
+                                    src={receiptFile.dataUrl}
+                                    alt="Dekont Önizleme"
+                                    className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Eye size={14} className="text-white" />
+                                  </div>
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-white truncate max-w-[190px]">
+                                    {receiptFile.name}
+                                  </p>
+                                  <p className="text-[10px] text-white/40 mt-0.5 flex items-center gap-1.5">
+                                    <span>{formatBytes(receiptFile.size)}</span>
+                                    <span>·</span>
+                                    <span className="text-[#0ecb81] font-bold">Dekont hazır</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewReceiptModal({ url: receiptFile.dataUrl, name: receiptFile.name })}
+                                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+                                  title="Büyük Önizleme"
+                                >
+                                  <Eye size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReceiptFile(null);
+                                    setReceiptError(null);
+                                  }}
+                                  className="p-2 rounded-lg bg-[#f6465d]/10 hover:bg-[#f6465d]/20 text-[#f6465d] transition-colors cursor-pointer"
+                                  title="Dekontu Kaldır / Değiştir"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Sürükle / Seç Alanı */
+                            <div
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsDraggingReceipt(true);
+                              }}
+                              onDragLeave={() => setIsDraggingReceipt(false)}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setIsDraggingReceipt(false);
+                                const file = e.dataTransfer.files?.[0] || null;
+                                handleReceiptChange(file);
+                              }}
+                              onClick={() => fileInputRef.current?.click()}
+                              className={`rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
+                                isDraggingReceipt
+                                  ? "border-[#0ecb81] bg-[#0ecb81]/10"
+                                  : "border-white/15 hover:border-[#0ecb81]/50 hover:bg-white/[0.02]"
+                              }`}
+                            >
+                              {isProcessingReceipt ? (
+                                <div className="flex items-center gap-2 text-xs text-white/70 py-2">
+                                  <RefreshCw size={16} className="animate-spin text-[#0ecb81]" />
+                                  <span>Dekont işleniyor ve sıkıştırılıyor...</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-white/40">
+                                    <UploadCloud size={20} className="text-[#0ecb81]" />
+                                  </div>
+                                  <div className="text-center">
+                                    <span className="text-xs font-bold text-white block">
+                                      Dekont Görselini Seçin veya Sürükleyin
+                                    </span>
+                                    <span className="text-[10px] text-white/40 mt-0.5 block">
+                                      JPG, PNG veya WEBP {isReceiptMandatory ? "(Zorunlu)" : "(İsteğe Bağlı)"}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {receiptError && (
+                            <div className="p-2.5 rounded-xl bg-[#f6465d]/10 border border-[#f6465d]/30 flex items-center gap-2 text-xs text-[#f6465d]">
+                              <AlertCircle size={14} className="shrink-0" />
+                              <span>{receiptError}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <motion.button
+                          whileTap={{ scale: canSubmitIban ? 0.98 : 1 }}
+                          onClick={handleSentDeposit}
+                          disabled={isSubmitting || !canSubmitIban}
+                          className={`w-full rounded-2xl py-4 text-sm font-black transition-all ${
+                            canSubmitIban
+                              ? "text-black cursor-pointer shadow-lg"
+                              : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
+                          }`}
+                          style={
+                            canSubmitIban
+                              ? {
+                                  background: "linear-gradient(135deg,#0ecb81,#05a660)",
+                                  boxShadow: "0 8px 24px rgba(14,203,129,0.3)",
+                                }
+                              : {}
+                          }
+                        >
+                          {isSubmitting
+                            ? "İşleniyor ve Talep İletiliyor..."
+                            : canSubmitIban
+                            ? "Transferi gerçekleştirdim."
+                            : "Lütfen Dekont Yükleyiniz (Zorunlu)"}
+                        </motion.button>
+                      </>
+                    );
+                  })()}
+                </motion.div>
+              )}
+
+              {/* STEP 3: Details - Crypto (All coins & networks) */}
+              {dStep === "details" && method && (method.cryptoData || method.id === "trc20" || method.id === "crypto") && (
+                <motion.div
+                  key={`dep-details-crypto-${method.id}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-3.5 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setDStep("amount")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.changeAmount || "Tutarı Değiştir"}
+                  </button>
+
+                  {countdownAt && <Countdown startedAt={countdownAt} />}
+
+                  {/* QR Code container */}
+                  {(() => {
+                    const cryptoMethod = method.cryptoData;
+                    const cryptoAddress = cryptoMethod?.address
+                      || (method.id === "trc20" ? paymentSettings.trc20Address : paymentSettings.erc20Address)
+                      || "TKXVLatVmzivs3XAQ7WLcKLAGsyPtfxh6S";
+                    const qrImgSrc = cryptoMethod?.qrCode || (method.id === "trc20" ? paymentSettings.trc20QrCode : paymentSettings.erc20QrCode);
+                    const networkLabel = cryptoMethod?.network || (method.id === "trc20" ? "Tron (TRC-20)" : "Ethereum (ERC-20)");
+                    const coinSym = cryptoMethod?.coin || (method.id === "trc20" || method.id === "crypto" ? "USDT" : method.currency);
+
+                    const amtNum = parseFloat(amount || "0");
+                    const calc = getCalculatedCrypto(amtNum, coinSym, isTL);
+                    const cryptoSendStr = calc.cryptoAmountFormatted;
+
+                    return (
+                      <>
+                        <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/8 bg-black/60 p-5 text-center">
+                          <div className="flex items-center gap-2">
+                            <CryptoIcon coin={coinSym} size={28} />
+                            <p className="text-xs font-black text-white">{method.label} — {networkLabel}</p>
+                          </div>
+
+                          {/* Dynamic Live SVG QR Code or Uploaded Image */}
+                          {qrImgSrc ? (
+                            <div className="w-[180px] h-[180px] rounded-2xl bg-white p-2.5 shadow-lg border border-white/20 overflow-hidden flex items-center justify-center">
+                              <img src={qrImgSrc} alt="Cüzdan QR Kodu" className="w-full h-full object-contain pointer-events-none select-none" />
+                            </div>
+                          ) : (
+                            <CryptoQrCode value={cryptoAddress} size={180} showCopyButton={false} />
+                          )}
+
+                          <span className="text-[11px] text-white/40 font-medium">{t.scanQrWithWallet || "Kripto cüzdanınız ile QR kodu taratın"}</span>
+                        </div>
+
+                        {/* Gönderilmesi Gereken Kripto Tutarı (Kopyalanabilir) */}
+                        <div className="rounded-2xl border border-[#0ecb81]/40 bg-gradient-to-b from-[#0ecb81]/15 to-[#0ecb81]/[0.04] p-4 flex flex-col gap-2.5 shadow-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <Coins size={16} className="text-[#0ecb81]" />
+                              <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                                {t.cryptoSendAmount || "Gönderilmesi Gereken Tutar"}
+                              </span>
+                            </div>
+                            <CopyBtn text={cryptoSendStr} />
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-black/75 border border-white/10">
+                            <span className="font-mono text-xl sm:text-2xl font-black text-[#0ecb81] tracking-tight break-all select-all">
+                              {cryptoSendStr} <span className="text-sm font-bold text-white/80">{coinSym}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try { await navigator.clipboard.writeText(cryptoSendStr); } catch {}
+                              }}
+                              className="text-[11px] font-black text-white hover:text-white shrink-0 cursor-pointer flex items-center gap-1.5 bg-[#0ecb81]/20 hover:bg-[#0ecb81]/30 text-[#0ecb81] px-3 py-1.5 rounded-lg border border-[#0ecb81]/30 transition-all active:scale-95"
+                            >
+                              <Copy size={12} />
+                              <span>{t.copy || "Kopyala"}</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-white/60 pt-0.5">
+                            <span>
+                              {isTL ? "Yatırım Tutarı:" : "Deposit Amount:"}
+                              <span className="font-bold text-white ml-1">
+                                {isTL ? `₺${amtNum.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${amtNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              </span>
+                            </span>
+                            <span className="flex items-center gap-1 font-mono text-[10px] text-white/50">
+                              <Zap size={10} className="text-[#FFB800]" />
+                              {isTL
+                                ? `1 ${coinSym} ≈ ₺${calc.coinPriceTRY.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`
+                                : `1 ${coinSym} ≈ $${calc.coinPriceUSD.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                              }
+                            </span>
+                          </div>
+
+                          <p className="text-[10px] text-amber-300 leading-relaxed bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 font-medium">
+                            ⚠️ {t.exactAmountNotice || "Lütfen cüzdanınızdan tam olarak yukarıda belirtilen coin tutarını gönderiniz."}
+                          </p>
+                        </div>
+
+                        {/* Cüzdan Adresi */}
+                        <div className="rounded-2xl border border-white/8 bg-black/60 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold text-white/35 uppercase tracking-widest">
+                              {t.depositWalletAddress || "Yatırma Cüzdan Adresi"}
+                            </span>
+                            <CopyBtn text={cryptoAddress} />
+                          </div>
+                          <p className="text-xs font-mono text-white/90 break-all select-all leading-relaxed p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                            {cryptoAddress}
+                          </p>
+                        </div>
+
+                        {/* Memo / Destination Tag if required (e.g. XRP, TON) */}
+                        {cryptoMethod?.memoOrTagRequired && cryptoMethod?.memoOrTagValue && (
+                          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                                Destination Tag / Memo (Zorunlu)
+                              </span>
+                              <CopyBtn text={cryptoMethod.memoOrTagValue} />
+                            </div>
+                            <p className="text-sm font-mono font-bold text-amber-300 break-all select-all p-2 rounded-lg bg-black/40 border border-amber-500/20">
+                              {cryptoMethod.memoOrTagValue}
+                            </p>
+                            <p className="text-[10px] text-amber-300/60 mt-1.5">
+                              Bu kripto para transferinde Tag/Memo girmemek transferinizin kaybolmasına sebep olabilir.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.network}</p>
+                            <p className="text-xs font-black text-white mt-0.5 truncate">{networkLabel}</p>
+                          </div>
+                          <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.amount}</p>
+                            <p className="text-xs font-black text-[#0ecb81] mt-0.5 font-mono truncate" title={`${cryptoSendStr} ${coinSym}`}>
+                              {cryptoSendStr} {coinSym}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl p-2.5 border border-white/6 bg-black/40 text-center">
+                            <p className="text-[9px] text-white/30 font-bold uppercase">{t.confirmationTime}</p>
+                            <p className="text-xs font-black text-white mt-0.5">{t.approxMinutes}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-amber-500/20 bg-amber-500/[0.04]">
+                          <AlertCircle size={15} className="text-amber-400 mt-0.5 shrink-0" />
+                          <p className="text-xs text-white/60 leading-relaxed">
+                            Yalnızca <span className="text-white font-bold">{networkLabel}</span> ağı üzerinden <span className="text-white font-bold">{coinSym}</span> transferi yapınız. Hatalı ağ transferleri blokzincirinde geri alınamaz.
+                          </p>
+                        </div>
+
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleSentDeposit}
+                          disabled={isSubmitting}
+                          className="w-full rounded-2xl py-4 text-sm font-black text-black cursor-pointer shadow-lg transition-transform active:scale-98"
+                          style={{
+                            background: `linear-gradient(135deg,${method.color},${method.color}cc)`,
+                            boxShadow: `0 8px 24px ${method.color}30`,
+                          }}
+                        >
+                          {isSubmitting ? t.processing : t.completedDeposit}
+                        </motion.button>
+                      </>
+                    );
+                  })()}
+                </motion.div>
+              )}
+
+              {/* STEP 3: Details - Custom Payment Method */}
+              {dStep === "details" && method && method.customData && (
+                <motion.div
+                  key={`dep-details-custom-${method.id}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-3.5 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setDStep("amount")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.changeAmount}
+                  </button>
+
+                  {countdownAt && <Countdown startedAt={countdownAt} />}
+
+                  {/* QR Code container if available */}
+                  {method.customData.qrCode && (
+                    <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/8 bg-black/60 p-5">
+                      <p className="text-xs font-bold text-white/50">{method.label}</p>
+                      <QRVisual data={method.customData.accountNumber || method.customData.name} imgSrc={method.customData.qrCode} />
+                      <span className="text-[10px] text-white/30 font-medium">{t.scanQrWithWallet}</span>
+                    </div>
+                  )}
+
+                  {/* Account Information Card */}
+                  <div
+                    className="rounded-2xl p-4 border"
+                    style={{
+                      backgroundColor: "rgba(18,18,22,0.9)",
+                      borderColor: `${method.color}35`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
+                      <div>
+                        <span className="text-xs font-bold text-white/50 block">{t.depositDetails}</span>
+                        <span className="text-[10px] text-white/35">{method.label}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-black block" style={{ color: method.color }}>
+                          {isTL || method.currency === "TL" ? `₺${amount}` : `$${amount} ${method.currency}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {[
+                      ...(method.customData.accountHolder ? [{ label: t.accountHolder, value: method.customData.accountHolder, copy: true }] : []),
+                      ...(method.customData.accountNumber ? [{ label: t.destinationAddress, value: method.customData.accountNumber, copy: true, accent: "#ffffff" }] : []),
+                      {
+                        label: t.depositAmount,
+                        value: isTL || method.currency === "TL" ? `₺${amount}` : `${amount} ${method.currency}`,
+                        copy: true,
+                        accent: "#0ecb81"
+                      },
+                      ...(method.customData.transferCode ? [{ label: t.descriptionMandatory, value: method.customData.transferCode, copy: true, accent: "#FFB800" }] : []),
+                      ...(method.customData.customRows || []).map(r => ({ label: r.label, value: r.value, copy: r.copy !== false })),
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                        <span className="text-xs text-white/40 shrink-0">{row.label}</span>
+                        <div className="flex items-center gap-2 ml-3">
+                          <span className="text-xs font-mono font-bold text-right break-all" style={{ color: row.accent ?? "#ffffff" }}>
+                            {row.value}
+                          </span>
+                          {row.copy && <CopyBtn text={row.value} />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Custom Notes or Standard Notice */}
+                  {method.customData.notes ? (
+                    <div
+                      className="flex items-start gap-2.5 rounded-2xl p-3.5 border"
+                      style={{
+                        backgroundColor: "rgba(255,184,0,0.06)",
+                        borderColor: "rgba(255,184,0,0.25)"
+                      }}
+                    >
+                      <AlertCircle size={16} className="text-[#FFB800] mt-0.5 shrink-0" />
+                      <p className="text-xs text-white/70 leading-relaxed whitespace-pre-line">
+                        {method.customData.notes}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2.5 rounded-2xl p-3.5 border border-white/8 bg-white/[0.03]">
+                      <AlertCircle size={16} className="text-white/40 mt-0.5 shrink-0" />
+                      <p className="text-xs text-white/50 leading-relaxed">
+                        {t.wireTransferInstructions || "Lütfen belirtilen hesap bilgilerine transferinizi tamamladıktan sonra butona tıklayınız."}
+                      </p>
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSentDeposit}
+                    disabled={isSubmitting}
+                    className="w-full rounded-2xl py-4 text-sm font-black text-black cursor-pointer shadow-lg"
+                    style={{
+                      background: `linear-gradient(135deg, ${method.color}, ${method.color}cc)`,
+                      boxShadow: `0 8px 24px ${method.color}30`,
+                    }}
+                  >
+                    {isSubmitting ? t.processing : t.completedDeposit}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 4: Success */}
+              {dStep === "success" && (
+                <motion.div
+                  key="dep-success"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center gap-4 text-center py-8"
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 280, damping: 18 }}
+                    className="flex h-20 w-20 items-center justify-center rounded-full"
+                    style={{ background: "rgba(14,203,129,0.15)", border: "2px solid rgba(14,203,129,0.3)" }}
+                  >
+                    <CheckCircle2 size={40} className="text-[#0ecb81]" />
+                  </motion.div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-white mb-1.5">{t.depositRequestSent}</h3>
+                    <p className="text-sm text-white/50 leading-relaxed max-w-sm">
+                      {t.depositRequestSentDesc}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 w-full mt-3">
+                    <button
+                      onClick={() => setTab("pending")}
+                      className="flex-1 rounded-2xl py-3.5 text-xs font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
+                    >
+                      {t.viewTransaction}
+                    </button>
+                    <button
+                      onClick={() => navigate("/")}
+                      className="flex-1 rounded-2xl py-3.5 text-xs font-black text-black cursor-pointer"
+                      style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
+                    >
+                      {t.startTrading}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          )}
+
+          {/* ═════════════════ TAB: WITHDRAW ═════════════════ */}
+          {tab === "withdraw" && (
+            <AnimatePresence mode="wait">
+              {currentUser && currentUser.kycStatus !== "verified" ? (
+                <motion.div
+                  key="kyc-blocked"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center text-center p-6 rounded-3xl border border-white/10 bg-transparent my-2"
+                >
+                  <h3 className="text-base font-black text-white mb-2">{t.kycRequiredWithdraw}</h3>
+                  <p className="text-xs text-white/60 leading-relaxed max-w-sm mb-6">
+                    {t.kycRequiredDesc}
+                  </p>
+                  <button
+                    onClick={() => navigate("/profile?kyc=open")}
+                    className="w-full max-w-xs py-3.5 rounded-2xl font-black text-xs text-black cursor-pointer shadow-lg transition-transform active:scale-95"
+                    style={{ background: "linear-gradient(135deg, #FF6B00, #FFB800)", boxShadow: "0 6px 20px rgba(255,107,0,0.25)" }}
+                  >
+                    {t.verifyNow}
+                  </button>
+                </motion.div>
+              ) : (
+                <>
+                  {/* STEP 1: Method selection */}
+              {wStep === "method" && (
+                <motion.div
+                  key="wit-method"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between px-1 py-2">
+                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{t.withdrawableBalance}</span>
+                    <span className="text-sm font-black text-white">
+                      {userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {realBal <= 0 && (
+                    <div className="flex items-start gap-2.5 rounded-2xl p-3.5 bg-[#FFB800]/[0.06]">
+                      <AlertCircle size={15} className="text-[#FFB800] mt-0.5 shrink-0" />
+                      <p className="text-xs text-white/60 leading-relaxed">
+                        {t.insufficientRealBalWithdraw}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs font-black uppercase tracking-wider text-white/40 px-1 mt-1">
+                    {t.selectWithdrawMethod}
+                  </p>
+
+                  <div className="flex flex-col gap-2">
+                    {withdrawMethods.map((m) => {
+                      const Icon = m.icon;
+                      return (
+                        <motion.button
+                          key={m.id}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => selectWithdrawMethod(m)}
+                          disabled={realBal <= 0}
+                          className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left disabled:opacity-30 cursor-pointer h-[64px]"
+                          style={{
+                            background: "linear-gradient(135deg, rgba(20,20,24,0.7) 0%, rgba(12,12,16,0.9) 100%)",
+                            border: "none",
+                          }}
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                            <Icon size={28} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-black text-white">{m.label}</span>
+                            <p className="text-[11px] text-white/45 mt-0.5">{m.sub}</p>
+                          </div>
+
+                          <ChevronRight size={14} className="text-white/25 shrink-0" />
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 2: Amount & Destination */}
+              {wStep === "amount" && method && (
+                <motion.div
+                  key="wit-amount"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-4 w-full max-w-full overflow-hidden"
+                >
+                  <button
+                    onClick={() => setWStep("method")}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white w-fit cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> {t.chooseDifferentMethod}
+                  </button>
+
+                  {/* Selected method card */}
+                  <div className="rounded-2xl p-3.5 border border-white/8 bg-black/60">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <method.icon size={28} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">{method.label}</p>
+                        <p className="text-[11px] text-white/40">{t.minWithdrawAmount} {userSym}{withdrawMin}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Amount input */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                        {t.withdrawAmount}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setAmount(realBal.toString())}
+                        className="text-[11px] font-bold text-[#FF6B00] hover:underline cursor-pointer"
+                      >
+                        {t.withdrawAll} ({userSym}{realBal.toLocaleString(isTL ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black px-4 py-3.5 focus-within:border-[#FF6B00]/50 transition-colors">
+                      <span className="text-2xl font-black text-white/30">
+                        {userSym}
+                      </span>
+                      <input
+                        ref={inputRef}
+                        type="number"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder={`${withdrawMin}`}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '+') e.preventDefault();
+                        }}
+                        className="flex-1 bg-transparent text-3xl font-black text-white outline-none placeholder:text-white/15"
+                      />
+                      <span className="text-xs font-black text-white/40">{isTL ? "TL" : method.currency}</span>
+                    </div>
+
+                    {/* Quick amount presets */}
+                    <div className="grid grid-cols-4 gap-2 mt-2.5">
+                      {(isTL ? [150, 300, 500, 1000] : [5, 10, 25, 50]).map((preset) => {
+                        const isSelected = amount === preset.toString();
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setAmount(preset.toString())}
+                            className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-white/15 text-white border-white/25 shadow-sm"
+                                : "border-white/5 bg-white/[0.03] hover:bg-white/10 text-white/70"
+                            }`}
+                          >
+                            {userSym}{preset}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Destination input */}
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-2">
+                      {method.id === "iban" ? "IBAN (TR...)" : t.destinationWalletOrIban}
+                    </label>
+                    <input
+                      placeholder={method.id === "iban" ? "TR00 0000 0000 0000 0000 0000 00" : "0x... veya T..."}
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black px-4 py-3.5 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#FF6B00]/50 font-mono transition-colors"
+                    />
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleWithdraw}
+                    disabled={
+                      !amount ||
+                      parseFloat(amount) < withdrawMin ||
+                      parseFloat(amount) > realBal ||
+                      !destination.trim() ||
+                      isSubmitting
+                    }
+                    className="w-full rounded-2xl py-4 text-sm font-black text-black disabled:opacity-30 transition-opacity cursor-pointer shadow-lg"
+                    style={{
+                      background: `linear-gradient(135deg,${method.color},${method.color}cc)`,
+                      boxShadow: `0 8px 24px ${method.color}30`,
+                    }}
+                  >
+                    {isSubmitting ? t.processing : t.submitRequest}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Success */}
+              {wStep === "success" && (
+                <motion.div
+                  key="wit-success"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center gap-4 text-center py-8"
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 280, damping: 18 }}
+                    className="flex h-20 w-20 items-center justify-center rounded-full"
+                    style={{ background: "rgba(255,107,0,0.15)", border: "2px solid rgba(255,107,0,0.3)" }}
+                  >
+                    <ArrowUpCircle size={40} className="text-[#FF6B00]" />
+                  </motion.div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-white mb-1.5">{t.withdrawRequestSent}</h3>
+                    <p className="text-sm text-white/50 leading-relaxed max-w-sm">
+                      {t.withdrawRequestSentDesc}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 w-full mt-3">
+                    <button
+                      onClick={() => setTab("pending")}
+                      className="flex-1 rounded-2xl py-3.5 text-xs font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
+                    >
+                      {t.viewTransaction}
+                    </button>
+                    <button
+                      onClick={() => navigate("/")}
+                      className="flex-1 rounded-2xl py-3.5 text-xs font-black text-black cursor-pointer"
+                      style={{ background: "linear-gradient(135deg,#FF6B00,#FFB800)" }}
+                    >
+                      {t.continueTrading}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+                </>
+              )}
+            </AnimatePresence>
+          )}
+
+          {/* ═════════════════ TAB: PENDING / TRANSACTIONS ═════════════════ */}
+          {tab === "pending" && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-black uppercase tracking-wider text-white/40">
+                  {t.transactionsTab}
+                </p>
+                <span className="text-[11px] text-white/30">{userRequests.length} {t.txCount}</span>
+              </div>
+
+              {userRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center rounded-3xl bg-black/40">
+                  <Hash size={32} className="text-white/15 mb-3" />
+                  <p className="text-sm text-white/40 font-bold">{t.noTransactions}</p>
+                </div>
+              ) : (
+                userRequests.map((req) => {
+                  const isD = req.type === "deposit";
+                  const statusCfg = {
+                    pending:  { color: "#9CA3AF", label: t.statusPending, icon: Clock },
+                    accepted: { color: "#0ecb81", label: t.statusAccepted, icon: Check },
+                    rejected: { color: "#f6465d", label: t.statusRejected, icon: X },
+                  }[req.status];
+                  const StatusIcon = statusCfg.icon;
+
+                  return (
+                    <div
+                      key={req.id}
+                      className="rounded-xl border border-white/8 overflow-hidden transition-all"
+                      style={{ background: "linear-gradient(135deg, #101013 0%, #0a0a0c 100%)" }}
+                    >
+                      {/* Clickable Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandReq(req.id)}
+                        className="w-full flex items-center justify-between p-3.5 text-left cursor-pointer hover:bg-white/[0.02]"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg shrink-0">
+                            <StatusIcon size={14} style={{ color: statusCfg.color }} />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-white block truncate">{isD ? t.depositTx : t.withdrawTx}</span>
+                            <span className="text-[10px] text-white/35 font-mono truncate block">{req.method}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-xs font-normal" style={{ color: isD ? "#0ecb81" : "#FF6B00" }}>
+                            {isD ? "+" : "-"}{req.currency === "TL" || req.currency === "TRY" ? "₺" : "$"}{req.amount}
+                          </span>
+                          <span className="text-[10px] font-bold"
+                            style={{ color: statusCfg.color }}>
+                            {statusCfg.label}
+                          </span>
+                          {expandedReqs[req.id] ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
+                        </div>
+                      </button>
+
+                      {/* Expandable Details Body */}
+                      <AnimatePresence>
+                        {expandedReqs[req.id] && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="px-3.5 pb-3.5 pt-1 border-t border-white/5 flex flex-col gap-2.5 text-xs"
+                          >
+                            {req.destination && (
+                              <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                                <span className="text-[9px] font-bold text-white/30 uppercase block mb-0.5">{t.destinationAddress}</span>
+                                <span className="text-[11px] font-mono text-white/70 break-all">{req.destination}</span>
+                              </div>
+                            )}
+
+                            {/* Yüklenen Dekont Önizleme Butonu */}
+                            {req.receiptUrl && (
+                              <div className="p-2 rounded-lg bg-[#0ecb81]/[0.05] border border-[#0ecb81]/25 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText size={14} className="text-[#0ecb81]" />
+                                  <div className="min-w-0">
+                                    <span className="text-[9px] font-bold text-white/35 uppercase block">{t.transferReceipt}</span>
+                                    <span className="text-[11px] text-white/80 font-medium truncate block max-w-[160px]">
+                                      {req.receiptName || t.transferReceipt}
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewReceiptModal({ url: req.receiptUrl!, name: req.receiptName || "Dekont" })}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#0ecb81]/15 hover:bg-[#0ecb81]/25 text-[#0ecb81] text-[10px] font-bold transition-all cursor-pointer shrink-0"
+                                >
+                                  <Eye size={12} />
+                                  <span>{t.review}</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Reddedilme Sebebi */}
+                            {req.status === "rejected" && req.rejectionReason && (
+                              <div className="p-2.5 rounded-lg bg-[#f6465d]/10 border border-[#f6465d]/25 text-left">
+                                <div className="flex items-center gap-1.5 text-[#f6465d] font-bold text-[11px] mb-1">
+                                  <AlertCircle size={13} className="shrink-0" />
+                                  <span>{t.rejectionReasonLabel}</span>
+                                </div>
+                                <p className="text-[11px] text-white/90 leading-relaxed pl-4 font-normal">
+                                  {req.rejectionReason}
+                                </p>
+
+                                {req.type === "withdraw" && (
+                                  <div className="mt-2 pt-1.5 border-t border-[#f6465d]/15 flex justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setTab("deposit");
+                                        setDStep("method");
+                                        setMethod(null);
+                                        setAmount("");
+                                      }}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white transition-all cursor-pointer"
+                                    >
+                                      <ArrowDownLeft size={11} className="text-[#0ecb81]" />
+                                      <span>{t.goToDepositScreen}</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-1 text-[10px] text-white/30">
+                              <span className="font-mono">{req.id}</span>
+                              <span>
+                                {new Date(req.createdAt).toLocaleDateString(isTL ? "tr-TR" : "en-US", {
+                                  day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── Dekont Önizleme Modal (Kullanıcı) ── */}
+      <AnimatePresence>
+        {previewReceiptModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPreviewReceiptModal(null)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative max-w-lg w-full rounded-3xl bg-[#111114] border border-white/15 overflow-hidden shadow-2xl z-10 flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-[#0ecb81]/15 border border-[#0ecb81]/30 flex items-center justify-center">
+                    <FileText size={16} className="text-[#0ecb81]" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white truncate max-w-[240px]">
+                      {previewReceiptModal.name || "Havale Dekontu"}
+                    </h4>
+                    <p className="text-[10px] text-white/40">Yüklenen transfer dekontu</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewReceiptModal(null)}
+                  className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-auto flex items-center justify-center bg-black/60 min-h-[260px]">
+                <img
+                  src={previewReceiptModal.url}
+                  alt="Dekont Detay"
+                  className="max-h-[65vh] max-w-full object-contain rounded-xl border border-white/10 shadow-2xl"
+                />
+              </div>
+
+              <div className="p-3.5 border-t border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => setPreviewReceiptModal(null)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors cursor-pointer"
+                >
+                  Kapat
+                </button>
+                <a
+                  href={previewReceiptModal.url}
+                  download={previewReceiptModal.name || "dekont.jpg"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-[#0ecb81] hover:bg-[#0ecb81]/90 text-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <ExternalLink size={13} />
+                  <span>İndir / Yeni Sekmede Aç</span>
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

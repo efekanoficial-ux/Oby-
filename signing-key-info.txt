@@ -1,0 +1,10 @@
+Keep this file and signing.keystore in a safe place. You'll need these files if you want to upload future versions of your PWA to the Google Play Store.
+
+Key store file: signing.keystore
+Key store password: mTZ9w0oYnL31
+Key alias: my-key-alias
+Key password: mTZ9w0oYnL31
+Signer's full name: Obyo Admin
+Signer's organization: Obyo Option
+Signer's organizational unit: Engineering
+Signer's country code: US
