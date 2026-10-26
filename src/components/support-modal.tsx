@@ -235,23 +235,25 @@ export function SupportModal({ visible, onClose }: SupportModalProps) {
             </div>
           ) : (
             /* DURUM 3: Varsayılan Görünüm -> Ekranın Tam Ortasında Bağlan Tuşu */
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4 my-auto">
-              <Headphones size={32} className="text-white/30" />
-              <div>
-                <p className="text-xs font-semibold text-white/70">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-5 my-auto max-w-sm mx-auto">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/60 shadow-sm">
+                <Headphones size={26} className="text-white/80 shrink-0" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-bold text-white tracking-tight">
                   {t.welcomeLiveSupport || "Canlı destek hattına hoş geldiniz"}
                 </p>
-                <p className="text-[11px] text-white/40 mt-1 max-w-xs">
+                <p className="text-xs text-white/50 leading-relaxed max-w-xs mx-auto">
                   {t.clickToConnectDesc || "Temsilciye bağlanmak ve mesajlaşmayı aktifleştirmek için aşağıdaki butona tıklayın."}
                 </p>
               </div>
 
               <button
                 onClick={handleConnectAgent}
-                className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                className="w-full max-w-xs px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xl hover:scale-[1.01] active:scale-[0.98]"
               >
-                <PhoneCall size={14} />
-                <span>{t.connectToAgent || "Müşteri Temsilcisine Bağlan"}</span>
+                <PhoneCall size={15} className="shrink-0" />
+                <span className="text-center">{t.connectToAgent || "Müşteri Temsilcisine Bağlan"}</span>
               </button>
             </div>
           )}

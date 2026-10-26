@@ -381,8 +381,8 @@ function DesktopSidebar({
     { path: "/",            icon: BarChart2, label: t.navTrade    },
     { path: "/history",     icon: Clock,     label: t.navHistory  },
     { path: "/wallet",      icon: Wallet,    label: t.navBalance  },
-    { path: "/leaderboard", icon: Trophy,    label: "Liderler"    },
-    { path: "/bonuses",     icon: Gift,      label: "Bonuslar"    },
+    { path: "/leaderboard", icon: Trophy,    label: t.leaderboard || "Lider Tablosu" },
+    { path: "/bonuses",     icon: Gift,      label: t.bonusesBtn || "Bonuslar" },
     { path: "/profile",     icon: Gem,       label: t.navVip      },
   ];
 
@@ -597,7 +597,7 @@ function DesktopHeader({
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition-all text-xs font-bold cursor-pointer">
           <ChevronLeft size={14} />
           <BarChart2 size={14} className="text-[#FF6B00]" />
-          <span>İşlem Masasına Dön</span>
+          <span>{t.backToTrade || "İşlem Masasına Dön"}</span>
         </div>
       </Link>
       <div className="flex items-center gap-2.5">

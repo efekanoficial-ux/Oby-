@@ -26,14 +26,12 @@ export function LanguageModal({ show, onClose }: LanguageModalProps) {
   }, [show, language]);
 
   const handleConfirm = () => {
-    setLanguage(selectedCode, true);
-    localStorage.setItem("obyo_lang", selectedCode);
+    const matched = LANGUAGES.find((l) => l.code === selectedCode);
+    const langName = matched ? matched.name : selectedCode;
+    setLanguage(langName, true);
+    localStorage.setItem("obyo_lang", langName);
     localStorage.setItem("obyo_manual_lang", "1");
     onClose();
-    // Reload page to apply language changes globally
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
   };
 
   return (
@@ -57,8 +55,8 @@ export function LanguageModal({ show, onClose }: LanguageModalProps) {
             {/* Header - No icons/logos */}
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div>
-                <h3 className="text-base font-bold text-white">{t.appLangSelect}</h3>
-                <p className="text-xs text-white/40">{t.selectLangSub}</p>
+                <h3 className="text-base font-bold text-white">{t.appLangSelect || "Language Selection"}</h3>
+                <p className="text-xs text-white/40">{t.selectLangSub || "Select application language"}</p>
               </div>
               <button
                 onClick={onClose}
@@ -68,23 +66,23 @@ export function LanguageModal({ show, onClose }: LanguageModalProps) {
               </button>
             </div>
 
-            {/* Language Options - No flags/icons */}
-            <div className="mt-4 flex flex-col gap-2">
+            {/* Language Options - White active styling without orange */}
+            <div className="mt-4 flex flex-col gap-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
               {LANGUAGES.map((lang) => {
                 const isSelected = selectedCode === lang.code;
                 return (
                   <button
                     key={lang.code}
                     onClick={() => setSelectedCode(lang.code)}
-                    className={`flex items-center justify-between w-full px-4 py-3.5 rounded-xl transition-all text-left cursor-pointer ${
+                    className={`flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all text-left cursor-pointer ${
                       isSelected
-                        ? "bg-[#FF6B00]/15 border border-[#FF6B00] text-white font-bold shadow-[0_0_15px_rgba(255,107,0,0.2)]"
+                        ? "bg-white/15 border border-white text-white font-bold shadow-[0_0_15px_rgba(255,255,255,0.1)]"
                         : "bg-white/5 border border-white/10 hover:bg-white/10 text-white/80"
                     }`}
                   >
                     <span className="text-sm font-semibold">{lang.name}</span>
                     {isSelected && (
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FF6B00] text-black">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-black">
                         <Check size={12} strokeWidth={3} />
                       </div>
                     )}
@@ -93,10 +91,10 @@ export function LanguageModal({ show, onClose }: LanguageModalProps) {
               })}
             </div>
 
-            {/* Confirm / OK button */}
+            {/* Confirm / OK button - White button without orange */}
             <button
               onClick={handleConfirm}
-              className="mt-6 w-full rounded-xl py-3.5 text-sm font-black text-black bg-[#FF6B00] hover:bg-[#ff7a1a] transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(255,107,0,0.3)] cursor-pointer"
+              className="mt-5 w-full rounded-xl py-3 text-sm font-black text-black bg-white hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg cursor-pointer"
             >
               OK
             </button>

@@ -1369,12 +1369,12 @@ export function getLanguageCode(langStr?: string): LanguageCode {
     langStr = localStorage.getItem("obyo_lang") || detectCountryLanguage();
   }
   const l = (langStr || "").toLowerCase();
-  if (l.includes("tur") || l === "tr") return "tr";
-  if (l.includes("deu") || l.includes("ger") || l === "de") return "de";
+  if (l.includes("tur") || l.includes("türk") || l === "tr") return "tr";
+  if (l.includes("deu") || l.includes("ger") || l === "de" || l.includes("deutsch")) return "de";
   if (l.includes("esp") || l.includes("spa") || l === "es") return "es";
   if (l.includes("rus") || l === "ru") return "ru";
   if (l.includes("ara") || l === "ar") return "ar";
-  if (l.includes("eng") || l === "en") return "en";
+  if (l.includes("eng") || l === "en" || l.includes("english")) return "en";
   return "en";
 }
 

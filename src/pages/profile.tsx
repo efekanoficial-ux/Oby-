@@ -97,14 +97,23 @@ export default function Profile() {
 
   const isVerified = currentUser?.kycStatus === "verified";
 
+  const currentLanguageName =
+    language === "tr" || language === "Türkçe" ? "Türkçe" :
+    language === "en" || language === "English" ? "English" :
+    language === "de" || language === "Deutsch" ? "Deutsch" :
+    language === "es" || language === "Español" ? "Español" :
+    language === "ru" || language === "Русский" ? "Русский" :
+    language === "ar" || language === "العربية" ? "العربية" :
+    language;
+
   const menuItems: any[] = [
     { icon: Trophy,      label: t.leaderboard || "Lider Tablosu", value: t.daily || "Günlük", action: () => navigate("/leaderboard"),     href: undefined, customColor: undefined },
-    { icon: Gift,        label: "Bonuslar",                       value: "",                   badge: unclaimedBonusCount > 0 ? unclaimedBonusCount : undefined, action: () => navigate("/bonuses"),         href: undefined, customColor: undefined },
-    { icon: Wallet,      label: t.depositWithdraw,                value: "",                   action: () => navigate("/wallet"),          href: undefined, customColor: undefined },
-    { icon: Settings,    label: t.language,                       value: language,             action: () => setShowLangModal(true),       href: undefined, customColor: undefined },
-    { icon: Bell,        label: t.notifications,                  value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined, customColor: undefined },
-    { icon: Shield,      label: t.privacyPolicy,                  value: "",                   action: () => navigate("/privacy"),         href: "/privacy", customColor: undefined },
-    { icon: HelpCircle,  label: t.about,                          value: "",                   action: () => setShowAbout(true),           href: undefined, customColor: undefined },
+    { icon: Gift,        label: t.bonusesBtn || "Bonuslar",       value: "",                   badge: unclaimedBonusCount > 0 ? unclaimedBonusCount : undefined, action: () => navigate("/bonuses"),         href: undefined, customColor: undefined },
+    { icon: Wallet,      label: t.depositWithdraw || "Para Yatır / Çek", value: "",            action: () => navigate("/wallet"),          href: undefined, customColor: undefined },
+    { icon: Settings,    label: t.language || "Dil",              value: currentLanguageName,  action: () => setShowLangModal(true),       href: undefined, customColor: undefined },
+    { icon: Bell,        label: t.notifications || "Bildirimler", value: notifState ? t.on : t.off, action: () => setNotifState(prev => !prev),  href: undefined, customColor: undefined },
+    { icon: Shield,      label: t.privacyPolicy || "Gizlilik Politikası", value: "",           action: () => navigate("/privacy"),         href: "/privacy", customColor: undefined },
+    { icon: HelpCircle,  label: t.about || "Hakkında",            value: "",                   action: () => setShowAbout(true),           href: undefined, customColor: undefined },
   ];
 
   const displayName = currentUser

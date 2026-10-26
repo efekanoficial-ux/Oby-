@@ -229,7 +229,7 @@ export default function History() {
         {tradesLoading && (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin mb-3 h-7 w-7 rounded-full border-2 border-white/20 border-t-white" />
-            <p className="text-xs text-white/40">İşlem geçmişi yükleniyor...</p>
+            <p className="text-xs text-white/40">{t.loadingStatus || "İşlem geçmişi yükleniyor..."}</p>
           </div>
         )}
 
