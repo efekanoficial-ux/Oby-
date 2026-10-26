@@ -4,7 +4,7 @@ import { getTranslations, getLanguageCode, detectCountryLanguage, LanguageCode, 
 interface LanguageContextType {
   language: string;
   langCode: LanguageCode;
-  setLanguage: (lang: string) => void;
+  setLanguage: (lang: string, manual?: boolean) => void;
   t: typeof translationsMap["tr"];
 }
 
@@ -12,15 +12,23 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<string>(() => {
-    return localStorage.getItem("obyo_lang") || detectCountryLanguage();
+    const isManual = typeof localStorage !== "undefined" && localStorage.getItem("obyo_manual_lang") === "1";
+    if (isManual) {
+      const saved = localStorage.getItem("obyo_lang");
+      if (saved) return saved;
+    }
+    return detectCountryLanguage();
   });
 
   const langCode = getLanguageCode(language);
   const t = getTranslations(langCode);
 
-  const setLanguage = (newLang: string) => {
+  const setLanguage = (newLang: string, manual = false) => {
     setLanguageState(newLang);
     localStorage.setItem("obyo_lang", newLang);
+    if (manual) {
+      localStorage.setItem("obyo_manual_lang", "1");
+    }
     // Dispatch custom event to notify any non-React listeners
     window.dispatchEvent(new Event("languagechange"));
   };
@@ -35,24 +43,42 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", handleStorage);
     window.addEventListener("languagechange", handleStorage);
 
-    // If user hasn't explicitly set a language yet, detect physical country via IP
-    if (!localStorage.getItem("obyo_lang")) {
-      fetch("https://ipapi.co/json/")
-        .then(r => r.json())
-        .then(data => {
-          const cc = (data.country_code || "").toUpperCase();
+    // If user hasn't explicitly set a manual language, detect physical region via IP
+    const isManual = localStorage.getItem("obyo_manual_lang") === "1";
+    if (!isManual) {
+      const detectRegion = async () => {
+        try {
+          let cc = "";
+          try {
+            const res = await fetch("https://api.country.is/");
+            if (res.ok) {
+              const data = await res.json();
+              cc = (data.country || "").toUpperCase();
+            }
+          } catch {}
+
+          if (!cc) {
+            const res2 = await fetch("https://ipapi.co/json/");
+            if (res2.ok) {
+              const data2 = await res2.json();
+              cc = (data2.country_code || "").toUpperCase();
+            }
+          }
+
           let matched = "";
           if (cc === "TR" || cc === "AZ") matched = "Türkçe";
-          else if (["DE", "AT", "CH"].includes(cc)) matched = "Deutsch";
+          else if (["DE", "AT", "CH", "LI", "LU"].includes(cc)) matched = "Deutsch";
           else if (["ES", "MX", "AR", "CO", "CL", "PE", "EC", "VE", "GT", "CU", "DO"].includes(cc)) matched = "Español";
           else if (["RU", "BY", "KZ", "KG", "UZ"].includes(cc)) matched = "Русский";
           else if (["SA", "AE", "EG", "IQ", "QA", "KW", "BH", "OM", "JO", "LB", "MA", "DZ", "TN"].includes(cc)) matched = "العربية";
+          else if (["US", "GB", "CA", "AU", "NZ", "IE"].includes(cc)) matched = "English";
 
-          if (matched && !localStorage.getItem("obyo_lang")) {
+          if (matched && localStorage.getItem("obyo_manual_lang") !== "1") {
             setLanguage(matched);
           }
-        })
-        .catch(() => {});
+        } catch {}
+      };
+      detectRegion();
     }
 
     return () => {

@@ -9,32 +9,28 @@ export interface AssetConfig {
   revert: number;
   /** Decimal places for rounding ticks/candles. */
   digits: number;
-  /**
-   * Binance trade stream symbol for best-effort real data anchoring.
-   * Only set for assets that have a genuine live feed (crypto).
-   */
-  binance?: string;
-  /** Whether this instrument tracks live real-world market feeds (forex/ticks) */
-  isRealFeed?: boolean;
 }
 
 /**
- * The only 13 instruments the platform trades.
+ * All assets defined in the platform.
+ * Must match src/lib/assets.ts
  */
 export const ASSETS: AssetConfig[] = [
-  { symbol: "Crypto IDX",         base: 6850.25, vol: 0.00030, revert: 0.0008, digits: 2 },
-  { symbol: "AUD/CAD (OTC)",      base: 0.9900,  vol: 0.00003, revert: 0.0010, digits: 5 },
-  { symbol: "AUD/CHF (OTC)",      base: 0.5520,  vol: 0.00003, revert: 0.0010, digits: 5 },
-  { symbol: "AUD/DKK (OTC)",      base: 4.4200,  vol: 0.00009, revert: 0.0010, digits: 4 },
-  { symbol: "AUD/HUF (OTC)",      base: 233.50,  vol: 0.00011, revert: 0.0010, digits: 3 },
-  { symbol: "AUD/JPY (OTC)",      base: 97.20,   vol: 0.00012, revert: 0.0010, digits: 3 },
-  { symbol: "AUD/NOK (OTC)",      base: 6.9300,  vol: 0.00012, revert: 0.0010, digits: 4 },
-  { symbol: "AUD/NZD (OTC)",      base: 1.0820,  vol: 0.00008, revert: 0.0012, digits: 5 },
-  { symbol: "AUD/SEK (OTC)",      base: 6.9100,  vol: 0.00012, revert: 0.0010, digits: 4 },
-  { symbol: "AUD/SGD (OTC)",      base: 0.8650,  vol: 0.00009, revert: 0.0010, digits: 5 },
-  { symbol: "AUD/USD (OTC)",      base: 0.6600,  vol: 0.00010, revert: 0.0010, digits: 5 },
-  { symbol: "AUD/ZAR (OTC)",      base: 12.050,  vol: 0.00016, revert: 0.0009, digits: 4 },
-  { symbol: "CAD/CHF (OTC)",      base: 0.6080,  vol: 0.00010, revert: 0.0010, digits: 5 },
+  { symbol: "EUR/USD (OTC)", base: 1.0850, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "GBP/USD (OTC)", base: 1.2650, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "USD/JPY (OTC)", base: 150.20, vol: 0.00012, revert: 0.0010, digits: 3 },
+  { symbol: "USD/CAD (OTC)", base: 1.3550, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/USD (OTC)", base: 0.6600, vol: 0.00010, revert: 0.0010, digits: 5 },
+  { symbol: "USD/CHF (OTC)", base: 0.8850, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "NZD/USD (OTC)", base: 0.6050, vol: 0.00010, revert: 0.0010, digits: 5 },
+  { symbol: "EUR/GBP (OTC)", base: 0.8580, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "EUR/JPY (OTC)", base: 163.00, vol: 0.00012, revert: 0.0010, digits: 3 },
+  { symbol: "GBP/JPY (OTC)", base: 190.00, vol: 0.00012, revert: 0.0010, digits: 3 },
+  { symbol: "AUD/CAD (OTC)", base: 0.9900, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/CHF (OTC)", base: 0.5520, vol: 0.00003, revert: 0.0010, digits: 5 },
+  { symbol: "AUD/JPY (OTC)", base: 97.20,  vol: 0.00012, revert: 0.0010, digits: 3 },
+  { symbol: "AUD/NZD (OTC)", base: 1.0820, vol: 0.00008, revert: 0.0012, digits: 5 },
+  { symbol: "CAD/CHF (OTC)", base: 0.6080, vol: 0.00010, revert: 0.0010, digits: 5 },
 ];
 
 export const ASSET_BY_SYMBOL: Map<string, AssetConfig> = new Map();

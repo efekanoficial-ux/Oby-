@@ -634,15 +634,6 @@ function DesktopHeader({
           />
         </div>
 
-        {/* Dil Ayarları */}
-        <button
-          onClick={onSettings}
-          className="flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          <Settings size={13} className="shrink-0" />
-          <span className="whitespace-nowrap shrink-0">{t.languageSettings}</span>
-        </button>
-
         {/* Cüzdan Butonu */}
         <button
           onClick={onWallet}

@@ -26,8 +26,9 @@ export function LanguageModal({ show, onClose }: LanguageModalProps) {
   }, [show, language]);
 
   const handleConfirm = () => {
-    setLanguage(selectedCode);
+    setLanguage(selectedCode, true);
     localStorage.setItem("obyo_lang", selectedCode);
+    localStorage.setItem("obyo_manual_lang", "1");
     onClose();
     // Reload page to apply language changes globally
     setTimeout(() => {

@@ -56,32 +56,10 @@ interface Props {
   onDeleteDrawing?: (id: string) => void;
 }
 
+import { ASSET_DIGITS as CENTRAL_ASSET_DIGITS } from "@/lib/assets";
+
 const ASSET_DIGITS: Record<string, number> = {
-  "Crypto IDX": 2,
-  "AUD/CAD": 5,
-  "AUD/CAD (OTC)": 5,
-  "AUD/CHF": 5,
-  "AUD/CHF (OTC)": 5,
-  "AUD/DKK": 4,
-  "AUD/DKK (OTC)": 4,
-  "AUD/HUF": 3,
-  "AUD/HUF (OTC)": 3,
-  "AUD/JPY": 3,
-  "AUD/JPY (OTC)": 3,
-  "AUD/NOK": 4,
-  "AUD/NOK (OTC)": 4,
-  "AUD/NZD": 5,
-  "AUD/NZD (OTC)": 5,
-  "AUD/SEK": 4,
-  "AUD/SEK (OTC)": 4,
-  "AUD/SGD": 5,
-  "AUD/SGD (OTC)": 5,
-  "AUD/USD": 5,
-  "AUD/USD (OTC)": 5,
-  "AUD/ZAR": 4,
-  "AUD/ZAR (OTC)": 4,
-  "CAD/CHF": 5,
-  "CAD/CHF (OTC)": 5,
+  ...CENTRAL_ASSET_DIGITS,
 };
 
 /* ── Expiry countdown badge (rendered inside chart overlay) ─────────────── */
@@ -639,6 +617,7 @@ export function CandleChart({
     const live = agg[agg.length - 1];
     candlesRef.current = confirmed.slice(-INDICATOR_MAX);
     liveBucketRef.current = { ...live };
+    const wasEmpty = chartBarsRef.current === 0;
     chartBarsRef.current = agg.length;
     finalizedRef.current = 0;
     try {
@@ -654,7 +633,7 @@ export function CandleChart({
     if (showAligRef.current) updateAlligator();
     onCandlesRef.current?.([...candlesRef.current]);
     onPriceRef.current?.(live.close);
-    if (resetView) recenter();
+    if (resetView || wasEmpty) recenter();
     scheduleOverlayUpdate();
   };
 

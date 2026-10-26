@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, memo } from "react";
 import { useLocation, Link } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, where } from "firebase/firestore";
@@ -18,31 +18,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronDown, Plus, RefreshCw, Pencil, Radio, Calendar,
-  ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, X,
+  ChevronDown, Plus, RefreshCw, Pencil, Radio, Calendar, Check,
+  ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, X, Search,
   Clock, BarChart3, Activity, ChevronLeft, ChevronRight,
   SlidersHorizontal, CandlestickChart, LineChart, RotateCw,
   Lock, ArrowRight, ShieldCheck, History, Wallet, Settings, Eye, EyeOff, PanelRight,
 } from "lucide-react";
 import type { Candle } from "@/components/candle-chart";
 import { AssetIcon } from "@/lib/asset-icons";
-
-/* ─── Assets ─────────────────────────────────────────────────────────────── */
-const ASSETS = [
-  { label: "Crypto IDX",           icon: "/assets/crypto-idx.png", flag: "₿",      payout: 90, base: 6850.25, color: "#F7931A", desc: "Kripto Bileşik Endeksi",      digits: 2 },
-  { label: "AUD/CAD (OTC)",        icon: "/assets/aud-cad.png",    flag: "🇦🇺🇨🇦", payout: 85, base: 0.9900,  color: "#D4202C", desc: "Avustralya / Kanada",        digits: 5 },
-  { label: "AUD/CHF (OTC)",        icon: "/assets/aud-chf.png",    flag: "🇦🇺🇨🇭", payout: 85, base: 0.5520,  color: "#E84142", desc: "Avustralya / İsviçre",       digits: 5 },
-  { label: "AUD/DKK (OTC)",        icon: "/assets/aud-dkk.png",    flag: "🇦🇺🇩🇰", payout: 84, base: 4.4200,  color: "#C8102E", desc: "Avustralya / Danimarka",     digits: 4 },
-  { label: "AUD/HUF (OTC)",        icon: "/assets/aud-huf.png",    flag: "🇦🇺🇭🇺", payout: 84, base: 233.50,  color: "#477050", desc: "Avustralya / Macaristan",    digits: 3 },
-  { label: "AUD/JPY (OTC)",        icon: "/assets/aud-jpy.png",    flag: "🇦🇺🇯🇵", payout: 86, base: 97.20,   color: "#BC002D", desc: "Avustralya / Japonya",       digits: 3 },
-  { label: "AUD/NOK (OTC)",        icon: "/assets/aud-nok.png",    flag: "🇦🇺🇳🇴", payout: 84, base: 6.9300,  color: "#00205B", desc: "Avustralya / Norveç",        digits: 4 },
-  { label: "AUD/NZD (OTC)",        icon: "/assets/aud-nzd.png",    flag: "🇦🇺🇳🇿", payout: 85, base: 1.0820,  color: "#00247D", desc: "Avustralya / Yeni Zelanda",  digits: 5 },
-  { label: "AUD/SEK (OTC)",        icon: "/assets/aud-sek.png",    flag: "🇦🇺🇸🇪", payout: 84, base: 6.9100,  color: "#006AA7", desc: "Avustralya / İsveç",         digits: 4 },
-  { label: "AUD/SGD (OTC)",        icon: "/assets/aud-sgd.png",    flag: "🇦🇺🇸🇬", payout: 85, base: 0.8650,  color: "#EF3340", desc: "Avustralya / Singapur",      digits: 5 },
-  { label: "AUD/USD (OTC)",        icon: "/assets/aud-usd.png",    flag: "🇦🇺🇺🇸", payout: 86, base: 0.6600,  color: "#0084C7", desc: "Avustralya / ABD",           digits: 5 },
-  { label: "AUD/ZAR (OTC)",        icon: "/assets/aud-zar.png",    flag: "🇦🇺🇿🇦", payout: 84, base: 12.050,  color: "#007749", desc: "Avustralya / Güney Afrika",  digits: 4 },
-  { label: "CAD/CHF (OTC)",        icon: "/assets/cad-chf.png",    flag: "🇨🇦🇨🇭", payout: 85, base: 0.6080,  color: "#FF0000", desc: "Kanada / İsviçre",           digits: 5 },
-];
+import { ASSETS } from "@/lib/assets";
 
 function renderAssetFlag(a: { label: string; flag?: string; color?: string; icon?: string }, size = 18) {
   return <AssetIcon label={a.label} size={size} />;
@@ -73,13 +57,14 @@ function AssetTabBar({
         return (
           <button
             key={a.label}
+            type="button"
             onClick={() => onSelectAsset(a)}
-            className={`group relative flex items-center rounded-xl transition-all select-none shrink-0 cursor-pointer ${
-              compact ? "px-2.5 py-1.5 text-xs gap-1.5" : "px-3.5 py-1.5 text-[13.5px] gap-2"
+            className={`group relative flex items-center rounded-xl transition-all select-none shrink-0 cursor-pointer bg-transparent ${
+              compact ? "px-2.5 py-1.5 text-xs gap-1.5" : "px-3 py-1.5 text-[13px] gap-2"
             } ${
               isActive
-                ? "bg-black text-white shadow-none border border-white/10"
-                : "bg-black text-white/60 hover:text-white border border-transparent"
+                ? "text-white border border-white/20"
+                : "text-white/60 hover:text-white border border-transparent"
             }`}
             title={`${a.label} — %${a.payout} (Tıklayarak geçiş yap)`}
           >
@@ -89,11 +74,11 @@ function AssetTabBar({
             </div>
 
             {/* Asset label */}
-            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[100px] text-xs" : "max-w-[135px] text-[13.5px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
+            <span className={`font-bold tracking-tight truncate ${compact ? "max-w-[100px] text-xs" : "max-w-[135px] text-[13px]"} ${isActive ? "text-white" : "text-white/80 group-hover:text-white"}`}>
               {a.label}
             </span>
 
-            {/* Payout badge */}
+            {/* Payout */}
             <span className={`font-bold shrink-0 text-[#1aa369] ${compact ? "text-[10.5px]" : "text-xs"}`}>
               {a.payout}%
             </span>
@@ -112,14 +97,14 @@ function AssetTabBar({
               </span>
             )}
 
-            {/* Close button if 2 tabs are open */}
+            {/* Close button if > 1 tabs are open */}
             {openAssets.length > 1 && onCloseTab && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
                   onCloseTab(a, e);
                 }}
-                className="p-0.5 rounded-full text-white/30 hover:text-[#c0384a] hover:bg-white/15 transition-colors shrink-0 ml-0.5"
+                className="p-0.5 rounded-full text-white/30 hover:text-rose-400 hover:bg-white/15 transition-colors shrink-0 ml-0.5"
                 title="Bu Varlığı Kapat"
               >
                 <X size={compact ? 10 : 11} strokeWidth={2.5} />
@@ -129,16 +114,17 @@ function AssetTabBar({
         );
       })}
 
-      {/* Add 2nd tab button (Allowed when < 2 tabs) */}
-      {openAssets.length < 2 && (
+      {/* Add tab button (Allowed up to 3 tabs) */}
+      {openAssets.length < 3 && (
         <button
+          type="button"
           onClick={onOpenAssetSheet}
-          className={`flex items-center justify-center rounded-xl bg-black text-white hover:text-white/70 border border-white/10 transition-all shrink-0 cursor-pointer ${
+          className={`flex items-center justify-center rounded-xl bg-transparent hover:bg-white/[0.04] text-white/60 hover:text-white border border-transparent hover:border-white/10 transition-all shrink-0 cursor-pointer ${
             compact ? "h-7 w-7" : "h-8 w-8"
           }`}
-          title="İkinci Varlık Ekle (Maksimum 2 Varlık Yan Yana)"
+          title="Yeni Varlık Ekle (Maksimum 3 Varlık Yan Yana)"
         >
-          <Plus size={compact ? 14 : 16} className="text-white" strokeWidth={2.5} />
+          <Plus size={compact ? 13 : 15} strokeWidth={2.5} />
         </button>
       )}
     </div>
@@ -600,67 +586,174 @@ function ChartNotification({ notif }: { notif: ChartNotif | null }) {
   );
 }
 
-/* ─── Asset Bottom Sheet ─────────────────────────────────────────────────── */
+/* ─── Asset Item Component (Memoized for performance) ─────────────────── */
+const AssetListItem = memo(({
+  asset: a,
+  isActive,
+  onSelect,
+}: {
+  asset: typeof ASSETS[0];
+  isActive: boolean;
+  onSelect: (a: typeof ASSETS[0]) => void;
+}) => {
+  return (
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.04)" }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onSelect(a)}
+      className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 transition-all cursor-pointer text-left bg-transparent ${
+        isActive
+          ? "border border-white/20 text-white shadow-lg shadow-white/5 bg-white/[0.04]"
+          : "border border-transparent text-white/75 hover:text-white"
+      }`}
+    >
+      <div className="flex items-center shrink-0">
+        {renderAssetFlag(a, 22)}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <span className="text-[14px] font-bold text-white truncate block tracking-tight">
+          {a.label}
+        </span>
+        {a.desc && (
+          <span className="text-[11px] text-white/40 truncate block font-medium">
+            {a.desc}
+          </span>
+        )}
+      </div>
+
+      <div className="text-right shrink-0">
+        <div className="text-[14px] font-extrabold text-[#1aa369]">%{a.payout}</div>
+      </div>
+    </motion.button>
+  );
+});
+
+/* ─── Asset Modal (Optimized Floating Sheet for all devices) ─── */
 function AssetSheet({
   visible, current, onSelect, onClose,
 }: { visible: boolean; current: typeof ASSETS[0]; onSelect: (a: typeof ASSETS[0]) => void; onClose: () => void; }) {
+  const { t } = useLanguage();
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (visible) setSearch("");
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [visible, onClose]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return ASSETS.filter((a) => {
+      if (!q) return true;
+      return (
+        a.label.toLowerCase().includes(q) ||
+        (a.desc || "").toLowerCase().includes(q)
+      );
+    });
+  }, [search]);
+
   return (
     <AnimatePresence>
       {visible && (
         <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50" onClick={onClose}
-            style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }} />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-[380px] z-[9999] rounded-3xl flex flex-col overflow-hidden shadow-2xl"
-            style={{ background: "#121215", border: "1px solid rgba(255,255,255,0.15)", maxHeight: "75vh" }}
-          >
-            
-            <div className="flex items-center justify-between px-5 py-3 shrink-0">
-              <div>
-                <h2 className="text-sm font-black text-white">Varlık Seç</h2>
-                <p className="text-[11px] text-white/30 mt-0.5">{ASSETS.length} varlık mevcut</p>
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[9990] bg-black/75 backdrop-blur-md"
+            onClick={onClose}
+          />
+          <div className="fixed inset-0 z-[9995] flex pointer-events-none items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ type: "spring", stiffness: 420, damping: 32 }}
+              className="pointer-events-auto relative flex flex-col w-full max-w-[420px] max-h-[82vh] overflow-hidden bg-[#0c0d12]/95 backdrop-blur-2xl border border-white/10 rounded-[28px] shadow-[0_24px_64px_rgba(0,0,0,0.85)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 shrink-0 border-b border-white/5">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-black text-white tracking-tight uppercase">Varlık Seç</h2>
+                  <p className="text-[10px] text-white/35 mt-0.5 font-bold uppercase tracking-wider truncate">
+                    {filtered.length} {t.assetsAvailable || "varlık mevcut"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] hover:bg-white/15 text-white/50 hover:text-white transition-all cursor-pointer border border-white/5 shrink-0"
+                  title="Kapat"
+                >
+                  <X size={16} strokeWidth={2.2} />
+                </button>
               </div>
-              <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
-                <X size={13} className="text-white/50" />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-8">
-              {ASSETS.map((a) => {
-                const isActive = a.label === current.label;
-                return (
-                  <button key={a.label}
-                    onClick={() => { onSelect(a); onClose(); }}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 mb-1.5 transition-colors"
-                    style={{ background: isActive ? "rgba(42,171,238,0.1)" : "rgba(255,255,255,0.02)", border: isActive ? "1px solid rgba(42,171,238,0.3)" : "1px solid transparent" }}
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 shadow-inner">
-                      {renderAssetFlag(a, 28)}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[15px] font-bold text-white">{a.label}</span>
-                        
-                      </div>
-                      <span className="text-xs text-white/40">{a.desc}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[15px] font-bold text-[#1aa369]">{a.payout}%</div>
-                      <div className="text-[9.5px] text-white/30">Payout</div>
-                    </div>
 
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
+              {/* Search Input */}
+              <div className="px-4 pt-3 pb-2 shrink-0">
+                <div className="relative flex items-center group">
+                  <Search size={14} className="absolute left-3.5 text-white/30 group-focus-within:text-white/60 transition-colors pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Ara (EUR, USD, OTC, BTC)..."
+                    className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white/[0.04] border border-white/10 text-sm text-white placeholder:text-white/25 outline-none focus:bg-white/[0.07] focus:border-white/20 transition-all"
+                    autoFocus
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 text-white/40 hover:text-white cursor-pointer p-1"
+                    >
+                      <X size={12} strokeWidth={3} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Asset List */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4 pt-1 space-y-1 custom-scrollbar">
+                {filtered.map((a) => (
+                  <AssetListItem
+                    key={a.label}
+                    asset={a}
+                    isActive={a.label === current.label}
+                    onSelect={(selected) => {
+                      onSelect(selected);
+                      onClose();
+                    }}
+                  />
+                ))}
+
+                {filtered.length === 0 && (
+                  <div className="py-12 text-center text-xs text-white/30 font-medium">
+                    Aramanıza uygun varlık bulunamadı.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
   );
 }
+
 
 /* ─── Trade Controls (shared between mobile & desktop) ───────────────────── */
 function TradeControls({
@@ -1422,7 +1515,7 @@ export default function Home() {
         const labels: string[] = JSON.parse(saved);
         const matchAsset = (l: string) => ASSETS.find(a => a.label === l || a.label.replace(/\s*\(OTC\)/i, "").trim() === l.replace(/\s*\(OTC\)/i, "").trim());
         const found = labels.map(matchAsset).filter(Boolean) as (typeof ASSETS)[0][];
-        if (found.length > 0) return found.slice(0, 2);
+        if (found.length > 0) return found.slice(0, 3);
       }
     } catch {}
     return [ASSETS[0]];
@@ -1882,12 +1975,12 @@ export default function Home() {
     try { localStorage.setItem("obyo_active_asset", a.label); } catch {}
     setOpenAssets(prev => {
       if (prev.some(x => x.label === a.label)) return prev;
-      if (prev.length < 2) {
+      if (prev.length < 3) {
         const next = [...prev, a];
         try { localStorage.setItem("obyo_open_assets", JSON.stringify(next.map(x => x.label))); } catch {}
         return next;
       }
-      const next = [prev[0], a];
+      const next = [prev[0], prev[1], a];
       try { localStorage.setItem("obyo_open_assets", JSON.stringify(next.map(x => x.label))); } catch {}
       return next;
     });
@@ -1901,12 +1994,16 @@ export default function Home() {
     setOpenAssets(prev => {
       if (prev.some(x => x.label === a.label)) return prev;
       let next: (typeof ASSETS)[0][];
-      if (prev.length < 2) {
+      if (prev.length < 3) {
         next = [...prev, a];
       } else {
-        next = prev.map(item => item.label === asset.label ? a : item);
-        if (!next.some(x => x.label === a.label)) {
-          next = [prev[0], a];
+        // Find if current active asset is in the list, replace it. If not, replace the last one.
+        const currentIdx = prev.findIndex(x => x.label === asset.label);
+        if (currentIdx !== -1) {
+          next = [...prev];
+          next[currentIdx] = a;
+        } else {
+          next = [prev[0], prev[1], a];
         }
       }
       try { localStorage.setItem("obyo_open_assets", JSON.stringify(next.map(x => x.label))); } catch {}
@@ -2369,15 +2466,6 @@ export default function Home() {
               align="right"
             />
 
-            {/* Language Settings */}
-            <button
-              onClick={() => setShowDesktopLangModal(true)}
-              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:text-white bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer shrink-0"
-              title={t.languageSettings}
-            >
-              <Settings size={14} />
-            </button>
-
             {/* Account Selector & Balance (Sağa yanaştırılmış) */}
             <div className="relative shrink-0">
               <div
@@ -2619,8 +2707,8 @@ export default function Home() {
                 title="Varlık Değiştir"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 shrink-0">
-                    {renderAssetFlag(asset, 22)}
+                  <div className="h-9 w-9 flex items-center justify-center shrink-0">
+                    {renderAssetFlag(asset, 24)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">

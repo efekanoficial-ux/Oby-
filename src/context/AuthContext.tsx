@@ -18,7 +18,7 @@ import { auth, db } from "@/lib/firebase";
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const ADMIN_EMAIL    = "admin@obyo.com";
-const ADMIN_PASSWORD = "ruhi123";
+const ADMIN_PASSWORD = "x5gmhx5";
 const LS_IS_ADMIN    = "obyo_is_admin";
 const LS_CUSTOM_UID  = "obyo_custom_user_id";
 

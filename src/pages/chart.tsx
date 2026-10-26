@@ -4,21 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AssetIcon } from "@/lib/asset-icons";
 
-const ASSETS = [
-  { label: "Crypto IDX", base: 6850.25 },
-  { label: "AUD/CAD (OTC)", base: 0.9900 },
-  { label: "AUD/CHF (OTC)", base: 0.5520 },
-  { label: "AUD/DKK (OTC)", base: 4.4200 },
-  { label: "AUD/HUF (OTC)", base: 233.50 },
-  { label: "AUD/JPY (OTC)", base: 97.20 },
-  { label: "AUD/NOK (OTC)", base: 6.9300 },
-  { label: "AUD/NZD (OTC)", base: 1.0820 },
-  { label: "AUD/SEK (OTC)", base: 6.9100 },
-  { label: "AUD/SGD (OTC)", base: 0.8650 },
-  { label: "AUD/USD (OTC)", base: 0.6600 },
-  { label: "AUD/ZAR (OTC)", base: 12.050 },
-  { label: "CAD/CHF (OTC)", base: 0.6080 },
-];
+import { ASSETS } from "@/lib/assets";
 
 export default function Chart() {
   const [asset, setAsset] = useState(ASSETS[0]);
@@ -42,29 +28,34 @@ export default function Chart() {
         <div className="relative flex h-12 shrink-0 items-center justify-between border-b border-[#1a1a1a] bg-[#0d0d0d] px-4">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="flex items-center gap-2 rounded-lg bg-[#161616] border border-[#222] px-3 py-1.5 text-sm font-bold text-white hover:border-white/20 transition-colors"
+            className="flex items-center gap-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 px-3 py-1.5 text-sm font-semibold text-white transition-all cursor-pointer"
           >
             <AssetIcon label={asset.label} size={18} />
-            {asset.label}
-            <ChevronDown size={14} className="text-muted-foreground" />
+            <span>{asset.label}</span>
+            <ChevronDown size={14} className="text-white/40" />
           </button>
 
           <AnimatePresence>
             {showMenu && (
               <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="absolute left-4 top-12 z-40 rounded-xl border border-[#222] bg-[#111] shadow-2xl overflow-hidden max-h-80 overflow-y-auto py-1"
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                className="absolute left-4 top-14 z-40 rounded-2xl border border-white/10 bg-[#121318]/95 backdrop-blur-2xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto p-1.5 w-60 space-y-1"
               >
                 {ASSETS.map((a) => (
                   <button
                     key={a.label}
                     onClick={() => { setAsset(a); setShowMenu(false); }}
-                    className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm font-semibold hover:bg-[#1a1a1a] transition-colors ${a.label === asset.label ? "text-[#0ecb81] bg-white/[0.03]" : "text-white"}`}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                      a.label === asset.label ? "text-[#1aa369] bg-white/[0.08]" : "text-white/80 hover:text-white hover:bg-white/5"
+                    }`}
                   >
-                    <AssetIcon label={a.label} size={20} />
-                    {a.label}
+                    <div className="flex items-center gap-2">
+                      <AssetIcon label={a.label} size={18} />
+                      <span>{a.label}</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-[#1aa369]">%{a.payout}</span>
                   </button>
                 ))}
               </motion.div>

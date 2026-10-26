@@ -1253,12 +1253,30 @@ export function detectCountryLanguage(): string {
     return "English";
   }
   try {
-    // 1. Physical Country Timezone check (detects country location of the user)
+    // 1. Device / Browser Language (Device OS & Browser Settings)
+    const navLangs: string[] = [];
+    if (navigator.languages && navigator.languages.length > 0) {
+      navLangs.push(...navigator.languages);
+    }
+    if (navigator.language) {
+      navLangs.push(navigator.language);
+    }
+
+    for (const lang of navLangs) {
+      const l = (lang || "").toLowerCase();
+      if (l.startsWith("tr") || l.startsWith("az")) return "Türkçe";
+      if (l.startsWith("de")) return "Deutsch";
+      if (l.startsWith("es")) return "Español";
+      if (l.startsWith("ru") || l.startsWith("be") || l.startsWith("kk")) return "Русский";
+      if (l.startsWith("ar")) return "العربية";
+    }
+
+    // 2. Physical Region / Country Timezone (Physical Location)
     const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || "").toLowerCase();
     if (tz.includes("istanbul") || tz.includes("turkey") || tz.includes("ankara") || tz.includes("baku") || tz.includes("cyprus")) {
       return "Türkçe";
     }
-    if (tz.includes("berlin") || tz.includes("vienna") || tz.includes("zurich") || tz.includes("germany") || tz.includes("austria")) {
+    if (tz.includes("berlin") || tz.includes("vienna") || tz.includes("zurich") || tz.includes("germany") || tz.includes("austria") || tz.includes("busingen")) {
       return "Deutsch";
     }
     if (
@@ -1285,19 +1303,9 @@ export function detectCountryLanguage(): string {
       return "العربية";
     }
 
-    // 2. Browser languages list
-    const navLangs = navigator.languages && navigator.languages.length > 0
-      ? navigator.languages
-      : [navigator.language || ""];
-    
+    // 3. Fallback to English if device is en
     for (const lang of navLangs) {
-      const l = (lang || "").toLowerCase();
-      if (l.startsWith("tr") || l.startsWith("az")) return "Türkçe";
-      if (l.startsWith("de")) return "Deutsch";
-      if (l.startsWith("es")) return "Español";
-      if (l.startsWith("ru") || l.startsWith("be") || l.startsWith("kk")) return "Русский";
-      if (l.startsWith("ar")) return "العربية";
-      if (l.startsWith("en")) return "English";
+      if ((lang || "").toLowerCase().startsWith("en")) return "English";
     }
   } catch (e) {
     console.warn("Language detection error:", e);
