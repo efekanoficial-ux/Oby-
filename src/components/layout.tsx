@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift, ChevronLeft, ChevronRight, PanelLeft, RotateCcw } from "lucide-react";
+import { Clock, BarChart2, Wallet, Gem, ChevronDown, Bell, Settings, Phone, Check, Eye, EyeOff, Trophy, Gift, ChevronLeft, ChevronRight, PanelLeft, RotateCcw, Headphones } from "lucide-react";
 import { useDemoAccount } from "@/context/DemoAccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAccountMode, type AccMode } from "@/context/AccountModeContext";
@@ -10,6 +10,7 @@ import { NotificationsModal } from "@/components/notifications-modal";
 import { LanguageModal } from "@/components/language-modal";
 import { AnimatedBalance } from "@/components/animated-balance";
 import { useLanguage } from "@/context/LanguageContext";
+import { SupportModal } from "@/components/support-modal";
 
 export function initials(name?: string, surname?: string) {
   if (!name && !surname) return "OB";
@@ -457,7 +458,9 @@ function DesktopSidebar({
 export function CallRequestMenu({ buttonClass, iconSize = 15, align = "right" }: { buttonClass: string, iconSize?: number, align?: "left" | "right" }) {
   const [open, setOpen] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -480,56 +483,79 @@ export function CallRequestMenu({ buttonClass, iconSize = 15, align = "right" }:
   };
 
   return (
-    <div className="relative" ref={ref}>
-      <div
-        className={buttonClass}
-        title="Müşteri Hizmetleri"
-        onClick={() => setOpen(s => !s)}
-      >
-        <Phone size={iconSize} />
-      </div>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className={`fixed top-[64px] left-1/2 -translate-x-1/2 sm:absolute sm:top-full sm:left-auto sm:-right-2 sm:translate-x-0 mt-2 w-[calc(100vw-32px)] max-w-[320px] sm:w-64 rounded-2xl border border-white/10 bg-[#111] p-3 shadow-2xl z-50 sm:origin-top-right origin-top`}
-          >
-            {(!currentUser || currentUser.totalDeposited <= 0) ? (
-              <div className="py-2 px-1 text-center">
-                <p className="text-[11px] text-white/50 leading-relaxed mb-2">
-                  Aranma talebi oluşturabilmek için hesabınıza en az bir kez para yatırmış olmanız gerekmektedir.
-                </p>
-                <Link href="/wallet">
-                  <button onClick={() => setOpen(false)} className="w-full py-2 rounded-lg bg-white/10 text-white font-bold text-[10px] hover:bg-white/20 transition-colors">
-                    Yatırım Yap
-                  </button>
-                </Link>
-              </div>
-            ) : requested ? (
-              <div className="flex flex-col items-center justify-center py-3 gap-2">
-                <div className="h-8 w-8 rounded-full bg-[#0ecb81]/20 flex items-center justify-center text-[#0ecb81]">
-                  <Check size={16} />
+    <>
+      <div className="relative" ref={ref}>
+        <div
+          className={buttonClass}
+          title={t.customerService || "Müşteri Hizmetleri"}
+          onClick={() => setOpen(s => !s)}
+        >
+          <Phone size={iconSize} />
+        </div>
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className={`fixed top-[64px] left-1/2 -translate-x-1/2 sm:absolute sm:top-full sm:left-auto sm:-right-2 sm:translate-x-0 mt-2 w-[calc(100vw-32px)] max-w-[320px] sm:w-64 rounded-2xl border border-white/10 bg-[#111] p-3 shadow-2xl z-50 sm:origin-top-right origin-top flex flex-col gap-2`}
+            >
+              <p className="text-[11px] font-bold text-white/50 text-center mb-1">
+                {t.customerService || "Müşteri Hizmetleri"}
+              </p>
+
+              {/* Single Unified Uncolored Button for Customer Support */}
+              <button
+                onClick={() => {
+                  setShowSupportModal(true);
+                  setOpen(false);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Headphones size={15} className="text-white/70" />
+                <span>{t.customerServiceAndSupport || "Müşteri Hizmetleri & Canlı Destek"}</span>
+              </button>
+
+              <div className="h-px bg-white/10 my-0.5" />
+
+              {/* Phone Callback Option */}
+              {(!currentUser || currentUser.totalDeposited <= 0) ? (
+                <div className="py-1 px-1 text-center">
+                  <p className="text-[10px] text-white/40 leading-relaxed mb-1.5">
+                    {t.callRequestDepositNotice || "Telefonla aranma talebi için en az 1 kez yatırım yapmış olmalısınız."}
+                  </p>
+                  <Link href="/wallet">
+                    <button onClick={() => setOpen(false)} className="w-full py-1.5 rounded-lg bg-white/5 text-white/80 font-bold text-[10px] hover:bg-white/10 transition-colors">
+                      {t.depositBtn || "Yatırım Yap"}
+                    </button>
+                  </Link>
                 </div>
-                <p className="text-xs font-bold text-white text-center">Talebiniz Alındı</p>
-                <p className="text-[10px] text-white/50 text-center">Temsilcimiz en kısa sürede sizi arayacaktır.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-[11px] text-white/50 text-center mb-1">Müşteri hizmetleri tarafından aranmak ister misiniz?</p>
+              ) : requested ? (
+                <div className="flex flex-col items-center justify-center py-2 gap-1">
+                  <div className="h-6 w-6 rounded-full bg-[#0ecb81]/20 flex items-center justify-center text-[#0ecb81]">
+                    <Check size={14} />
+                  </div>
+                  <p className="text-[11px] font-bold text-white text-center">{t.callRequestReceived || "Talebiniz Alındı"}</p>
+                  <p className="text-[9.5px] text-white/50 text-center">{t.callRepresentativeSoon || "Temsilcimiz en kısa sürede sizi arayacaktır."}</p>
+                </div>
+              ) : (
                 <button
                   onClick={handleRequest}
-                  className="w-full py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition-colors"
+                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 font-bold text-[11px] transition-colors cursor-pointer"
                 >
-                  Aranma Talebi Oluştur
+                  {t.callMeRequest || "Sizi Arayalım (Telefon Talebi)"}
                 </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <SupportModal
+        visible={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+      />
+    </>
   );
 }
 

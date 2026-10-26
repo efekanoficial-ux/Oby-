@@ -189,8 +189,13 @@ router.post("/notify/telegram", async (req, res) => {
       `📋 <b>Durum:</b> ${isAutoVerified ? "✅ Otomatik Doğrulandı" : "⏳ Admin Onayı Bekliyor"}\n` +
       `⏰ <b>Tarih:</b> <code>${nowStr}</code>\n\n` +
       `👉 <i>Admin Paneli > Kullanıcılar sekmesinden kimlik belgelerini inceleyebilirsiniz.</i>`;
-  } else if (customMessage) {
-    htmlMessage = escHtml(customMessage);
+  } else if (type === "support" || customMessage) {
+    htmlMessage = customMessage ||
+      `💬 <b>YENİ CANLI DESTEK TALEBİ!</b> 💬\n\n` +
+      `👤 <b>Kullanıcı:</b> ${escHtml(userName || "Belirtilmedi")}\n` +
+      (userEmail ? `📧 <b>E-posta:</b> <code>${escHtml(userEmail)}</code>\n` : "") +
+      `⏰ <b>Tarih:</b> <code>${nowStr}</code>\n\n` +
+      `👉 <i>Admin Paneli > Canlı Destek sekmesinden talebi onaylayıp yanıt verebilirsiniz.</i>`;
   } else {
     res.status(400).json({ ok: false, error: "Geçersiz veya eksik bildirim tipi." });
     return;

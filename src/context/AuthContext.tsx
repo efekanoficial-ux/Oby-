@@ -381,7 +381,7 @@ interface AuthContextType {
   isRejectionViewed: (req: ObyoRequest) => boolean;
   markRejectionsAsViewed: (requestIds: string[]) => Promise<void>;
   triggerTelegramNotify: (payload: {
-    type: "deposit" | "withdraw" | "register" | "kyc" | "test";
+    type: "deposit" | "withdraw" | "register" | "kyc" | "support" | "test";
     userName?: string;
     userEmail?: string;
     amount?: number;
@@ -1689,7 +1689,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const triggerTelegramNotify = async (payload: {
-    type: "deposit" | "withdraw" | "register" | "kyc" | "test";
+    type: "deposit" | "withdraw" | "register" | "kyc" | "support" | "test";
     userName?: string;
     userEmail?: string;
     amount?: number;

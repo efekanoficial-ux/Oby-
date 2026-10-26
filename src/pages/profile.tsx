@@ -168,8 +168,8 @@ export default function Profile() {
             <h2 className="mt-1 text-xl font-black text-white">{displayName}</h2>
             <p className="mt-0.5 text-xs text-white/30">{displayEmail}</p>
 
-            {/* User ID */}
-            {currentUser && (
+            {/* User ID (Only if distinct from email and does not contain @) */}
+            {currentUser && currentUser.id && currentUser.id.toLowerCase() !== currentUser.email?.toLowerCase() && !currentUser.id.includes("@") && (
               <div className="mt-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <Hash size={9} className="text-white/25" />

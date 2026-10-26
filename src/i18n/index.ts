@@ -419,6 +419,23 @@ const tr = {
   wireTransferInstructions: "Lütfen belirtilen hesap bilgilerine transferinizi tamamladıktan sonra butona tıklayınız.",
   dailyPnlTitle: "Günlük sıfırlanan kâr / zarar",
   min6Chars: "En az 6 karakter",
+
+  // Support & Customer Representative
+  customerService: "Müşteri Hizmetleri",
+  customerServiceAndSupport: "Müşteri Hizmetleri & Canlı Destek",
+  callMeRequest: "Sizi Arayalım (Telefon Talebi)",
+  callRequestDepositNotice: "Telefonla aranma talebi için en az 1 kez yatırım yapmış olmalısınız.",
+  connectToAgent: "Müşteri Temsilcisine Bağlan",
+  welcomeLiveSupport: "Canlı destek hattına hoş geldiniz",
+  clickToConnectDesc: "Temsilciye bağlanmak ve mesajlaşmayı aktifleştirmek için aşağıdaki butona tıklayın.",
+  waitingForAgent: "Size uygun müşteri temsilcisi bekleniyor...",
+  unlocksOnApproval: "Müşteri hizmetleri onay verince mesajlaşabilirsiniz...",
+  busyMessage: "Müşteri hizmetlerimiz şu an yoğun, lütfen daha sonra tekrar deneyiniz.",
+  typeYourMessage: "Mesajınızı yazınız...",
+  sendMsg: "Gönder",
+  you: "Siz",
+  system: "Sistem",
+  agent: "Müşteri Temsilcisi",
 };
 
 const en: typeof tr = {
@@ -830,6 +847,23 @@ const en: typeof tr = {
   wireTransferInstructions: "Please click the button after completing your transfer to the specified account details.",
   dailyPnlTitle: "Daily reset profit / loss",
   min6Chars: "At least 6 characters",
+
+  // Support & Customer Representative
+  customerService: "Customer Service",
+  customerServiceAndSupport: "Customer Service & Live Support",
+  callMeRequest: "Request Callback (Phone)",
+  callRequestDepositNotice: "You must have made at least one deposit to request a callback.",
+  connectToAgent: "Connect to Support Agent",
+  welcomeLiveSupport: "Welcome to Live Support",
+  clickToConnectDesc: "Click the button below to connect with an agent and enable live chat.",
+  waitingForAgent: "Waiting for an available customer representative...",
+  unlocksOnApproval: "You can chat once customer support approves...",
+  busyMessage: "Our customer service is currently busy, please try again later.",
+  typeYourMessage: "Type your message...",
+  sendMsg: "Send",
+  you: "You",
+  system: "System",
+  agent: "Support Representative",
 };
 
 const de: typeof tr = {
@@ -1241,10 +1275,27 @@ const de: typeof tr = {
   wireTransferInstructions: "Bitte klicken Sie auf die Schaltfläche, nachdem Sie Ihre Überweisung auf das angegebene Konto abgeschlossen haben.",
   dailyPnlTitle: "Täglich zurückgesetzter Gewinn / Verlust",
   min6Chars: "Mindestens 6 Zeichen",
+
+  // Support & Customer Representative
+  customerService: "Kundenservice",
+  customerServiceAndSupport: "Kundenservice & Live-Support",
+  callMeRequest: "Rückruf anfordern (Telefon)",
+  callRequestDepositNotice: "Sie müssen mindestens eine Einzahlung getätigt haben, um einen Rückruf anzufordern.",
+  connectToAgent: "Mit Kundenberater verbinden",
+  welcomeLiveSupport: "Willkommen beim Live-Support",
+  clickToConnectDesc: "Klicken Sie auf die Schaltfläche unten, um sich mit einem Berater zu verbinden und den Chat zu aktivieren.",
+  waitingForAgent: "Warten auf einen verfügbaren Kundenberater...",
+  unlocksOnApproval: "Sie können chatten, sobald der Kundenservice zustimmt...",
+  busyMessage: "Unser Kundenservice ist derzeit ausgelastet. Bitte versuchen Sie es später erneut.",
+  typeYourMessage: "Nachricht eingeben...",
+  sendMsg: "Senden",
+  you: "Sie",
+  system: "System",
+  agent: "Kundenberater",
 };
-const es: typeof tr = { ...en, navHistory: "Historial", navTrade: "Operar", navBalance: "Saldo", navVip: "VIP / Perfil", upBtn: "SUBE", downBtn: "BAJA", selectAccount: "Seleccionar cuenta", demoAccount: "Cuenta Demo", realAccount: "Cuenta Real", tournamentAccount: "Cuenta de Torneo", tournamentTab: "Torneo", dailyRankingTab: "Clasificación Diaria", youTag: "TÚ", all: "Todos", winners: "Ganadores", losers: "Perdedores", cryptoCurrencies: "Criptomonedas", bankTransfer: "Transferencia bancaria", searchCryptoOrMethod: "Buscar cripto o método...", noDepositMethodFound: "No se encontró ningún método activo.", clearFilters: "Borrar filtros" };
-const ru: typeof tr = { ...en, navHistory: "История", navTrade: "Торговля", navBalance: "Баланс", navVip: "VIP / Профиль", upBtn: "BЫШЕ", downBtn: "НИЖЕ", selectAccount: "Выбрать счет", demoAccount: "Демо счет", realAccount: "Реальный счет", tournamentAccount: "Турнирный счет", tournamentTab: "Турнир", dailyRankingTab: "Ежедневный рейтинг", youTag: "ВЫ", all: "Все", winners: "Выигрыши", losers: "Проигрыши", cryptoCurrencies: "Криптовалюты", bankTransfer: "Банковский перевод", searchCryptoOrMethod: "Поиск криптовалюты или метода...", noDepositMethodFound: "Активные методы не найдены.", clearFilters: "Очистить фильтры" };
-const ar: typeof tr = { ...en, navHistory: "السجل", navTrade: "تداول", navBalance: "الرصيد", navVip: "VIP / الملف", upBtn: "أعلى", downBtn: "أسفل", selectAccount: "اختر الحساب", demoAccount: "حساب تجريبي", realAccount: "حساب حقيقي", tournamentAccount: "حساب البطولة", tournamentTab: "البطولة", dailyRankingTab: "الترتيب اليومي", youTag: "أنت", all: "الكل", winners: "الرابحة", losers: "الخاسرة", cryptoCurrencies: "العملات الرقمية", bankTransfer: "تحويل بنكي", searchCryptoOrMethod: "البحث عن عملة أو طريقة...", noDepositMethodFound: "لم يتم العثور على طريقة نشطة.", clearFilters: "إعادة ضبط الفلاتر" };
+const es: typeof tr = { ...en, navHistory: "Historial", navTrade: "Operar", navBalance: "Saldo", navVip: "VIP / Perfil", upBtn: "SUBE", downBtn: "BAJA", selectAccount: "Seleccionar cuenta", demoAccount: "Cuenta Demo", realAccount: "Cuenta Real", tournamentAccount: "Cuenta de Torneo", tournamentTab: "Torneo", dailyRankingTab: "Clasificación Diaria", youTag: "TÚ", all: "Todos", winners: "Ganadores", losers: "Perdedores", cryptoCurrencies: "Criptomonedas", bankTransfer: "Transferencia bancaria", searchCryptoOrMethod: "Buscar cripto o método...", noDepositMethodFound: "No se encontró ningún método activo.", clearFilters: "Borrar filtros", customerService: "Atención al Cliente", customerServiceAndSupport: "Atención al Cliente y Soporte en Vivo", callMeRequest: "Solicitar Llamada (Teléfono)", callRequestDepositNotice: "Debe haber realizado al menos un depósito para solicitar una llamada.", connectToAgent: "Conectar con Agente", welcomeLiveSupport: "Bienvenido al Soporte en Vivo", clickToConnectDesc: "Haga clic en el botón a continuación para conectarse con un agente y activar el chat.", waitingForAgent: "Esperando un representante de atención al cliente...", unlocksOnApproval: "Podrá chatear una vez que el soporte apruebe...", busyMessage: "Nuestro servicio al cliente está ocupado en este momento. Inténtelo más tarde.", typeYourMessage: "Escriba su mensaje...", sendMsg: "Enviar", you: "Usted", system: "Sistema", agent: "Representante de Soporte" };
+const ru: typeof tr = { ...en, navHistory: "История", navTrade: "Торговля", navBalance: "Баланс", navVip: "VIP / Профиль", upBtn: "BЫШЕ", downBtn: "НИЖЕ", selectAccount: "Выбрать счет", demoAccount: "Демо счет", realAccount: "Реальный счет", tournamentAccount: "Турнирный счет", tournamentTab: "Турнир", dailyRankingTab: "Ежедневный рейтинг", youTag: "ВЫ", all: "Все", winners: "Выигрыши", losers: "Проигрыши", cryptoCurrencies: "Криптовалюты", bankTransfer: "Банковский перевод", searchCryptoOrMethod: "Поиск криптовалюты или метода...", noDepositMethodFound: "Активные методы не найдены.", clearFilters: "Очистить фильтры", customerService: "Служба поддержки", customerServiceAndSupport: "Служба поддержки и Онлайн-чат", callMeRequest: "Заказать звонок (Телефон)", callRequestDepositNotice: "Для заказа звонка необходимо совершить хотя бы один депозит.", connectToAgent: "Связаться с оператором", welcomeLiveSupport: "Добро пожаловать в Онлайн-чат", clickToConnectDesc: "Нажмите кнопку ниже, чтобы связаться с оператором и активировать чат.", waitingForAgent: "Ожидание подходящего оператора поддержки...", unlocksOnApproval: "Вы сможете общаться после подтверждения службой поддержки...", busyMessage: "Наши операторы сейчас заняты, пожалуйста, попробуйте позже.", typeYourMessage: "Введите ваше сообщение...", sendMsg: "Отправить", you: "Вы", system: "Система", agent: "Оператор поддержки" };
+const ar: typeof tr = { ...en, navHistory: "السجل", navTrade: "تداول", navBalance: "الرصيد", navVip: "VIP / الملف", upBtn: "أعلى", downBtn: "أسفل", selectAccount: "اختر الحساب", demoAccount: "حساب تجريبي", realAccount: "حساب حقيقي", tournamentAccount: "حساب البطولة", tournamentTab: "البطولة", dailyRankingTab: "الترتيب اليومي", youTag: "أنت", all: "الكل", winners: "الرابحة", losers: "الخاسرة", cryptoCurrencies: "العملات الرقمية", bankTransfer: "تحويل بنكي", searchCryptoOrMethod: "البحث عن عملة أو طريقة...", noDepositMethodFound: "لم يتم العثور على طريقة نشطة.", clearFilters: "إعادة ضبط الفلاتر", customerService: "خدمة العملاء", customerServiceAndSupport: "خدمة العملاء والدعم المباشر", callMeRequest: "طلب اتصال (هاتف)", callRequestDepositNotice: "يجب عليك إيداع مبلغ مرة واحدة على الأقل لطلب إعادة الاتصال.", connectToAgent: "التواصل مع ممثل خدمة العملاء", welcomeLiveSupport: "مرحبًا بك في خدمة الدعم المباشر", clickToConnectDesc: "انقر على الزر أدناه للتواصل مع ممثل الخدمة وتفعيل المحادثة.", waitingForAgent: "في انتظار ممثل خدمة العملاء المناسب...", unlocksOnApproval: "يمكنك المراسلة بمجرد موافقة خدمة العملاء...", busyMessage: "خدمة العملاء لدينا مشغولة حاليًا، يرجى المحاولة مرة أخرى لاحقًا.", typeYourMessage: "اكتب رسالتك...", sendMsg: "إرسال", you: "أنت", system: "النظام", agent: "ممثل الدعم" };
 
 export const translationsMap = { tr, en, de, es, ru, ar };
 

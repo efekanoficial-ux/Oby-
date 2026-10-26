@@ -12,7 +12,7 @@ import {
   QrCode, CircleDollarSign, Eye, EyeOff, Search, AlertTriangle,
   FileText, Download, ZoomIn, ZoomOut, RotateCw, ExternalLink, Maximize2,
   Send, Bot, Bell, Key, Copy, CheckCheck, MessageSquare, Trophy,
-  Gift, Sparkles, Coins, GraduationCap
+  Gift, Sparkles, Coins, GraduationCap, Headphones
 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -30,8 +30,9 @@ import {
   deleteBonus,
 } from "@/lib/bonuses";
 import { AdminBonusesTab } from "@/components/admin/AdminBonusesTab";
+import { AdminSupportTab } from "@/components/admin/AdminSupportTab";
 
-type AdminTab  = "requests" | "users" | "tournaments" | "bonuses" | "settings" | "telegram";
+type AdminTab  = "requests" | "users" | "tournaments" | "bonuses" | "settings" | "telegram" | "support";
 type ReqFilter = "all" | "deposit" | "withdraw" | "pending";
 
 function StatusBadge({ status }: { status: ObyoRequest["status"] }) {
@@ -722,20 +723,24 @@ export default function Admin() {
         {([
           { id: "requests",    label: "İstekler",     badge: pendingCount },
           { id: "users",       label: "Kullanıcılar"                      },
+          { id: "support",     label: "Canlı Destek", isSupport: true     },
           { id: "tournaments", label: "Turnuvalar",   isTour: true        },
           { id: "bonuses",     label: "Bonuslar",     isBonus: true       },
           { id: "settings",    label: "Cüzdanlar"                         },
           { id: "telegram",    label: "Telegram",     isTelegram: true    },
-        ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean; isTour?: boolean; isBonus?: boolean }[]).map(t => {
+        ] as { id: AdminTab; label: string; badge?: number; isTelegram?: boolean; isTour?: boolean; isBonus?: boolean; isSupport?: boolean }[]).map(t => {
           const isActive = tab === t.id;
           const isTgConfigured = Boolean(formSettings.telegramBotToken?.trim() && formSettings.telegramChatId?.trim());
-          const activeColor = t.isTelegram ? "#2AABEE" : t.isTour ? "#A855F7" : t.isBonus ? "#FF6B00" : "#FF6B00";
+          const activeColor = t.isTelegram ? "#2AABEE" : t.isSupport ? "#0ecb81" : t.isTour ? "#A855F7" : t.isBonus ? "#FF6B00" : "#FF6B00";
           return (
             <button key={t.id} onClick={() => setTab(t.id as AdminTab)}
               className="flex items-center gap-1.5 justify-center py-3 px-4 text-xs font-black relative cursor-pointer select-none whitespace-nowrap flex-1 md:flex-none"
               style={{ color: isActive ? activeColor : "#555" }}>
               {t.isTelegram && (
                 <Send size={13} className={`shrink-0 ${isActive ? "text-[#2AABEE]" : "text-[#2AABEE]/60"}`} />
+              )}
+              {t.isSupport && (
+                <Headphones size={13} className={`shrink-0 ${isActive ? "text-[#0ecb81]" : "text-[#0ecb81]/60"}`} />
               )}
               {t.isTour && (
                 <Trophy size={13} className={`shrink-0 ${isActive ? "text-[#A855F7]" : "text-[#A855F7]/60"}`} />
@@ -2993,6 +2998,13 @@ export default function Admin() {
 
             </div>
 
+          </div>
+        )}
+
+        {/* ── SUPPORT tab ────────────────────────────────────────────────── */}
+        {tab === "support" && (
+          <div className="p-4">
+            <AdminSupportTab />
           </div>
         )}
 
